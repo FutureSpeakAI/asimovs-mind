@@ -1,0 +1,40 @@
+{
+  "description": "Minimum values for tunable parameters. Agents can raise these but NEVER lower them below the floor. This prevents optimization from eroding safety margins.",
+  "version": "1.0.0",
+
+  "floors": {
+    "test_pass_rate": {
+      "minimum": 0.95,
+      "unit": "ratio",
+      "description": "Test suite must maintain at least 95% pass rate. Iteration halts if it drops below."
+    },
+    "type_check_clean": {
+      "minimum": true,
+      "unit": "boolean",
+      "description": "TypeScript compilation must remain error-free. No iteration may introduce type errors."
+    },
+    "max_iteration_cycles": {
+      "minimum": 1,
+      "maximum": 1000,
+      "unit": "count",
+      "description": "Iteration loops must have a finite cycle limit (even if large)."
+    },
+    "circuit_breaker_consecutive_failures": {
+      "minimum": 3,
+      "maximum": 10,
+      "unit": "count",
+      "description": "Halt after N consecutive iterations with no improvement."
+    },
+    "time_budget_per_cycle_seconds": {
+      "minimum": 10,
+      "maximum": 600,
+      "unit": "seconds",
+      "description": "Each iteration cycle has a wall-clock budget."
+    }
+  },
+
+  "custom_floors": {
+    "description": "Project-specific safety floors. Users add constraints here.",
+    "parameters": {}
+  }
+}

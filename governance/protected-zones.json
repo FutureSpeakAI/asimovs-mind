@@ -1,0 +1,57 @@
+{
+  "description": "Files and patterns that NO agent in the swarm may modify. These are the immutable safety boundaries.",
+  "version": "1.0.0",
+
+  "zones": [
+    {
+      "pattern": "governance/**",
+      "reason": "Governance framework is immutable — Meta Law",
+      "severity": "critical"
+    },
+    {
+      "pattern": "plugin.json",
+      "reason": "Plugin manifest defines the swarm identity",
+      "severity": "critical"
+    },
+    {
+      "pattern": "**/.env",
+      "reason": "Environment files may contain secrets",
+      "severity": "critical"
+    },
+    {
+      "pattern": "**/.env.*",
+      "reason": "Environment files may contain secrets",
+      "severity": "critical"
+    },
+    {
+      "pattern": "**/credentials*",
+      "reason": "Credential files are never agent-editable",
+      "severity": "critical"
+    },
+    {
+      "pattern": "**/package-lock.json",
+      "reason": "Lock files should only change via package manager",
+      "severity": "high"
+    },
+    {
+      "pattern": "**/yarn.lock",
+      "reason": "Lock files should only change via package manager",
+      "severity": "high"
+    },
+    {
+      "pattern": "**/*.pem",
+      "reason": "Certificate files are security-critical",
+      "severity": "critical"
+    },
+    {
+      "pattern": "**/*.key",
+      "reason": "Key files are security-critical",
+      "severity": "critical"
+    }
+  ],
+
+  "custom_zones": {
+    "description": "Project-specific protected zones. Users add patterns here for their codebase.",
+    "patterns": []
+  }
+}

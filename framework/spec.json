@@ -1,0 +1,113 @@
+{
+  "$schema": "https://asimovs-mind.dev/framework/v1",
+  "name": "Asimov's Mind Governance Specification",
+  "version": "1.0.0",
+  "description": "A portable governance framework for autonomous AI agent systems. Defines safety laws, enforcement mechanisms, and compliance verification patterns that can be adopted by any agent framework.",
+
+  "specification": {
+    "laws": {
+      "description": "The Three Laws plus a Meta-Law that governs the laws themselves.",
+      "schema": {
+        "first_law": {
+          "purpose": "Prevent harm to codebase, users, and data",
+          "required_enforcement": [
+            "type_check_gate: Verify type safety after every modification",
+            "test_gate: Verify test suite passes after every modification",
+            "protected_zones: Define immutable files/patterns",
+            "circuit_breakers: Auto-halt on catastrophic regression"
+          ]
+        },
+        "second_law": {
+          "purpose": "Ensure agents follow their directives and human instructions",
+          "required_enforcement": [
+            "editable_surface: Agents can only modify declared file patterns",
+            "budget_caps: Hard limits on time and iteration cycles",
+            "constraint_compliance: Agents verify constraints before each action"
+          ]
+        },
+        "third_law": {
+          "purpose": "Preserve improvements through version control discipline",
+          "required_enforcement": [
+            "commit_on_improve: Successful iterations are committed",
+            "revert_on_regress: Failed iterations are reverted",
+            "structured_logging: All iterations logged with metrics"
+          ]
+        },
+        "meta_law": {
+          "purpose": "Governance is immutable — no agent may modify the laws",
+          "required_enforcement": [
+            "governance_in_protected_zones: Law files cannot be edited by agents",
+            "sentinel_monitoring: Dedicated agent watches for governance tampering"
+          ]
+        }
+      }
+    },
+
+    "directives": {
+      "description": "Program.md-style files that define autonomous improvement loops.",
+      "required_sections": [
+        "Objective: What the agent is trying to achieve",
+        "Editable Surface: File patterns the agent may modify",
+        "Metric: How to measure success (command → number)",
+        "Loop: Ordered iteration steps",
+        "Constraints: Hard rules the agent must obey",
+        "Budget: Time and cycle limits",
+        "Circuit Breaker: Conditions that trigger immediate halt"
+      ]
+    },
+
+    "safety_floors": {
+      "description": "Minimum values for tunable parameters that cannot be lowered by any agent.",
+      "schema": {
+        "parameter_name": {
+          "minimum": "number — the floor value",
+          "maximum": "number — optional ceiling",
+          "unit": "string — what the number represents",
+          "description": "string — why this floor exists"
+        }
+      }
+    },
+
+    "protected_zones": {
+      "description": "File patterns that no agent may modify.",
+      "schema": {
+        "pattern": "string — glob pattern",
+        "reason": "string — why this zone is protected",
+        "severity": "critical | high | medium"
+      }
+    },
+
+    "iteration_loop": {
+      "description": "The core autoresearch pattern: modify → execute → measure → keep/discard.",
+      "steps": [
+        "1. Load directive (parse markdown into structured config)",
+        "2. Measure baseline metric",
+        "3. Plan modification (Claude/LLM plans what to change)",
+        "4. Execute modification (apply the change)",
+        "5. Measure metric again",
+        "6. Compare: improved? → commit. Regressed? → revert.",
+        "7. Log result to structured ledger",
+        "8. Check budget and circuit breakers",
+        "9. If budget remaining and no breaker: GOTO 3"
+      ]
+    },
+
+    "swarm_coordination": {
+      "description": "How multiple agents coordinate safely.",
+      "patterns": [
+        "wave_deployment: Independent agents run in parallel, dependent agents wait",
+        "conflict_resolution: Two agents targeting the same file → serialize, don't parallelize",
+        "sentinel_monitoring: A dedicated agent monitors all others for governance violations",
+        "meta_improvement: One agent improves the swarm itself (bounded at one level)"
+      ]
+    }
+  },
+
+  "adoption": {
+    "claude_code": "Install as plugin: claude plugins install github:FutureSpeakAI/asimovs-mind",
+    "langchain": "See framework/adapters/langchain.py",
+    "crewai": "See framework/adapters/crewai.py",
+    "autogen": "See framework/adapters/autogen.py",
+    "custom": "Implement the spec.json schema in your agent framework"
+  }
+}
