@@ -2,7 +2,7 @@
 
 ### Every Claude Code instance becomes a node in a governed, self-improving software hivemind.
 
-A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. Ships with 17 agents, scales to N. 13 skills, 6 directives, 7 governance hooks, unified memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
+A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. The agent swarm scales to N -- 13 skills, 6 directives, 7 governance hooks, unified memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
@@ -74,7 +74,7 @@ Measure baseline
 +-- Loop
 ```
 
-Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across 17 agents and the entire GitHub ecosystem.
+Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across N agents and the entire GitHub ecosystem.
 
 ## Asimov's cLaws
 
@@ -151,7 +151,7 @@ The Workflow Observer watches your patterns and suggests automation -- but never
 
 ## The Swarm
 
-Ships with 17 agents, scales to N. The Swarm Coordinator dynamically discovers all agents (plugin + project-local) at the start of every cycle. The Meta-Improver creates new specialists when the swarm has capability gaps. You create them with `/create-agent`. Organized by function, deployed in coordinated waves:
+The agent swarm scales to N -- The Swarm Coordinator dynamically discovers all agents (plugin + project-local) at the start of every cycle. The Meta-Improver creates new specialists when the swarm has capability gaps. You create them with `/create-agent`. Organized by function, deployed in coordinated waves:
 
 **Discovery** -- GitScout (GitHub search + scoring), GitLoader (fetch + scan + adapt + integrate), Scout (web research + documentation)
 
@@ -207,7 +207,7 @@ asimovs-mind/
 |   +-- discovery-rules.json # cLaws extension for code import
 +-- personality/             # Agent Friday identity
 |   +-- friday.md            # Personality, modes, relationship model
-+-- agents/                  # 17 agents (scales to N)
++-- agents/                  # N agents (dynamic discovery + creation)
 +-- skills/                  # 13 user-invokable /commands
 +-- directives/              # 6 autoresearch-style loops
 +-- hooks/                   # 7 governance enforcement hooks

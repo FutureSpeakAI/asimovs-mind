@@ -88,7 +88,7 @@ The kernel is the same everywhere. The runtime (CLI, Electron, messaging) is a t
 
 What exists today:
 
-- 15 agents scaling to N (dynamic discovery + creation)
+- N agents (dynamic discovery + creation via Meta-Improver and /create-agent)
 - GitScout + GitLoader (GitHub code discovery pipeline)
 - Safety scanner (AST-based, Tier 1/2/3)
 - Provenance tracking (append-only ledger)
