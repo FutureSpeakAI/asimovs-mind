@@ -66,7 +66,7 @@ Measure baseline
 +-- Loop
 ```
 
-Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across 14 agents and the entire GitHub ecosystem.
+Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across our Asimov agent swarm and the entire GitHub ecosystem.
 
 ## Asimov's cLaws
 
