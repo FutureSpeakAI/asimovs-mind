@@ -1,18 +1,20 @@
 ---
 name: unleash
-description: "Start the full Asimov's Mind agent swarm on the current codebase. Deploys all 12 agents in coordinated waves to diagnose, fix, optimize, and improve."
+description: "Start the full Asimov's Mind agent swarm on the current codebase. Discovers all available agents (plugin + project-local) and deploys them in coordinated waves."
 user_invocable: true
 ---
 
-# /unleash — Deploy the Swarm
+# /unleash -- Deploy the Swarm
 
 Launch the Asimov's Mind swarm coordinator, which will:
 
-1. **Diagnose** the codebase (tests, types, performance, security, docs)
-2. **Deploy Wave 1** (parallel): Debugger + Optimizer + Auditor + Sentinel
-3. **Deploy Wave 2** (after Wave 1): Evolver + Documenter + Architect
-4. **Deploy Wave 3** (after Wave 2): Breeder + Librarian + Meta-Improver
-5. **Synthesize** all results into a comprehensive improvement report
+1. **Discover** all available agents (plugin agents + project-local `.asimovs-mind/agents/`)
+2. **Diagnose** the codebase (tests, types, performance, security, docs)
+3. **Deploy Wave 1** (parallel): Independent agents (diagnosis, scanning, fixing)
+4. **Deploy Wave 2** (after Wave 1): Dependent agents (improvement, evolution)
+5. **Deploy Wave 3** (after Wave 2): Meta-agents (self-improvement, memory, documentation)
+6. **Discovery** (conditional): GitScout + GitLoader if the swarm identifies unmet needs
+7. **Synthesize** all results into a comprehensive improvement report
 
 ## Usage
 

@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
-  "version": "0.2.0",
-  "description": "Governed Recursive Self-Improvement for AI Agent Swarms. Autoresearch-style iteration loops bounded by Asimov's cLaws. 14 specialized agents including GitScout and GitLoader for autonomous capability discovery from GitHub. Safety-scanned, provenance-tracked, governance-enforced code integration.",
+  "version": "0.3.0",
+  "description": "The governed software hivemind for Claude Code. N dynamically-discovered agents with GitHub-scale code discovery, bounded by immutable Asimov's cLaws. Ships with 15 agents, scales to N via Meta-Improver and /create-agent. Safety-scanned, provenance-tracked, governance-enforced.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"

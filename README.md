@@ -2,7 +2,7 @@
 
 ### Every Claude Code instance becomes a node in a governed, self-improving software hivemind.
 
-A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, and immutable safety governance. 14 specialized agents search, adapt, and integrate code from the open-source ecosystem -- bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
+A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, and immutable safety governance. Ships with 15 agents, scales to N -- the swarm grows as new specialists are created by the Meta-Improver or by you via `/create-agent`. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
@@ -121,7 +121,7 @@ Every Claude Code instance running this plugin can draw from the collective inte
 
 ## The Swarm
 
-14 agents organized by function, deployed in coordinated waves:
+Ships with 15 agents, scales to N. The Swarm Coordinator dynamically discovers all agents (plugin + project-local) at the start of every cycle. The Meta-Improver creates new specialists when the swarm has capability gaps. You create them with `/create-agent`. Organized by function, deployed in coordinated waves:
 
 **Discovery** -- GitScout (GitHub search + scoring), GitLoader (fetch + scan + adapt + integrate), Scout (web research + documentation)
 
@@ -129,7 +129,9 @@ Every Claude Code instance running this plugin can draw from the collective inte
 
 **Governance** -- Sentinel (cLaw enforcement + violation detection), Auditor (security scanning + dependency auditing)
 
-**Infrastructure** -- Swarm Coordinator (wave orchestration), Documenter (docs sync), Librarian (cross-session memory), Meta-Improver (swarm self-improvement, bounded by Meta-Law)
+**Infrastructure** -- Swarm Coordinator (wave orchestration), Documenter (docs sync), Librarian (cross-session memory), Meta-Improver (swarm self-improvement + agent creation, bounded by Meta-Law)
+
+**Your agents** -- `/create-agent CSS layout specialist` writes a new agent to `.asimovs-mind/agents/` in your project. The Coordinator discovers it on the next cycle. The swarm grows to fit the work.
 
 ## Portable Governance
 
@@ -164,8 +166,8 @@ asimovs-mind/
 |   +-- protected-zones.json # Untouchable file patterns
 |   +-- safety-floors.json   # Minimums that cannot be lowered
 |   +-- discovery-rules.json # cLaws extension for code import
-+-- agents/                  # 14 specialized agents
-+-- skills/                  # 8 user-invokable /commands
++-- agents/                  # 15 agents (scales to N)
++-- skills/                  # 9 user-invokable /commands
 +-- directives/              # 6 autoresearch-style loops
 +-- discovery/               # GitScout + GitLoader tooling
 |   +-- safety_scanner.py    # AST-based static analysis
