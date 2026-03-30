@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
   "version": "1.0.0-beta",
-  "description": "Agent Friday's kernel for Claude Code. The governed software hivemind. Ships with 17 agents (scales to N), 12 skills, 6 directives, 7 governance hooks. Personality, onboarding, session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
+  "description": "Agent Friday's kernel for Claude Code. The governed software hivemind. Ships with 17 agents (scales to N), 13 skills, 6 directives, 7 governance hooks, unified memory system. Personality, onboarding, tribal knowledge (/remember), session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"
