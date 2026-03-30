@@ -147,6 +147,30 @@ def main():
         integrity = config.get("governance_integrity", "unknown")
         lines.append(f"Federation: {agent_count} agents discovered, governance integrity {integrity}.")
 
+    # Memory system context — what Friday remembers
+    try:
+        sys.path.insert(0, str(PLUGIN_ROOT / "discovery"))
+        from memory import get_status, get_all_trust
+        status = get_status()
+        if status.get("total_evidence", 0) > 0:
+            trust_data = get_all_trust(min_confidence=0.1)
+            high_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) >= 0.8]
+            low_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) < 0.5]
+
+            memory_parts = [f"Memory: {status['total_evidence']} observations"]
+            if high_trust:
+                names = ", ".join(e for e, _ in high_trust[:3])
+                memory_parts.append(f"trusted: {names}")
+            if low_trust:
+                names = ", ".join(e for e, _ in low_trust[:3])
+                memory_parts.append(f"caution: {names}")
+            if status.get("graph_nodes", 0) > 0:
+                memory_parts.append(f"{status['graph_nodes']} entities tracked")
+
+            lines.append(". ".join(memory_parts) + ".")
+    except (ImportError, Exception):
+        pass  # Memory system not available — skip gracefully
+
     output = "\n".join(lines)
     if output.strip():
         print(output)

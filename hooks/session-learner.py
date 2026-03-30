@@ -173,6 +173,28 @@ def main():
         update_recent_sessions(record)
         append_to_history(record)
 
+        # Feed evidence into the unified memory system
+        try:
+            sys.path.insert(0, str(PLUGIN_ROOT / "discovery"))
+            from memory import record_evidence, record_co_occurrence
+
+            # Record session evidence with file co-occurrence
+            record_evidence(
+                "session", "session",
+                "positive" if git_commits > 0 else "neutral",
+                record.get("summary", ""),
+                dimensions={"files_modified": sorted(files_modified)[:20]},
+            )
+
+            # Record file co-occurrence for the knowledge graph
+            if len(files_modified) > 1:
+                record_co_occurrence(
+                    sorted(files_modified)[:20],
+                    context=record.get("summary", ""),
+                )
+        except (ImportError, Exception):
+            pass  # Memory system not available — skip gracefully
+
         # Clear the ledger for the next session
         clear_ledger()
 

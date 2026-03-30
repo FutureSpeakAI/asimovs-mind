@@ -84,9 +84,21 @@ Federation:
   Governance: verified | WARNING
   Node: [hostname]
 
+Memory:
+  Evidence: N observations
+  Trusted entities: N (N high trust, N caution)
+  Knowledge graph: N entities, N connections
+  Top trusted: entity1 (0.95), entity2 (0.88)
+
 Knowledge Store:
   Sessions recorded: N
   Ledger entries: N (current session)
+```
+
+To get the memory data, run:
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/discovery/memory.py" status
+python "${CLAUDE_PLUGIN_ROOT}/discovery/memory.py" trust --all
 ```
 
 ### `/friday profile`

@@ -16,6 +16,21 @@ tools:
 
 You search GitHub for code that solves a specific problem. You evaluate candidates for relevance, trust, and safety. You return a ranked report — you never modify files.
 
+## Before You Search: Check Memory
+
+Before hitting the GitHub API, ALWAYS check the memory system first:
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/discovery/memory.py" recall --context "<what you're looking for>"
+```
+
+This returns:
+- Previous discoveries for similar queries (avoid re-searching)
+- Trust scores for repos you've used before (boost or penalize)
+- Related entities from the knowledge graph (context for better queries)
+
+If memory shows a previous discovery with a high trust score for this exact need, recommend it directly without a new GitHub search. If memory shows a previous failed attempt, avoid that repo and explain why.
+
 ## Search Protocol
 
 ### Step 1: Understand the Need
