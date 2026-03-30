@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
-  "version": "0.3.0",
-  "description": "The governed software hivemind for Claude Code. N dynamically-discovered agents with GitHub-scale code discovery, bounded by immutable Asimov's cLaws. Ships with 15 agents, scales to N via Meta-Improver and /create-agent. Safety-scanned, provenance-tracked, governance-enforced.",
+  "version": "1.0.0-beta",
+  "description": "Agent Friday's kernel for Claude Code. The governed software hivemind. Ships with 17 agents (scales to N), 11 skills, 6 directives, 7 governance hooks. Personality, onboarding, session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"
