@@ -2,7 +2,7 @@
 
 ### Every Claude Code instance becomes a node in a governed, self-improving software hivemind.
 
-A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, and immutable safety governance. Ships with 15 agents, scales to N -- the swarm grows as new specialists are created by the Meta-Improver or by you via `/create-agent`. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
+A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. Ships with 17 agents, scales to N. 13 skills, 6 directives, 7 governance hooks, unified memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
@@ -41,15 +41,17 @@ claude plugin install asimovs-mind
 ```bash
 /discover a retry mechanism with exponential backoff   # the hivemind moment
 /unleash                                               # deploy the full swarm
-/iterate fix-tests                                     # autoresearch loop on test failures
-/iterate discover                                      # autonomous GitHub code discovery
-/breed "code review specialist"                        # evolve a specialized local model
-/evolve "You are a helpful assistant..."               # judge-scored prompt improvement
+/iterate fix-tests                                     # autoresearch loop
+/onboard                                               # meet Agent Friday
+/friday mode creative                                  # switch modes
+/remember the auth uses JWT in httpOnly cookies         # teach Friday
+/federate init                                         # join the hivemind
+/create-agent CSS layout specialist                    # grow the swarm
+/breed "code review specialist"                        # spawn a local model
+/evolve "You are a helpful assistant..."               # evolve a prompt
 /diagnose                                              # codebase health check
-/govern verify                                         # governance compliance audit
+/govern verify                                         # governance audit
 ```
-
-The `/discover` command is the one that changes things. Your agent searches the entire GitHub ecosystem for solutions, safety-scans candidates with AST analysis, scores them by trust, adapts them to your project's conventions, integrates the best match, runs tests, and records full provenance. One command. Fully autonomous. Fully governed.
 
 ## How it works
 
@@ -72,7 +74,7 @@ Measure baseline
 +-- Loop
 ```
 
-Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across our Asimov agent swarm and the entire GitHub ecosystem.
+Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across 17 agents and the entire GitHub ecosystem.
 
 ## Asimov's cLaws
 
@@ -106,11 +108,25 @@ Our research quantified what happens without it. Ungoverned agents crashed on 56
 
 Governance is not a tradeoff against performance. It is a precondition for it.
 
+## The Memory
+
+Trust graph. Knowledge graph. Vectorless RAG. One system, three views.
+
+Every session feeds the memory. Every discovery updates trust scores. Every file modification strengthens the knowledge graph. Friday doesn't just act -- it remembers.
+
+**Trust Graph** -- Multi-dimensional scoring of repos and agents, backed by evidence with time decay. When GitScout searches GitHub, it checks memory first. When an imported component breaks tests two weeks later, the trust score drops. Hermeneutic re-evaluation: every score is recomputed from all evidence, not incrementally updated. Drift is impossible.
+
+**Knowledge Graph** -- Entity co-occurrence built from session patterns. Files that change together are related. After 15 sessions, Friday knows which files cluster and checks them first when you report a bug.
+
+**Vectorless RAG** -- Context retrieval without embeddings or vector databases. Relevance is computed from entity matching, co-occurrence, evidence recency, and trust scores. When Ollama is available locally, semantic embeddings layer on top -- but the base system works everywhere with zero dependencies.
+
+**Tribal Knowledge** -- `/remember the payments API rate limits at 100 req/min`. Memories persist in `.asimovs-mind/knowledge/memories.json`, propagate through git, and surface automatically when Friday works on something related. One engineer teaches Friday, the whole team benefits.
+
 ## Capability Discovery: The Hivemind
 
 Every Claude Code instance running this plugin can draw from the collective intelligence of open source. GitScout and GitLoader are the mechanism.
 
-**GitScout** searches the GitHub API, scores candidates by relevance and trust, and returns ranked recommendations. **GitLoader** fetches the top candidate, runs AST safety analysis, adapts the code to your project's conventions, records provenance, integrates it, and runs verification.
+**GitScout** searches the GitHub API, checks the memory system first (avoids re-searching, surfaces previous trust data), scores candidates by relevance and trust, and returns ranked recommendations. **GitLoader** fetches the top candidate, runs AST safety analysis, adapts the code to your project's conventions, records provenance, integrates it, and runs verification.
 
 **Trust tiers** ensure proportional caution:
 
@@ -125,19 +141,35 @@ Every Claude Code instance running this plugin can draw from the collective inte
 
 **Provenance** is permanent. Every integration carries an attribution comment (source repo, commit SHA, license, trust scores) and is logged to an append-only ledger. The history cannot be rewritten.
 
+## Agent Friday Lives Here
+
+This is not a generic coding assistant. When you run `/onboard`, you meet Friday -- a personality with opinions, taste, and the ability to earn your trust over time.
+
+Five modes: focus (silent executor), partner (thinks aloud, the default), teacher (explains everything), creative (makes media, takes risks), sentinel (paranoid security). The mode is visible. You control it. The governance does not change.
+
+The Workflow Observer watches your patterns and suggests automation -- but never assumes permission. The Creative agent generates contextual media when the moment calls for it. The unified memory powers all of it -- every session, Friday opens knowing what you worked on last, which repos have been reliable, and which agents perform best.
+
 ## The Swarm
 
-Ships with 15 agents, scales to N. The Swarm Coordinator dynamically discovers all agents (plugin + project-local) at the start of every cycle. The Meta-Improver creates new specialists when the swarm has capability gaps. You create them with `/create-agent`. Organized by function, deployed in coordinated waves:
+Ships with 17 agents, scales to N. The Swarm Coordinator dynamically discovers all agents (plugin + project-local) at the start of every cycle. The Meta-Improver creates new specialists when the swarm has capability gaps. You create them with `/create-agent`. Organized by function, deployed in coordinated waves:
 
 **Discovery** -- GitScout (GitHub search + scoring), GitLoader (fetch + scan + adapt + integrate), Scout (web research + documentation)
 
-**Improvement** -- Debugger (test repair), Optimizer (performance), Evolver (prompt engineering), Breeder (Ollama model evolution), Architect (structural analysis)
+**Improvement** -- Debugger (test repair), Optimizer (performance), Evolver (prompt engineering), Breeder (Ollama model evolution), Architect (structural analysis), Creative (contextual media generation)
 
 **Governance** -- Sentinel (cLaw enforcement + violation detection), Auditor (security scanning + dependency auditing)
 
-**Infrastructure** -- Swarm Coordinator (wave orchestration), Documenter (docs sync), Librarian (cross-session memory), Meta-Improver (swarm self-improvement + agent creation, bounded by Meta-Law)
+**Learning** -- Librarian (cross-session memory, CLAUDE.md management), Workflow Observer (pattern recognition, automation proposals)
+
+**Infrastructure** -- Swarm Coordinator (wave orchestration), Documenter (docs sync), Meta-Improver (swarm self-improvement + agent creation, bounded by Meta-Law)
 
 **Your agents** -- `/create-agent CSS layout specialist` writes a new agent to `.asimovs-mind/agents/` in your project. The Coordinator discovers it on the next cycle. The swarm grows to fit the work.
+
+## The Federation
+
+Every developer running this plugin on a shared repo is a node. One node discovers a retry handler via `/discover`, safety-scans it, integrates it, commits with provenance. Every other node pulls those improvements and inherits the trust scores. Agent definitions created via `/create-agent` propagate the same way. Tribal knowledge from `/remember` propagates the same way. The swarm grows across machines.
+
+The governance travels with the code. The HMAC-signed manifest detects tampering. The cLaws are the same on every node. The memory system travels with the federation -- trust scores, knowledge graph, and tribal knowledge all propagate through git.
 
 ## Portable Governance
 
@@ -166,26 +198,38 @@ Autoresearch-style improvement loops, each defining an objective, metric, editab
 
 ```
 asimovs-mind/
-+-- plugin.json              # Claude Code plugin manifest (v0.2.0)
++-- plugin.json              # Claude Code plugin manifest (v1.0.0-beta)
++-- .claude-plugin/           # Marketplace wrapper for installation
 +-- governance/              # Asimov's cLaws (immutable)
 |   +-- laws.json            # Three Laws + Meta-Law
 |   +-- protected-zones.json # Untouchable file patterns
 |   +-- safety-floors.json   # Minimums that cannot be lowered
 |   +-- discovery-rules.json # cLaws extension for code import
-+-- agents/                  # 15 agents (scales to N)
-+-- skills/                  # 9 user-invokable /commands
++-- personality/             # Agent Friday identity
+|   +-- friday.md            # Personality, modes, relationship model
++-- agents/                  # 17 agents (scales to N)
++-- skills/                  # 13 user-invokable /commands
 +-- directives/              # 6 autoresearch-style loops
-+-- discovery/               # GitScout + GitLoader tooling
++-- hooks/                   # 7 governance enforcement hooks
+|   +-- first-law.py         # PreToolUse: protected zone enforcement
+|   +-- third-law.py         # PostToolUse: session ledger
+|   +-- safety-scanner-hook.py # PreToolUse: AST scan on code write
+|   +-- personality-loader.py  # SessionStart: loads personality + memory
+|   +-- session-learner.py     # Stop: extracts learnings, feeds memory
+|   +-- integrity-check.py    # SessionStart: HMAC governance verification
+|   +-- trust-tracker.py      # PostToolUse: agent performance tracking
++-- discovery/               # Discovery + memory system
 |   +-- safety_scanner.py    # AST-based static analysis
 |   +-- provenance.py        # Attribution + tracking CLI
+|   +-- memory.py            # Unified trust graph + knowledge graph + RAG
 +-- framework/               # Portable governance spec + adapters
 ```
 
 ## Credits
 
-**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, GitScout, GitLoader, and the capability discovery system.
+**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, the unified memory system, GitScout, GitLoader, and the capability discovery system.
 
-**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the self-improvement engines, and the GitLoader architecture that this plugin builds upon.
+**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the trust graph, the self-improvement engines, and the GitLoader architecture that this plugin builds upon.
 
 **[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy is the foundation -- the elegant modify-measure-keep/discard loop that started it all. We took the pattern, proved governance improves it, and extended it to ecosystem scale.
 

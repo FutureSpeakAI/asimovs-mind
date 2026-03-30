@@ -2,7 +2,7 @@
 
 ### From Claude Code plugin to the Agent Friday kernel
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin (v0.3.0, where we are now) to the portable intelligence and governance kernel that powers Agent Friday across every runtime.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v1.0.0-beta.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
 
