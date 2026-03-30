@@ -1,0 +1,14 @@
+{
+  "name": "asimovs-mind-marketplace",
+  "owner": {
+    "name": "FutureSpeak.AI",
+    "url": "https://github.com/FutureSpeakAI"
+  },
+  "plugins": [
+    {
+      "name": "asimovs-mind",
+      "source": ".",
+      "description": "The governed software hivemind for Claude Code. N dynamically-discovered agents with GitHub-scale code discovery, bounded by immutable Asimov's cLaws."
+    }
+  ]
+}

@@ -27,7 +27,13 @@ The data is real. The experiments are reproducible. Paper and code: [asimovs-min
 ## Install
 
 ```bash
-claude plugins add github:FutureSpeakAI/asimovs-mind
+# Add the marketplace
+claude plugin marketplace add FutureSpeakAI/asimovs-mind
+
+# Install the plugin
+claude plugin install asimovs-mind
+
+# Restart Claude Code to activate
 ```
 
 ## See it in action
