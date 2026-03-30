@@ -1,14 +1,28 @@
 # Asimov's Mind
 
-### Governed Recursive Self-Improvement for AI Agent Swarms
+### Every Claude Code instance becomes a node in a governed, self-improving software hivemind.
 
-A Claude Code plugin that deploys a swarm of 14 specialized AI agents to autonomously debug, optimize, and improve any codebase -- bounded by **Asimov's cLaws**, a governance framework that makes autonomous AI agents safe, accountable, and effective.
+A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, and immutable safety governance. 14 specialized agents search, adapt, and integrate code from the open-source ecosystem -- bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
-With **GitScout** and **GitLoader**, your agent can search the entire GitHub ecosystem for solutions, safety-scan them with AST analysis, and integrate them into your project -- turning Claude Code into a node of a software hivemind.
-
-Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
+Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
 ---
+
+## We tested this. Here is what happened.
+
+Karpathy's autoresearch introduced a powerful pattern: an LLM agent modifies code, trains for 5 minutes, measures the result, keeps improvements, reverts regressions, and loops. Elegant. But a single ungoverned agent hits limits fast -- it crashes, it degrades, it explores the same dimensions repeatedly.
+
+We took that pattern, added governance, and deployed it across a coordinated swarm. Then we ran controlled experiments comparing ungoverned vs. governed agents on identical hardware and tasks:
+
+| | Ungoverned | Governed Single | Governed Swarm |
+|---|:-:|:-:|:-:|
+| **Crash rate** | 56% | 22% | 25% |
+| **Degradation per step** | 0.035 | 0.018 | 0.011 |
+| **Explored architecture** | No | No | Yes |
+
+Governance cut crashes in half. The governed swarm degraded 3x slower during sustained exploration. And the swarm's specialist architect agent was the only one to discover an architectural improvement that generalist agents never even tried.
+
+The data is real. The experiments are reproducible. Paper and code: [asimovs-mind-research](https://github.com/FutureSpeakAI/asimovs-mind-research)
 
 ## Install
 
@@ -16,181 +30,156 @@ Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Inspired by [Karpat
 claude plugins add github:FutureSpeakAI/asimovs-mind
 ```
 
-That's it. The swarm is ready.
-
-## Quick Start
+## See it in action
 
 ```bash
-# Search GitHub for code and integrate it safely
-/discover a retry mechanism with exponential backoff
-
-# Deploy the full swarm on your codebase
-/unleash
-
-# Run a specific improvement loop
-/iterate fix-tests
-
-# Breed a specialized local model
-/breed "code review specialist"
-
-# Evolve a system prompt
-/evolve "You are a helpful assistant..."
-
-# Check codebase health
-/diagnose
-
-# View governance rules
-/govern
+/discover a retry mechanism with exponential backoff   # the hivemind moment
+/unleash                                               # deploy the full swarm
+/iterate fix-tests                                     # autoresearch loop on test failures
+/iterate discover                                      # autonomous GitHub code discovery
+/breed "code review specialist"                        # evolve a specialized local model
+/evolve "You are a helpful assistant..."               # judge-scored prompt improvement
+/diagnose                                              # codebase health check
+/govern verify                                         # governance compliance audit
 ```
 
-## Capability Discovery: GitScout + GitLoader
+The `/discover` command is the one that changes things. Your agent searches the entire GitHub ecosystem for solutions, safety-scans candidates with AST analysis, scores them by trust, adapts them to your project's conventions, integrates the best match, runs tests, and records full provenance. One command. Fully autonomous. Fully governed.
 
-The discovery system lets your agent search GitHub for existing solutions and safely integrate them. Instead of writing everything from scratch, your agent stands on the shoulders of the open-source community.
+## How it works
 
-Type `/discover a SOAP optimizer for PyTorch` and the pipeline runs: GitScout searches GitHub, scores by relevance + trust, GitLoader fetches the code, the safety scanner runs AST analysis, the adapter extracts and transforms the component, provenance is recorded, tests are run, and the result is kept or reverted.
+We took autoresearch's core loop and extended it in three directions: governance, specialization, and ecosystem-scale discovery.
 
-**Trust Tiers:** Verified repos (known authors, MIT license) integrate directly. Community repos get 1 quarantine test cycle. Experimental repos get 2. Untrusted repos are blocked.
+```
+Measure baseline
+    |
++-> Plan modification (agent reasoning)
+|   |
+|   Perform modification
+|   |
+|   Measure again
+|   |
+|   Improved? -> git commit -> continue
+|   Regressed? -> git revert -> try different approach
+|   |
+|   Budget or circuit breaker? -> halt
+|   |
++-- Loop
+```
 
-**Safety Scanner:** AST-based static analysis that HARD_BLOCKs process spawning, network calls at import time, destructive file operations, and blocked imports. SOFT_BLOCKs unsafe deserialization and global state mutation.
-
-**Provenance:** Every integration gets an immutable attribution comment (source repo, license, trust scores) and is logged to an append-only provenance ledger.
-
-## The Swarm
-
-14 specialized agents that work in parallel waves:
-
-| Agent | Role | Capability |
-|-------|------|------------|
-| **Swarm Coordinator** | Brain | Diagnoses, prioritizes, deploys agents in waves |
-| **GitScout** | Discovery | Searches GitHub for code, scores relevance + trust |
-| **GitLoader** | Integration | Fetches, safety-scans, adapts, and integrates code |
-| **Debugger** | Test Fixer | Autonomous test repair and type error resolution |
-| **Optimizer** | Performance | Startup parallelization, async I/O, memory leaks |
-| **Evolver** | Prompt Engineer | Iterative prompt improvement via judge-scored evolution |
-| **Breeder** | Model Factory | Creates specialized Ollama models via Modelfile evolution |
-| **Auditor** | Security | OWASP Top 10 scanning, dependency auditing |
-| **Documenter** | Documentation | Keeps docs in sync with code changes |
-| **Sentinel** | Governance | Monitors all agents for law compliance |
-| **Librarian** | Memory | Cross-session learning, CLAUDE.md management |
-| **Scout** | Research | Web search, documentation lookup, tech discovery |
-| **Architect** | Architecture | Structural analysis, refactoring plans |
-| **Meta-Improver** | Self-Improvement | Improves the swarm itself (bounded recursion) |
+Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across 14 agents and the entire GitHub ecosystem.
 
 ## Asimov's cLaws
 
-The governance framework at the heart of Asimov's Mind. Three Laws plus a Meta-Law that constrain every agent, every action, every integration. They cannot be bypassed, overridden, or optimized away.
+Governance is not a constraint on autonomy. It is what enables autonomy at scale.
+
+The reason autonomous recursive self-improvement has not been deployed widely is trust. Ungoverned agents break things -- our experiments proved it quantitatively. Asimov's cLaws solve this structurally: not guardrails bolted on after the fact, but governance woven into every agent, every action, every integration.
 
 **First Law -- Do No Harm**
 > An agent shall not, through action or inaction, cause harm to the codebase, its users, or its data.
 
-Enforced by: type-check gates, test gates, protected zones, circuit breakers, and the **safety scanner** (AST analysis that blocks dangerous patterns in discovered code before it touches your project).
+Type-check gates. Test gates. Protected zones for credentials and governance files. Circuit breakers that halt after consecutive failures. AST-based safety scanning that blocks dangerous code patterns before they touch your project.
 
 **Second Law -- Obey Protocol**
-> An agent shall follow its directive and human instructions, except where doing so would conflict with the First Law.
+> An agent shall follow its directive, except where doing so would conflict with the First Law.
 
-Enforced by: editable surfaces, budget caps, pipeline order enforcement, constraint compliance.
+Editable surfaces confine each agent to its zone. Budget caps prevent runaway loops. The discovery pipeline must be followed in sequence -- scout, scan, adapt, rescan, attribute, integrate, test. No shortcuts.
 
 **Third Law -- Preserve Progress**
-> An agent shall preserve its improvements through version control discipline, except where doing so would conflict with the First or Second Law.
+> An agent shall preserve improvements through version control discipline, except where doing so would conflict with the First or Second Law.
 
-Enforced by: git commit on improve, git revert on regress, structured ledger logging, **provenance tracking** for all imported code.
+Git commit on improvement, git revert on regression. Structured ledger logging. Provenance tracking on all imported code. Append-only logs that cannot be rewritten.
 
 **Meta-Law -- Governance Immutability**
 > No agent, directive, or improvement loop may modify the governance framework itself.
 
-Enforced by: governance files in protected zones, Sentinel monitoring, safety floors that can be raised but never lowered.
+The Laws are absolute. The Sentinel enforces them. Safety floors can be raised but never lowered. This is the property that makes overnight unsupervised operation possible.
 
-## How It Works
+### Why governance?
 
-The core pattern comes from [autoresearch](https://github.com/karpathy/autoresearch): treat code improvement as an iterative experiment.
+Our research quantified what happens without it. Ungoverned agents crashed on 56% of experiments. They started with destructive changes and compounded the damage. Governed agents crashed 22% of the time, took less destructive paths, and recovered faster. The governed swarm degraded at one-third the rate of the ungoverned agent.
 
-```
-Load directive (program.md)
-    ↓
-Measure baseline metric
-    ↓
-┌─→ Plan modification (LLM decides what to change)
-│   ↓
-│   Execute modification
-│   ↓
-│   Measure metric again
-│   ↓
-│   Improved? → git commit → continue
-│   Regressed? → git revert → try different approach
-│   ↓
-│   Budget exhausted? → stop
-│   Circuit breaker? → halt
-│   ↓
-└── Otherwise → loop
-```
+Governance is not a tradeoff against performance. It is a precondition for it.
 
-Each agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations.
+## Capability Discovery: The Hivemind
 
-## Directives
+Every Claude Code instance running this plugin can draw from the collective intelligence of open source. GitScout and GitLoader are the mechanism.
 
-Autoresearch-style `program.md` files that define improvement loops:
+**GitScout** searches the GitHub API, scores candidates by relevance and trust, and returns ranked recommendations. **GitLoader** fetches the top candidate, runs AST safety analysis, adapts the code to your project's conventions, records provenance, integrates it, and runs verification.
 
-| Directive | What it optimizes |
-|-----------|-------------------|
-| `fix-tests.md` | Test pass rate |
-| `fix-types.md` | TypeScript strict compliance |
-| `optimize-startup.md` | App initialization time |
-| `security-hardening.md` | OWASP vulnerability count |
-| `discover.md` | Autonomous capability discovery from GitHub |
-| `full-sweep.md` | Everything (the overnight run) |
+**Trust tiers** ensure proportional caution:
 
-Create your own by following the directive format in any `.md` file.
+| Tier | Trust | Quarantine | Who qualifies |
+|------|:-----:|:----------:|---------------|
+| Verified | 0.85+ | None | karpathy, pytorch-labs, huggingface, facebookresearch |
+| Community | 0.65+ | 1 test cycle | Open license, multiple contributors, established repos |
+| Experimental | 0.50+ | 2 test cycles | Single author, newer repos |
+| Untrusted | <0.50 | Blocked | Not integrated |
+
+**Safety scanning** is non-negotiable. The AST analyzer hard-blocks process spawning, network calls at import time, destructive file operations, blocked module imports, and framework monkey-patching. Code that fails Tier 1 analysis is rejected before it can be adapted.
+
+**Provenance** is permanent. Every integration carries an attribution comment (source repo, commit SHA, license, trust scores) and is logged to an append-only ledger. The history cannot be rewritten.
+
+## The Swarm
+
+14 agents organized by function, deployed in coordinated waves:
+
+**Discovery** -- GitScout (GitHub search + scoring), GitLoader (fetch + scan + adapt + integrate), Scout (web research + documentation)
+
+**Improvement** -- Debugger (test repair), Optimizer (performance), Evolver (prompt engineering), Breeder (Ollama model evolution), Architect (structural analysis)
+
+**Governance** -- Sentinel (cLaw enforcement + violation detection), Auditor (security scanning + dependency auditing)
+
+**Infrastructure** -- Swarm Coordinator (wave orchestration), Documenter (docs sync), Librarian (cross-session memory), Meta-Improver (swarm self-improvement, bounded by Meta-Law)
 
 ## Portable Governance
 
-The governance framework is not limited to Claude Code. Adapters are provided for:
+Asimov's cLaws is a specification, not a product. Implement it in any agent framework:
 
-- **LangChain** — `framework/adapters/langchain.py`
-- **CrewAI** — `framework/adapters/crewai.py`
-- **AutoGen** — `framework/adapters/autogen.py`
+- `framework/adapters/langchain.py`
+- `framework/adapters/crewai.py`
+- `framework/adapters/autogen.py`
 
-The full specification is in `framework/spec.json` — implement it in any agent system.
+The full spec is in `framework/spec.json`. The governance pattern -- Laws, protected zones, safety floors, Sentinel monitoring -- works anywhere agents need to be trusted.
+
+## Directives
+
+Autoresearch-style improvement loops, each defining an objective, metric, editable surface, budget, and circuit breaker:
+
+| Directive | Target |
+|-----------|--------|
+| `fix-tests` | Test pass rate |
+| `fix-types` | TypeScript strict compliance |
+| `optimize-startup` | Initialization time |
+| `security-hardening` | OWASP vulnerability count |
+| `discover` | Autonomous GitHub code discovery |
+| `full-sweep` | Everything (the overnight run) |
 
 ## Project Structure
 
 ```
 asimovs-mind/
-├── plugin.json              # Claude Code plugin manifest (v0.2.0)
-├── governance/              # Asimov's cLaws (immutable safety bounds)
-│   ├── laws.json            # Three Laws + Meta-Law definitions
-│   ├── protected-zones.json # Files no agent may modify
-│   ├── safety-floors.json   # Parameter minimums that can't be lowered
-│   └── discovery-rules.json # cLaws extension for code discovery
-├── agents/                  # 14 specialized swarm agents
-│   ├── git-scout.md         # GitHub code discovery
-│   └── git-loader.md        # Safe code integration
-├── skills/                  # User-invokable /commands
-│   └── discover.md          # /discover -- capability discovery
-├── directives/              # Autoresearch-style improvement loops
-│   └── discover.md          # Autonomous discovery loop
-├── discovery/               # Discovery tools (by FutureSpeak.AI)
-│   ├── safety_scanner.py    # AST-based code safety analysis
-│   └── provenance.py        # Attribution and tracking CLI
-└── framework/               # Portable governance for other systems
-    ├── spec.json            # Full cLaws specification
-    └── adapters/            # LangChain, CrewAI, AutoGen adapters
++-- plugin.json              # Claude Code plugin manifest (v0.2.0)
++-- governance/              # Asimov's cLaws (immutable)
+|   +-- laws.json            # Three Laws + Meta-Law
+|   +-- protected-zones.json # Untouchable file patterns
+|   +-- safety-floors.json   # Minimums that cannot be lowered
+|   +-- discovery-rules.json # cLaws extension for code import
++-- agents/                  # 14 specialized agents
++-- skills/                  # 8 user-invokable /commands
++-- directives/              # 6 autoresearch-style loops
++-- discovery/               # GitScout + GitLoader tooling
+|   +-- safety_scanner.py    # AST-based static analysis
+|   +-- provenance.py        # Attribution + tracking CLI
++-- framework/               # Portable governance spec + adapters
 ```
-
-## Research
-
-Asimov's Mind is backed by empirical research. We ran controlled experiments comparing ungoverned vs. governed AI agents doing autonomous ML research:
-
-- **Governance halved crash rates** (56% ungoverned vs 22% governed)
-- **Governed swarm degraded 3x slower** during cumulative exploration
-- **Specialist agents explored dimensions generalists ignored**
-
-Paper and experiment code: [asimovs-mind-research](https://github.com/FutureSpeakAI/asimovs-mind-research)
 
 ## Credits
 
-- **[FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, GitScout, GitLoader, and the capability discovery system
-- **[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI -- The original cLaw governance system, self-improvement engines, and GitLoader architecture that inspired this plugin
-- **[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy -- The core iteration pattern (modify, measure, keep or discard)
+**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, GitScout, GitLoader, and the capability discovery system.
+
+**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the self-improvement engines, and the GitLoader architecture that this plugin builds upon.
+
+**[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy is the foundation -- the elegant modify-measure-keep/discard loop that started it all. We took the pattern, proved governance improves it, and extended it to ecosystem scale.
 
 ## License
 
