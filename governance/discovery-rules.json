@@ -1,0 +1,64 @@
+{
+  "name": "Discovery Governance Rules",
+  "description": "Extension of the Three Laws for autonomous code discovery from GitHub",
+  "version": "1.0.0",
+
+  "first_law_extension": {
+    "name": "Do No Harm — Code Import",
+    "hard_blocks": [
+      "Code that fails safety scanner with ANY Tier 1 finding",
+      "Code from repos with no license",
+      "Code requiring imports not available in the project",
+      "Code that executes side effects at import/module scope"
+    ],
+    "safety_scanner_path": "${CLAUDE_PLUGIN_ROOT}/discovery/safety_scanner.py",
+    "post_adaptation_rescan": true,
+    "max_imports_per_session": 3,
+    "max_lines_per_import": 200
+  },
+
+  "second_law_extension": {
+    "name": "Obey Protocol — Discovery Pipeline",
+    "mandatory_pipeline_order": [
+      "GitScout search",
+      "Safety scan (pre-adaptation)",
+      "Adapt to project conventions",
+      "Safety scan (post-adaptation)",
+      "Provenance record",
+      "Attribution comment",
+      "Integration review output",
+      "Insert code",
+      "Run tests",
+      "Record outcome"
+    ],
+    "read_only_for_agents": [
+      "${CLAUDE_PLUGIN_ROOT}/discovery/",
+      "${CLAUDE_PLUGIN_ROOT}/governance/"
+    ]
+  },
+
+  "third_law_extension": {
+    "name": "Preserve Progress — Attribution",
+    "provenance_tracker_path": "${CLAUDE_PLUGIN_ROOT}/discovery/provenance.py",
+    "provenance_log": ".asimovs-mind-provenance.jsonl",
+    "append_only": true,
+    "attribution_comment_required": true,
+    "reverts_must_be_logged": true
+  },
+
+  "trust_tiers": {
+    "tier_1": {"min_trust": 0.85, "max_lines": 200, "quarantine": false},
+    "tier_2": {"min_trust": 0.65, "max_lines": 150, "quarantine_cycles": 1},
+    "tier_3": {"min_trust": 0.50, "max_lines": 100, "quarantine_cycles": 2}
+  },
+
+  "scanner_module_allowlist": [
+    "torch", "torch.nn", "torch.nn.functional", "torch.optim",
+    "torch.cuda", "torch.amp",
+    "math", "os", "sys", "time", "typing", "dataclasses",
+    "functools", "itertools", "collections", "abc", "copy",
+    "warnings", "contextlib", "pathlib", "re", "string",
+    "struct", "io", "enum", "gc", "platform", "numpy",
+    "json", "hashlib", "uuid", "datetime", "logging"
+  ]
+}

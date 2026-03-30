@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
-  "version": "0.1.0",
-  "description": "Governed Recursive Self-Improvement for AI Agent Swarms. Autoresearch-style iteration loops bounded by Asimov's Laws. 12 specialized agents that self-improve within cryptographic safety constraints.",
+  "version": "0.2.0",
+  "description": "Governed Recursive Self-Improvement for AI Agent Swarms. Autoresearch-style iteration loops bounded by Asimov's cLaws. 14 specialized agents including GitScout and GitLoader for autonomous capability discovery from GitHub. Safety-scanned, provenance-tracked, governance-enforced code integration.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"
@@ -15,6 +15,10 @@
     "governance",
     "safety",
     "asimov",
-    "recursive-improvement"
+    "recursive-improvement",
+    "code-discovery",
+    "github-scout",
+    "capability-discovery",
+    "hivemind"
   ]
 }
