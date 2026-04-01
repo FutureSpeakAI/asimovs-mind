@@ -29,7 +29,7 @@
   "mcpServers": {
     "sovereign-vault": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/vault-server/index.js"],
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/vault-server/bootstrap.js"],
       "description": "Sovereign Vault — AES-256-GCM encrypted state, Ed25519 identity, Privacy Shield, Ollama monitoring"
     }
   },

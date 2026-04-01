@@ -251,6 +251,7 @@ describe('TIER F: Directive Definitions', () => {
 describe('TIER G: MCP Vault Server Files', () => {
   const serverFiles = [
     'mcp/vault-server/package.json',
+    'mcp/vault-server/bootstrap.js',
     'mcp/vault-server/index.js',
     'mcp/vault-server/crypto.js',
     'mcp/vault-server/vault.js',

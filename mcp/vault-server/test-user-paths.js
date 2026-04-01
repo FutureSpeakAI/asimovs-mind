@@ -56,10 +56,22 @@ describe('PATH 1: Brand New User — First Install', () => {
     assert.ok(exists, 'MCP server index.js should exist');
   });
 
-  it('vault server has self-bootstrapping for npm install', async () => {
-    const indexContent = await fs.readFile(path.join(PLUGIN_ROOT, 'mcp', 'vault-server', 'index.js'), 'utf-8');
-    assert.ok(indexContent.includes('ensureDependencies'), 'Should have ensureDependencies function');
-    assert.ok(indexContent.includes('npm install'), 'Should auto-run npm install');
+  it('vault server has bootstrap.js that auto-installs deps', async () => {
+    const bootstrapPath = path.join(PLUGIN_ROOT, 'mcp', 'vault-server', 'bootstrap.js');
+    const exists = await fs.access(bootstrapPath).then(() => true).catch(() => false);
+    assert.ok(exists, 'bootstrap.js should exist');
+    const content = await fs.readFile(bootstrapPath, 'utf-8');
+    assert.ok(content.includes('npm install'), 'bootstrap.js should run npm install');
+    assert.ok(content.includes('node_modules'), 'bootstrap.js should check for node_modules');
+    assert.ok(content.includes("import('./index.js')"), 'bootstrap.js should dynamically import index.js');
+  });
+
+  it('plugin.json points to bootstrap.js, not index.js', async () => {
+    const raw = await fs.readFile(path.join(PLUGIN_ROOT, 'plugin.json'), 'utf-8');
+    const plugin = JSON.parse(raw);
+    const args = plugin.mcpServers['sovereign-vault'].args;
+    assert.ok(args.some(a => a.includes('bootstrap.js')), 'Should reference bootstrap.js');
+    assert.ok(!args.some(a => a.includes('index.js')), 'Should NOT reference index.js directly');
   });
 });
 

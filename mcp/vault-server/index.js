@@ -717,36 +717,13 @@ const UNLOCK_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-// --- Self-bootstrapping: auto-install deps if missing ---
-
-async function ensureDependencies() {
-  const nodeModulesPath = path.join(import.meta.dirname, 'node_modules');
-  try {
-    await fs.access(nodeModulesPath);
-  } catch {
-    process.stderr.write(`[sovereign-vault] node_modules missing. Running npm install...\n`);
-    const { execSync } = await import('node:child_process');
-    try {
-      execSync('npm install --production', {
-        cwd: import.meta.dirname,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 120000
-      });
-      process.stderr.write(`[sovereign-vault] Dependencies installed successfully.\n`);
-    } catch (err) {
-      process.stderr.write(`[sovereign-vault] npm install failed: ${err.message}\n`);
-      process.stderr.write(`[sovereign-vault] Please run manually: cd ${import.meta.dirname} && npm install\n`);
-      process.exit(1);
-    }
-  }
-}
-
 // --- Main ---
+// NOTE: Dependency bootstrapping is handled by bootstrap.js, which is the
+// actual entry point referenced in plugin.json. It runs npm install before
+// importing this file. Do NOT add ensureDependencies() here — ESM imports
+// at the top of this file would fail before it could execute.
 
 async function main() {
-  // Auto-install dependencies if missing (first-run support)
-  await ensureDependencies();
-
   await initCrypto();
 
   // Ensure .asimovs-mind/vault/ directory exists for port file
