@@ -41,10 +41,10 @@ describe('TIER A: plugin.json Structure', () => {
     assert.ok(plugin.version);
   });
 
-  it('version is 2.0.0', async () => {
+  it('version is 2.1.0', async () => {
     const raw = await fs.readFile(pluginPath('plugin.json'), 'utf-8');
     const p = JSON.parse(raw);
-    assert.equal(p.version, '2.0.0');
+    assert.equal(p.version, '2.1.0');
   });
 
   it('all hook commands reference existing Python files', async () => {

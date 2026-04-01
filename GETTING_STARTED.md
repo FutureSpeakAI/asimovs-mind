@@ -52,10 +52,11 @@ Try these commands to explore what's available:
 
 | Command | What it does |
 |---------|-------------|
+| `/help` | Categorized command reference |
 | `/briefing` | Get your daily briefing |
 | `/memory recall "auth"` | Search Friday's memory |
 | `/trust "Alice"` | Check the trust graph |
-| `/status` | See the system state |
+| `/status` | Rich system health (calls 9 MCP tools) |
 | `/discover` | Find and integrate code from GitHub |
 | `/unleash` | Deploy the agent swarm |
 | `/peer listen` | Start encrypted P2P communications |
@@ -79,6 +80,8 @@ These three commands cover most of what you need at the start of a session:
 | `/briefing` | What happened since your last session -- commits, discoveries, test results |
 | `/memory recall "topic"` | Search Friday's 3-tier memory for anything related |
 | `/trust "PersonName" reliability` | Check or update trust graph for a person or repo |
+| `/status` | Rich system health -- vault, memory, trust, all 17 subsystems |
+| `/help` | Categorized command reference for all skills |
 
 ## Optional: Local-Only Mode
 

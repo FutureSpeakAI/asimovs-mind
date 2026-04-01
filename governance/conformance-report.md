@@ -1,9 +1,9 @@
 # cLaw Specification Conformance Report
 
-**Plugin:** Asimov's Mind v2.0.0
+**Plugin:** Asimov's Mind v2.1.0
 **Date:** 2026-04-01
-**Auditor:** Automated conformance check (Agent Friday Complete)
-**Runtime:** friday-core MCP server -- 17 subsystems, 89 MCP tools, holographic dashboard
+**Auditor:** Automated conformance check (Neural Binding)
+**Runtime:** friday-core MCP server -- 17 subsystems, 92 MCP tools, holographic dashboard
 
 This report systematically checks every section of the Asimov's cLaw Specification (`framework/spec.json`) and the full Agent Friday runtime against the shipped v2.0.0 plugin. Each section is rated CONFORMANT, PARTIAL, or NON-CONFORMANT with evidence and caveats.
 
@@ -59,6 +59,7 @@ Evidence:
 - `hooks/first-law.py` blocks writes to governance files
 - `hooks/integrity-check.py` verifies HMAC signatures of governance files at session start
 - `agents/sentinel.md` describes governance tampering detection
+- **EIS (Epistemic Independence Score)** -- `core/eis.js` now provides a running measurement of anti-sycophancy behavior (verification attempts, complexity acknowledgment, correction willingness). The website's anti-sycophancy claim is backed by measurement as of v2.1.0.
 
 ---
 
@@ -361,7 +362,7 @@ The cLaw Specification defines three certification levels:
 
 **Core: ACHIEVED**
 
-All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown. The full 17-subsystem friday-core runtime (89 MCP tools) operates under governance at all times.
+All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown. The full 17-subsystem friday-core runtime (92 MCP tools) operates under governance at all times.
 
 **Connected: ACHIEVED**
 
@@ -373,6 +374,6 @@ Encryption at rest is fully implemented (AES-256-GCM, Argon2id, BLAKE2b sub-keys
 
 ### Overall Certification: Core + Connected (with significant progress toward Sovereign)
 
-The plugin achieves full Core and Connected certification. The full Agent Friday runtime -- 17 subsystems exposing 89 MCP tools with a holographic dashboard -- operates under cLaw governance with encrypted state, cryptographic identity, P2P encrypted channels, person-level trust graphs, and enterprise consent gates.
+The plugin achieves full Core and Connected certification. The full Agent Friday runtime -- 17 subsystems exposing 92 MCP tools with a holographic dashboard -- operates under cLaw governance with encrypted state, cryptographic identity, P2P encrypted channels, person-level trust graphs, and enterprise consent gates.
 
 To achieve full Sovereign certification: provide a production-quality local model pipeline that can replace the Claude API for primary inference across all task types, and resolve the passphrase leakage issue structurally (e.g., by requiring browser-based unlock and rejecting conversation-based passphrase entry).

@@ -121,6 +121,18 @@ Tier 3 (Services)
 
 Open `http://localhost:{port}/` after unlocking the vault. The dashboard shows vault status, Ollama health, P2P peers, memory stats, trust summary, and 17 subsystem status indicators. Built with Three.js: 400 particles, neural grid, glowing central orb, HUD overlay. Live polling every 5 seconds.
 
+## Neural Binding (v2.1.0)
+
+The subsystems above are not isolated silos. The neural binding layer wires them into a single intelligence.
+
+**Event Wiring** (`core/wiring.js`) subscribes 10 cross-subsystem event routes. When trust decays, memory records it. When an agent completes, the context graph updates. When the personality detects sycophancy risk, the challenge level adjusts. The subsystems react to each other without coupling their code.
+
+**Session Conductor** (`core/session-conductor.js`) orchestrates session lifecycle: vault readiness check, trust auto-decay for unseen contacts, context graph hydration, personality-aware greeting generation, and commitment surfacing. One call replaces a dozen manual tool invocations at session start.
+
+**Epistemic Independence Score** (`core/eis.js`) measures how much Friday actually pushes back. Three signals feed it: verification attempts (does Friday fact-check?), complexity acknowledgment (does it admit uncertainty?), and correction willingness (does it update when wrong?). The EIS backs the anti-sycophancy claim with a running metric.
+
+**Living Dashboard** -- particles are now bound to real memory entries (colored by tier), the orb pulse rate tracks context event activity, subsystem dots are clickable for detail, and a memory search bar queries the 3-tier store directly from the browser.
+
 ## Sovereign Vault
 
 All persistent state is encrypted at rest. The Sovereign Vault subsystem provides AES-256-GCM encrypted storage with a passphrase-derived key hierarchy:

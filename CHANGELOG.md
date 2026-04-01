@@ -7,6 +7,41 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.1.0] — 2026-04-01 — Neural Binding
+
+The subsystems learn to talk to each other. The system becomes one intelligence.
+
+### Added
+- core/wiring.js: 10 cross-subsystem event subscriptions (the nervous system)
+- core/session-conductor.js: session lifecycle orchestration with personality-aware greeting
+- core/eis.js: Epistemic Independence Score (verification + complexity + correction)
+- /help skill: categorized command reference
+- /status overhaul: calls 9 MCP tools for rich system health
+- session_status MCP tool (uptime, context, greeting, commitments)
+- trust_explain MCP tool (natural language trust reasoning)
+- Memory auto-extraction from trust/agent/connector/enterprise events
+- Memory session buffer (5-min crash recovery flush)
+- Memory capacity management (short=100, medium=500, long=1000 with LRU)
+- Time-weighted recall (recency 0.4 + relevance 0.6)
+- Context graph hydration from vault + cwd detection
+- Mother signal bridge (sycophancy_risk → challenge_level mapping)
+- Personality versioning (max 20 history snapshots)
+- Trust auto-decay on session start (30-day unseen threshold)
+- Privacy event emission + transparency in personality loader
+- Dashboard: live particle data binding, connection indicator, memory search, clickable subsystem dots, mobile reflow
+- GitHub CI (Node 18/20/22), issue templates, PR template, CONTRIBUTING.md, SECURITY.md
+- docs/API_REFERENCE.md: complete reference for 92 MCP tools
+- test-wiring.js (9 tests), test-session.js (11 tests)
+- Bootstrap: Node version check, npm install progress dots, stale port cleanup
+
+### Changed
+- Dashboard particles bound to memory entries (color by tier)
+- Dashboard orb pulse rate tied to context event activity
+- HTTP bridge accepts GET for read-only tools
+- Session-learner feeds memory subsystem on session end
+
+---
+
 ## [2.0.0] -- 2026-04-01
 
 **Agent Friday Complete.** The governance kernel becomes the full Agent Friday runtime. 17 subsystems, 89 MCP tools, holographic dashboard. Full intelligence port from nexus-os into friday-core.
@@ -154,6 +189,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+[2.1.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v1.0.0-beta...v1.0.0
 [1.0.0-beta]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v0.3.0...v1.0.0-beta

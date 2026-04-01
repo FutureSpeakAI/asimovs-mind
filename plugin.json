@@ -1,6 +1,6 @@
 {
   "name": "asimovs-mind",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Agent Friday — the complete AI runtime for Claude Code. 17 subsystems, 89 MCP tools, holographic dashboard. Encrypted vault (AES-256-GCM), Ed25519 identity, P2P encrypted channels, Privacy Shield, 3-provider LLM routing, 3-tier memory with semantic search, person-level trust graph, personality evolution with anti-sycophancy calibration, agent delegation with awareness mesh, 9 connectors (72 tools), daily briefings, meeting intelligence, enterprise consent gates, and governance enforced by Asimov's cLaws. Local-first. Sovereign by design.",
   "author": {
     "name": "FutureSpeak.AI",
