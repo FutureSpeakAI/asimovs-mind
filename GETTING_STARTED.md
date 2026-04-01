@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js 18+** -- required for the Sovereign Vault MCP server
+- **Node.js 18+** -- required for the friday-core MCP server
 - **Python 3.7+** -- required for governance hooks
 - **Claude Code** -- installed and working
 - **Ollama** (optional) -- for local-only operation without cloud API dependency
@@ -18,10 +18,10 @@ git clone https://github.com/FutureSpeakAI/asimovs-mind.git
 claude plugin install ./asimovs-mind
 ```
 
-The vault server auto-installs its npm dependencies on first start. If this fails, run manually:
+The friday-core server auto-installs its npm dependencies on first start. If this fails, run manually:
 
 ```bash
-cd path/to/asimovs-mind/mcp/vault-server && npm install
+cd path/to/asimovs-mind/mcp/friday-core && npm install
 ```
 
 ## First Session
@@ -36,18 +36,25 @@ The vault encrypts all your state with AES-256-GCM. Your passphrase never leaves
 
 For extra security, open the browser link shown in the output to enter your passphrase there. This keeps it out of the API transcript entirely.
 
-### Step 2: Create Your Profile
+### Step 2: Open the Friday Dashboard
 
-Run `/onboard` and answer 7 questions about how you work.
+Open `http://localhost:{port}/` in your browser (the port is shown in the unlock output). The dashboard shows system health, memory stats, trust graph, P2P peers, and all 17 subsystem status indicators in a Three.js holographic interface.
 
-Friday adapts to your preferences, communication style, and workflow patterns.
+### Step 3: Create Your Profile
 
-### Step 3: You're Ready
+Run `/onboard` and answer 8 questions about how you work.
+
+Friday adapts to your preferences, communication style, and workflow patterns. Question 8 (the "mother question") calibrates anti-sycophancy and challenge level.
+
+### Step 4: You're Ready
 
 Try these commands to explore what's available:
 
 | Command | What it does |
 |---------|-------------|
+| `/briefing` | Get your daily briefing |
+| `/memory recall "auth"` | Search Friday's memory |
+| `/trust "Alice"` | Check the trust graph |
 | `/status` | See the system state |
 | `/discover` | Find and integrate code from GitHub |
 | `/unleash` | Deploy the agent swarm |
@@ -61,7 +68,17 @@ On each session start, unlock your vault:
 /friday unlock
 ```
 
-Or open the browser URL shown on startup to enter your passphrase without it touching the API transcript.
+Or open the browser URL shown on startup to enter your passphrase without it touching the API transcript. Then open `http://localhost:{port}/` for the dashboard -- it shows all 17 subsystem status indicators, memory stats, trust summary, and P2P peers.
+
+### Daily use
+
+These three commands cover most of what you need at the start of a session:
+
+| Command | What it does |
+|---------|-------------|
+| `/briefing` | What happened since your last session -- commits, discoveries, test results |
+| `/memory recall "topic"` | Search Friday's 3-tier memory for anything related |
+| `/trust "PersonName" reliability` | Check or update trust graph for a person or repo |
 
 ## Optional: Local-Only Mode
 
@@ -82,7 +99,7 @@ All intelligence stays on your machine. No API keys, no billing, no data leaving
 ## Troubleshooting
 
 **"Vault server not available"**
-Run `npm install` in the `mcp/vault-server/` directory.
+Run `npm install` in the `mcp/friday-core/` directory.
 
 **"python3 not found"**
 Ensure Python 3 is in your PATH. On Windows, try `python` instead of `python3`.

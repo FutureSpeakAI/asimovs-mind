@@ -41,10 +41,10 @@ describe('TIER A: plugin.json Structure', () => {
     assert.ok(plugin.version);
   });
 
-  it('version is 1.0.0', async () => {
+  it('version is 2.0.0', async () => {
     const raw = await fs.readFile(pluginPath('plugin.json'), 'utf-8');
     const p = JSON.parse(raw);
-    assert.equal(p.version, '1.0.0');
+    assert.equal(p.version, '2.0.0');
   });
 
   it('all hook commands reference existing Python files', async () => {
@@ -366,10 +366,10 @@ describe('TIER I: Documentation', () => {
       'README should mention P2P encrypted communication');
   });
 
-  it('ROADMAP.md exists and has v1.1.0 local sovereignty milestone', async () => {
+  it('ROADMAP.md exists and has future milestones', async () => {
     const content = await fs.readFile(pluginPath('ROADMAP.md'), 'utf-8');
-    assert.ok(content.includes('1.1.0') || content.includes('Local Sovereignty') || content.includes('local-only'),
-      'ROADMAP should mention v1.1.0 local sovereignty');
+    assert.ok(content.includes('2.0.0') || content.includes('2.1.0') || content.includes('Agent Friday'),
+      'ROADMAP should mention v2.0.0 or future milestones');
   });
 
   it('LICENSE file exists', async () => {

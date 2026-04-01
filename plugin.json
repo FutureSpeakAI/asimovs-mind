@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
-  "version": "1.0.0",
-  "description": "Agent Friday's kernel for Claude Code. The governed, sovereign software hivemind. N dynamically-discovered agents, 16 skills, 6 directives, 9 governance hooks, AES-256-GCM encrypted vault, Ed25519 cryptographic identity, encrypted P2P agent-to-agent communication, Privacy Shield PII scrubbing, Ollama intelligence routing, unified memory system. Personality, onboarding, tribal knowledge (/remember), session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
+  "version": "2.0.0",
+  "description": "Agent Friday — the complete AI runtime for Claude Code. 17 subsystems, 89 MCP tools, holographic dashboard. Encrypted vault (AES-256-GCM), Ed25519 identity, P2P encrypted channels, Privacy Shield, 3-provider LLM routing, 3-tier memory with semantic search, person-level trust graph, personality evolution with anti-sycophancy calibration, agent delegation with awareness mesh, 9 connectors (72 tools), daily briefings, meeting intelligence, enterprise consent gates, and governance enforced by Asimov's cLaws. Local-first. Sovereign by design.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"

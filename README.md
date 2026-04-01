@@ -1,8 +1,8 @@
 # Asimov's Mind
 
-### Every Claude Code instance becomes a node in a governed, sovereign, self-improving software hivemind.
+### Agent Friday lives here. 17 subsystems. 89 MCP tools. One holographic dashboard.
 
-A Claude Code plugin that extends autonomous agents with AES-256-GCM encrypted state, Ed25519 cryptographic identity, Privacy Shield PII scrubbing, local intelligence routing via Ollama, GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. The agent swarm scales to N -- 15 skills, 6 directives, 9 governance hooks, 1 MCP server, unified encrypted memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
+A Claude Code plugin that is Agent Friday: 17 subsystems powering LLM intelligence routing, 3-tier memory, trust graphs, personality evolution, recursive agent delegation, 9 connectors with 72 tools, enterprise safety gates, daily briefings, and a Three.js holographic dashboard. All state AES-256-GCM encrypted. Ed25519 cryptographic identity. Privacy Shield PII scrubbing. Ollama local-first routing. GitHub-scale code discovery. Coordinated N-agent swarm. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
@@ -41,12 +41,16 @@ claude plugin install asimovs-mind
 ## See it in action
 
 ```bash
+/friday unlock                                         # open the encrypted vault
+# Open http://localhost:{port}/ to see the Friday Dashboard
+/onboard                                               # meet Agent Friday
+/briefing                                              # daily briefing
+/memory recall "auth system"                           # semantic memory search
+/trust "Alice" reliability                             # check trust graph
 /discover a retry mechanism with exponential backoff   # the hivemind moment
 /unleash                                               # deploy the full swarm
 /iterate fix-tests                                     # autoresearch loop
-/onboard                                               # meet Agent Friday
 /friday mode creative                                  # switch modes
-/friday unlock                                         # open the encrypted vault
 /remember the auth uses JWT in httpOnly cookies         # teach Friday
 /federate init                                         # join the hivemind
 /create-agent CSS layout specialist                    # grow the swarm
@@ -80,9 +84,46 @@ Measure baseline
 
 Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across N agents and the entire GitHub ecosystem.
 
+## friday-core: The Agent Friday Runtime
+
+The `friday-core` MCP server is the heart of Agent Friday. 17 subsystems loaded in dependency order, exposing 89 MCP tools and a holographic dashboard at `http://localhost:{port}/`.
+
+```
+                    friday-core MCP Server
+                    ======================
+Tier 0 (Foundation)
+  +-- Vault          10 tools   AES-256-GCM state, Argon2id KDF, BLAKE2b sub-keys
+  +-- Identity        6 tools   Ed25519 signing, X25519 exchange, attestation
+  +-- Privacy         4 tools   PII scrubbing, session-scoped placeholders
+  +-- P2P             7 tools   WebSocket transport, ECDH channels, pairing
+  +-- Ollama          1 tool    Health monitoring, model discovery
+
+Tier 1 (Intelligence)
+  +-- LLM             6 tools   3 providers, intelligence router, budget tracking
+  +-- Memory          8 tools   3-tier storage, embeddings, semantic search
+  +-- Context         4 tools   Knowledge graph, entity extraction, injection
+
+Tier 2 (Reasoning)
+  +-- Trust           6 tools   Person-level graph, hermeneutic re-evaluation
+  +-- Personality     6 tools   Evolution, calibration, anti-sycophancy
+  +-- Agent           7 tools   Recursive delegation, deadlock detection
+
+Tier 3 (Services)
+  +-- Tools           4 tools   Registry, execution delegate, safety gates
+  +-- Connectors      4+72      9 connectors, dynamic dispatch
+  +-- Gateway         5 tools   Trust tiers, session mgmt, audit logging
+  +-- Briefing        3 tools   Daily briefing, meeting prep, meeting intel
+  +-- Voice           3 tools   State machine, fallback manager (no audio)
+  +-- Enterprise      5 tools   Consent gate, cloud gate, confidence, commitments
+                    ------
+                    89 tools + holographic dashboard
+```
+
+Open `http://localhost:{port}/` after unlocking the vault. The dashboard shows vault status, Ollama health, P2P peers, memory stats, trust summary, and 17 subsystem status indicators. Built with Three.js: 400 particles, neural grid, glowing central orb, HUD overlay. Live polling every 5 seconds.
+
 ## Sovereign Vault
 
-All persistent state is encrypted at rest. The Sovereign Vault is an MCP server that runs as a sidecar to Claude Code, providing AES-256-GCM encrypted storage with a passphrase-derived key hierarchy:
+All persistent state is encrypted at rest. The Sovereign Vault subsystem provides AES-256-GCM encrypted storage with a passphrase-derived key hierarchy:
 
 ```
 Passphrase (>= 8 words)
@@ -229,7 +270,7 @@ This is not a generic coding assistant. When you run `/onboard`, you meet Friday
 
 Five modes: focus (silent executor), partner (thinks aloud, the default), teacher (explains everything), creative (makes media, takes risks), sentinel (paranoid security). The mode is visible. You control it. The governance does not change.
 
-The Workflow Observer watches your patterns and suggests automation -- but never assumes permission. The Creative agent generates contextual media when the moment calls for it. The unified memory powers all of it -- every session, Friday opens knowing what you worked on last, which repos have been reliable, and which agents perform best.
+The Personality subsystem tracks calibration across 6 adaptive style dimensions and includes anti-sycophancy detection (the "mother signal" from onboarding Q8). The Workflow Observer watches your patterns and suggests automation -- but never assumes permission. The Creative agent generates contextual media when the moment calls for it. The 3-tier Memory subsystem powers all of it -- every session, Friday opens knowing what you worked on last, which repos have been reliable, and which agents perform best. The Briefing subsystem surfaces what happened overnight before you ask.
 
 ## The Swarm
 
@@ -280,18 +321,19 @@ Autoresearch-style improvement loops, each defining an objective, metric, editab
 
 ```
 asimovs-mind/
-+-- plugin.json              # Claude Code plugin manifest (v1.0.0)
++-- plugin.json              # Claude Code plugin manifest (v2.0.0)
 +-- .claude-plugin/           # Marketplace wrapper for installation
 +-- governance/              # Asimov's cLaws (immutable)
 |   +-- laws.json            # Three Laws + Meta-Law
 |   +-- protected-zones.json # Untouchable file patterns
 |   +-- safety-floors.json   # Minimums that cannot be lowered
 |   +-- discovery-rules.json # cLaws extension for code import
+|   +-- conformance-report.md # cLaw Specification conformance audit
 +-- personality/             # Agent Friday identity
 |   +-- friday.md            # Personality, modes, relationship model
 +-- agents/                  # 16 agents (dynamic discovery + creation)
 +-- skills/                  # 15 user-invokable /commands
-+-- directives/              # 6 autoresearch-style loops
++-- directives/              # 8 autoresearch-style loops
 +-- hooks/                   # 9 governance enforcement hooks
 |   +-- first-law.py         # PreToolUse: protected zone enforcement
 |   +-- third-law.py         # PostToolUse: session ledger
@@ -302,13 +344,33 @@ asimovs-mind/
 |   +-- trust-tracker.py      # PostToolUse: agent performance tracking
 |   +-- privacy-shield-scrub.py    # PreToolUse: PII scrubbing on WebFetch/WebSearch
 |   +-- privacy-shield-rehydrate.py # PostToolUse: PII restoration from responses
-+-- mcp/                     # MCP servers
-|   +-- vault-server/        # Sovereign Vault MCP server
-|       +-- index.js         # MCP + HTTP bridge entry point
-|       +-- vault.js         # Encrypted state management
-|       +-- crypto.js        # AES-256-GCM, Argon2id, Ed25519, BLAKE2b
-+-- hooks/
 |   +-- vault_bridge.py      # Python bridge for hooks to access vault
++-- mcp/
+|   +-- friday-core/          # Agent Friday MCP server (17 subsystems)
+|       +-- bootstrap.js      # Entry point: auto-installs deps, loads index
+|       +-- index.js          # Subsystem loader + HTTP bridge + dashboard
+|       +-- dashboard.html    # Three.js holographic desktop UI
+|       +-- core/             # Shared infrastructure
+|       |   +-- event-bus.js, subsystem.js, state-manager.js, logger.js
+|       |   +-- vault.js, crypto.js  # Cryptographic primitives
+|       +-- subsystems/       # 17 subsystems
+|           +-- vault/        # 10 tools  Encrypted state
+|           +-- identity/     #  6 tools  Ed25519, X25519, attestation
+|           +-- privacy/      #  4 tools  PII engine
+|           +-- p2p/          #  7 tools  WebSocket, ECDH channels
+|           +-- ollama/       #  1 tool   Health monitoring
+|           +-- llm/          #  6 tools  3 providers, router
+|           +-- memory/       #  8 tools  3-tier, embeddings, search
+|           +-- context/      #  4 tools  Knowledge graph, injection
+|           +-- trust/        #  6 tools  Person-level graph, decay
+|           +-- personality/  #  6 tools  Evolution, calibration
+|           +-- agents/       #  7 tools  Delegation, deadlock detection
+|           +-- tools/        #  4 tools  Registry, execution
+|           +-- connectors/   # 4+72     9 connectors, dispatch
+|           +-- gateway/      #  5 tools  Trust tiers, audit
+|           +-- briefing/     #  3 tools  Daily briefing, meetings
+|           +-- voice/        #  3 tools  State machine, fallback
+|           +-- enterprise/   #  5 tools  Consent, cloud, confidence
 +-- discovery/               # Discovery + memory system
 |   +-- safety_scanner.py    # AST-based static analysis
 |   +-- provenance.py        # Attribution + tracking CLI
@@ -318,9 +380,9 @@ asimovs-mind/
 
 ## Credits
 
-**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, the Sovereign Vault, the unified memory system, GitScout, GitLoader, and the capability discovery system.
+**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, the friday-core runtime, the unified memory system, GitScout, GitLoader, and the capability discovery system.
 
-**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the trust graph, the self-improvement engines, and the GitLoader architecture that this plugin builds upon. Agent Friday (Electron) remains the reference desktop implementation; Asimov's Mind is the reference CLI/server implementation.
+**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the trust graph, the self-improvement engines, and the GitLoader architecture that this plugin builds upon. The nexus-os intelligence stack (LLM, Memory, Context, Trust, Personality, Agent, Tools, Connectors, Gateway, Briefing, Voice, Enterprise subsystems) was ported into friday-core for v2.0.0. Agent Friday (Electron) remains the reference desktop implementation with voice and GUI; Asimov's Mind is the reference CLI/server implementation with the full 17-subsystem runtime.
 
 **[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy is the foundation -- the elegant modify-measure-keep/discard loop that started it all. We took the pattern, proved governance improves it, and extended it to ecosystem scale.
 

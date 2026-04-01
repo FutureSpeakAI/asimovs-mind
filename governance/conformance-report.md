@@ -1,10 +1,11 @@
 # cLaw Specification Conformance Report
 
-**Plugin:** Asimov's Mind v1.0.0
+**Plugin:** Asimov's Mind v2.0.0
 **Date:** 2026-04-01
-**Auditor:** Automated conformance check (Sovereign Forge Phase 12)
+**Auditor:** Automated conformance check (Agent Friday Complete)
+**Runtime:** friday-core MCP server -- 17 subsystems, 89 MCP tools, holographic dashboard
 
-This report systematically checks every section of the Asimov's cLaw Specification (`framework/spec.json`) and the broader Sovereign Forge design against the shipped v1.0.0 plugin. Each section is rated CONFORMANT, PARTIAL, or NON-CONFORMANT with evidence and caveats.
+This report systematically checks every section of the Asimov's cLaw Specification (`framework/spec.json`) and the full Agent Friday runtime against the shipped v2.0.0 plugin. Each section is rated CONFORMANT, PARTIAL, or NON-CONFORMANT with evidence and caveats.
 
 ---
 
@@ -111,7 +112,7 @@ Evidence:
 - Manifest stored in `.asimovs-mind/governance-manifest.json` (plaintext) or vault (encrypted)
 - HMAC key is derived from hostname + project path + salt (filesystem fallback) or from the vault's HMAC sub-key (when unlocked)
 - Constant-time comparison via `hmac.compare_digest()`
-- `mcp/vault-server/crypto.js` provides `hmacSign()` and `hmacVerify()` with vault-derived keys
+- `mcp/friday-core/core/crypto.js` provides `hmacSign()` and `hmacVerify()` with vault-derived keys
 
 Caveat -- known limitation:
 - **Laws are stored in JSON, not compiled binary.** HMAC signing of the JSON files is the "equivalent immutable artifact." The spec envisions compiled, self-verifying binaries. Our implementation provides tamper detection but not tamper prevention -- a determined attacker with filesystem access could modify both the law files and the manifest simultaneously. The vault-stored manifest (when available) mitigates this because the manifest is encrypted, but an attacker with the passphrase could still compromise both.
@@ -160,8 +161,8 @@ Caveat:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: `generateSigningKeyPair()` creates Ed25519 keypair via `sodium.crypto_sign_keypair()`
-- `mcp/vault-server/vault.js`: `generateIdentity()` generates keypair and encrypts private key with identity sub-key
+- `mcp/friday-core/core/crypto.js`: `generateSigningKeyPair()` creates Ed25519 keypair via `sodium.crypto_sign_keypair()`
+- `mcp/friday-core/core/vault.js`: `generateIdentity()` generates keypair and encrypts private key with identity sub-key
 - MCP tools exposed: `identity_generate`, `identity_status`, `identity_sign`, `identity_verify`
 - Private keys stored as XSalsa20-Poly1305 encrypted blobs inside the vault
 
@@ -170,7 +171,7 @@ Evidence:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: `generateExchangeKeyPair()` creates X25519 keypair via `sodium.crypto_box_keypair()`
+- `mcp/friday-core/core/crypto.js`: `generateExchangeKeyPair()` creates X25519 keypair via `sodium.crypto_box_keypair()`
 - Stored alongside the signing keypair in the identity record
 - Private key encrypted with identity sub-key before storage
 
@@ -182,7 +183,7 @@ Caveat:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: `SecureBuffer` class wraps all key material
+- `mcp/friday-core/core/crypto.js`: `SecureBuffer` class wraps all key material
 - `SecureBuffer.destroy()` overwrites buffer with random bytes then zeros
 - `SecureBuffer.from()` wipes the source buffer after copying
 - Private keys encrypted with `encryptPrivateKey()` before vault storage
@@ -198,7 +199,7 @@ Evidence:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/vault.js`: `generateAttestation()` computes `SHA-256(lawsText)` and includes in attestation payload
+- `mcp/friday-core/core/vault.js`: `generateAttestation()` computes `SHA-256(lawsText)` and includes in attestation payload
 - `verifyAttestation()` recomputes hash from provided laws text and compares
 
 ### 5.2 Timestamp
@@ -241,7 +242,7 @@ Caveat:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: AES-256-GCM encryption with 12-byte IV and 16-byte auth tag
+- `mcp/friday-core/core/crypto.js`: AES-256-GCM encryption with 12-byte IV and 16-byte auth tag
 - All vault state stored as `.enc` files (base64-encoded ciphertext)
 - `governance/safety-floors.json`: `encryption_at_rest: { minimum: true }` -- cannot be disabled
 - Migration of existing plaintext state runs automatically on vault initialization
@@ -252,7 +253,7 @@ Evidence:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: Argon2id with opslimit=4, memlimit=256MB, 16-byte salt
+- `mcp/friday-core/core/crypto.js`: Argon2id with opslimit=4, memlimit=256MB, 16-byte salt
 - Passphrase validation: minimum 8 words, minimum 4 unique words, minimum 24 characters, minimum 3-char average word length
 - `governance/safety-floors.json`: `passphrase_min_words: { minimum: 8 }` -- cannot be lowered
 - Master key destroyed immediately after sub-key derivation
@@ -266,7 +267,7 @@ Caveat -- known limitation:
 **Status: CONFORMANT**
 
 Evidence:
-- `mcp/vault-server/crypto.js`: Three sub-keys derived from master key via BLAKE2b-KDF (libsodium `crypto_kdf_derive_from_key`)
+- `mcp/friday-core/core/crypto.js`: Three sub-keys derived from master key via BLAKE2b-KDF (libsodium `crypto_kdf_derive_from_key`)
 - Context strings: `AF_VAULT` (vaultKey), `AF_HMAC_` (hmacKey), `AF_IDENT` (identityKey)
 - Sub-key IDs: 1, 2, 3 respectively
 - Each sub-key is 32 bytes, wrapped in SecureBuffer
@@ -325,7 +326,7 @@ Caveat:
 | 1.2 | Second Law | CONFORMANT | directives/*.md, discovery-rules.json, safety-floors.json |
 | 1.3 | Third Law | CONFORMANT | third-law.py, session-learner.py, provenance.py |
 | 1.4 | Meta-Law | CONFORMANT | protected-zones.json, integrity-check.py, first-law.py |
-| 2.1 | Safety Floors | CONFORMANT | safety-floors.json (9 floors including encryption, privacy) |
+| 2.1 | Safety Floors | CONFORMANT | safety-floors.json (9 floors including encryption, privacy), Enterprise subsystem consent/cloud gates |
 | 2.2 | Protected Zones | CONFORMANT | protected-zones.json (11 patterns), first-law.py |
 | 2.3 | Safety Scanner | CONFORMANT | safety_scanner.py, safety-scanner-hook.py |
 | 3.1 | HMAC Signing | PARTIAL | integrity-check.py, crypto.js (JSON not binary) |
@@ -360,20 +361,18 @@ The cLaw Specification defines three certification levels:
 
 **Core: ACHIEVED**
 
-All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown.
+All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown. The full 17-subsystem friday-core runtime (89 MCP tools) operates under governance at all times.
 
-**Connected: PARTIALLY ACHIEVED**
+**Connected: ACHIEVED**
 
-Attestation protocol is fully implemented (laws hash + timestamp + Ed25519 signature + verification). Peer attestation verification is available as an MCP tool. However, agent-to-agent encrypted communication channels do not exist. Federation works through git, not encrypted messaging. Automated trust establishment between peers is not implemented.
+Attestation protocol is fully implemented (laws hash + timestamp + Ed25519 signature + verification). Encrypted P2P channels implemented with X25519 ECDH key agreement, AES-256-GCM message encryption with sequence-numbered AAD, Ed25519 ciphertext signing, WebSocket transport, and attestation-gated handshake. The `/peer` skill provides user-facing connection management. Trust score exchange and file transfer are encrypted end-to-end. The Trust subsystem provides person-level trust graphs with hermeneutic re-evaluation. The Gateway subsystem enforces trust tier hierarchy across all access.
 
 **Sovereign: PARTIALLY ACHIEVED**
 
-Encryption at rest is fully implemented (AES-256-GCM, Argon2id, BLAKE2b sub-keys). The Privacy Shield scrubs PII from outbound web requests. Ollama routing provides a path to full local inference. However, the primary intelligence channel (Claude API) remains a cloud dependency. True sovereignty requires `local_only` mode, which depends on having capable local models. The passphrase-in-conversation leakage issue has a browser-based mitigation but not a structural fix.
+Encryption at rest is fully implemented (AES-256-GCM, Argon2id, BLAKE2b sub-keys). The Privacy Shield scrubs PII from outbound web requests. The LLM subsystem provides intelligence routing with 3 providers (Anthropic, OpenRouter, Ollama) and 4 routing policies including `local_only`. The Enterprise subsystem enforces consent gates and cloud gates for sovereign-first operation. However, the primary intelligence channel (Claude API) remains a cloud dependency when not in local-only mode. True sovereignty requires `local_only` routing with Ollama. The passphrase-in-conversation leakage issue has a browser-based mitigation (dashboard unlock form) but not a structural fix.
 
-### Overall Certification: Core (with significant progress toward Connected and Sovereign)
+### Overall Certification: Core + Connected (with significant progress toward Sovereign)
 
-The plugin achieves full Core certification. It has implemented the cryptographic infrastructure for Connected and Sovereign (keypairs, attestation, encryption, Privacy Shield) but lacks the communication protocol for Connected and the cloud independence for Sovereign.
+The plugin achieves full Core and Connected certification. The full Agent Friday runtime -- 17 subsystems exposing 89 MCP tools with a holographic dashboard -- operates under cLaw governance with encrypted state, cryptographic identity, P2P encrypted channels, person-level trust graphs, and enterprise consent gates.
 
-Connected certification: ACHIEVED. Encrypted P2P channels implemented with X25519 ECDH key agreement, AES-256-GCM message encryption with sequence-numbered AAD, Ed25519 ciphertext signing, WebSocket transport, and attestation-gated handshake. The `/peer` skill provides user-facing connection management. Trust score exchange and file transfer are encrypted end-to-end.
-
-To achieve Sovereign: provide a production-quality local model pipeline that can replace the Claude API for primary inference, and resolve the passphrase leakage issue structurally (e.g., by requiring browser-based unlock and rejecting conversation-based passphrase entry).
+To achieve full Sovereign certification: provide a production-quality local model pipeline that can replace the Claude API for primary inference across all task types, and resolve the passphrase leakage issue structurally (e.g., by requiring browser-based unlock and rejecting conversation-based passphrase entry).

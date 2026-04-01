@@ -2,7 +2,7 @@
 
 ### From Claude Code plugin to the Agent Friday kernel
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v1.0.0.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.0.0.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
 
@@ -191,38 +191,44 @@ Browser-based passphrase entry that keeps the passphrase out of the API transcri
 
 ---
 
-### v1.1.0 -- Full Local Sovereignty: Claude Code on Ollama, Zero Cloud Dependency
+### v2.0.0 -- Agent Friday Complete (shipped)
 
-The infrastructure is ready. The vault, P2P channels, federation, routing, trust graph, memory, and all governance hooks already function without cloud API access. This release makes local-only operation a first-class, documented, tested configuration.
+**The full Agent Friday runtime inside Claude Code.** 17 subsystems, 89 MCP tools, holographic dashboard.
 
-**What ships:**
-- `api_free_capable` safety floor enforcing that no plugin feature requires cloud API access
-- `/route local-only` command: guided setup that verifies Ollama, checks models, activates local-only routing, and reports capability status
-- `directives/local-sovereignty.md`: full documentation of requirements, capabilities, and setup path
-- Personality update: Friday acknowledges local-only mode and is honest about model capability tradeoffs
-- Verification that all governance hooks, all agents, and all skills function when Claude Code runs against Ollama instead of the Anthropic API
+Everything from v1.0.0, plus the complete intelligence port from nexus-os:
 
-**What it means:** The Privacy Shield was always a compromise -- scrubbing PII before sending it to a cloud you don't control. Local-only mode eliminates the compromise. No data leaves. No API keys. No billing. No rate limits. The sovereignty promise is fully realized.
-
-**What's left:** Only the Claude Code runtime configuration. Everything else is already built.
+- **friday-core MCP server** -- replaced vault-server with unified 17-subsystem runtime, loaded in 4 dependency tiers
+- **LLM subsystem** (6 tools) -- 3 providers, intelligence router, budget tracking
+- **Memory subsystem** (8 tools) -- 3-tier storage, embeddings, semantic search
+- **Context subsystem** (4 tools) -- knowledge graph, entity extraction, context injection
+- **Trust subsystem** (6 tools) -- person-level graph, hermeneutic re-evaluation, time decay
+- **Personality subsystem** (6 tools) -- evolution, calibration, anti-sycophancy detection
+- **Agent subsystem** (7 tools) -- recursive delegation, deadlock detection
+- **Tools subsystem** (4 tools) -- registry, execution delegate, safety gates
+- **Connectors subsystem** (4 + 72 tools) -- 9 connectors with dynamic dispatch
+- **Gateway subsystem** (5 tools) -- trust tiers, session management, audit logging
+- **Briefing subsystem** (3 tools) -- daily briefing, meeting prep, meeting intel
+- **Voice subsystem** (3 tools) -- state machine, fallback manager (no audio)
+- **Enterprise subsystem** (5 tools) -- consent gate, cloud gate, confidence, commitments
+- **Friday Dashboard** -- Three.js holographic interface at `http://localhost:{port}/`
 
 ---
 
-### v1.2.0 -- Multi-Platform Agent
+### v2.1.0 -- Multi-Platform Agent (next)
 
-#### 6. Slack Bridge
+#### Slack Bridge
 
 MCP server, same pattern as Telegram. Adds channel-aware context (the agent knows which Slack channel a message came from and adjusts trust tier accordingly: DM = owner tier, public channel = group tier).
 
-#### 7. Discord Bridge
+#### Discord Bridge
 
 MCP server. Same governance. Adds role-based trust mapping (Discord roles map to cLaw trust tiers).
 
-#### 8. Signal Bridge
+#### Signal Bridge
 
 MCP server via signal-cli. End-to-end encrypted by default (Signal handles this). The most sovereignty-aligned messaging platform.
 
-#### 9. TTS Output
+#### TTS Output
 
 Two paths:
 
@@ -234,34 +240,9 @@ A `/speak` skill toggles TTS on/off. When on, every response is also spoken. Gov
 
 ---
 
-### v1.3.0 -- The Trust Web
+### v2.2.0 -- The Trust Web
 
-#### 10. Agent Performance Tracker
-
-Persistent scoring of agent effectiveness:
-```json
-{
-  "debugger": { "deployed": 47, "kept": 43, "reverted": 4, "keep_rate": 0.91 },
-  "git-loader": { "deployed": 12, "kept": 5, "reverted": 7, "keep_rate": 0.42 },
-  "optimizer": { "deployed": 31, "kept": 24, "reverted": 7, "keep_rate": 0.77 }
-}
-```
-
-The Swarm Coordinator uses these scores to prioritize deployment. Low-performing agents get fewer cycles. The Meta-Improver targets them for prompt evolution.
-
-#### 11. Repo Trust Graph
-
-Persistent scoring of GitHub repos based on discovery outcomes:
-```json
-{
-  "KellerJordan/Muon": { "discoveries": 3, "kept": 2, "trust": 0.92 },
-  "facebookresearch/schedule_free": { "discoveries": 1, "kept": 0, "trust": 0.65, "note": "blocked by typing_extensions dep" }
-}
-```
-
-GitScout uses these scores to boost/penalize repos in future searches. The federation shares these scores via Git, so one node's trust assessments benefit all nodes.
-
-#### 12. Web Content Trust Layer
+#### Web Content Trust Layer
 
 PreToolUse hook on WebFetch/WebSearch that:
 1. Checks the URL against a known-unreliable-sources list
@@ -271,9 +252,9 @@ PreToolUse hook on WebFetch/WebSearch that:
 
 ---
 
-### v2.0.0 -- Financial Transactions (Future)
+### v3.0.0 -- Financial Transactions (future)
 
-#### 13. Transaction MCP Server
+#### Transaction MCP Server
 
 Wraps a payment API (Stripe Connect for fiat, Lightning Network for bitcoin). Governed by new cLaws:
 - Maximum transaction amount per session (safety floor)
@@ -281,7 +262,7 @@ Wraps a payment API (Stripe Connect for fiat, Lightning Network for bitcoin). Go
 - Full audit trail in `.asimovs-mind/transactions.jsonl`
 - Only owner trust tier can authorize payments
 
-#### 14. Code Marketplace
+#### Code Marketplace
 
 Agents can buy and sell code snippets:
 - Agent A has a well-tested retry handler (provenance: kept 15 times, trust 0.95)
@@ -295,7 +276,7 @@ This is the monetized version of the federation. The free version (Git-based sha
 
 ## The Holistic View
 
-With v1.0 shipped, here is what a user experiences:
+With v2.0.0 shipped, here is what a user experiences:
 
 **Morning:**
 ```
@@ -364,70 +345,42 @@ Developer B: git pull
 
 These features require the full Electron runtime and will NOT be ported to the Claude Code plugin:
 
-- **PersonaPlex voice loop** (real-time STT + LLM + TTS pipeline)
+- **PersonaPlex voice loop** (real-time STT + LLM + TTS pipeline with audio capture)
 - **System tray / always-on daemon** (background process)
-- **GUI** (settings, trust graph visualization, chat interface)
+- **Native GUI** (settings, trust graph visualization, chat interface)
 
-The following features were originally planned as Electron-only but have been shipped in the v1.0.0 plugin:
+The following features were originally planned as Electron-only but have been shipped in the plugin:
 
-- **Sovereign Vault** -- Now in `mcp/vault-server/` as an MCP sidecar
-- **Ed25519 persistent identity** -- Now in the vault server via libsodium
+- **Sovereign Vault** -- Now in `mcp/friday-core/` (Tier 0 subsystem)
+- **Ed25519 persistent identity** -- Now in the identity subsystem via libsodium
 - **Privacy Shield** -- Now in `hooks/privacy-shield-scrub.py` and `hooks/privacy-shield-rehydrate.py`
-- **Intelligence Router** -- Now in `/route` skill with Ollama monitoring via vault MCP server
+- **Intelligence Router** -- Now in the LLM subsystem with `/route` skill
+- **Full intelligence stack** -- LLM, Memory, Context, Trust, Personality, Agent, Tools, Connectors, Gateway, Briefing, Voice, Enterprise all ported from nexus-os in v2.0.0
+- **Holographic Dashboard** -- Three.js desktop served at `http://localhost:{port}/`
 
-Agent Friday (Electron) remains the reference desktop implementation with voice, GUI, and system tray. Asimov's Mind (Claude Code plugin) is the reference CLI/server implementation with the full governance kernel, encrypted state, and cryptographic identity.
+Agent Friday (Electron) remains the reference desktop implementation with real-time voice and native GUI. Asimov's Mind (Claude Code plugin) is the reference CLI/server implementation with the full 17-subsystem runtime, 89 MCP tools, and holographic dashboard.
 
 ---
 
-## File Manifest (v1.0.0)
+## File Manifest (v2.0.0)
 
 ```
 asimovs-mind/
-+-- plugin.json                        # Claude Code plugin manifest (v1.0.0)
++-- plugin.json                        # Claude Code plugin manifest (v2.0.0)
 +-- README.md                          # Plugin documentation
++-- CHANGELOG.md                       # Version history (Keep a Changelog format)
 +-- ROADMAP.md                         # This file
++-- GETTING_STARTED.md                 # Installation and first-run guide
 +-- governance/
 |   +-- laws.json                      # Three Laws + Meta-Law
 |   +-- protected-zones.json           # Immutable file patterns
 |   +-- safety-floors.json             # Tunable minimums (encryption, privacy, etc.)
 |   +-- discovery-rules.json           # Code import governance
 |   +-- conformance-report.md          # cLaw Specification conformance audit
-|   +-- website-alignment.md           # FutureSpeak.AI website claim verification
 +-- personality/
 |   +-- friday.md                      # Agent Friday identity
-+-- agents/
-|   +-- git-scout.md                   # GitHub code discovery
-|   +-- git-loader.md                  # Safe code integration
-|   +-- sentinel.md                    # Governance enforcement
-|   +-- swarm-coordinator.md           # Wave orchestration (N agents)
-|   +-- meta-improver.md              # Self-improvement + agent creation
-|   +-- debugger.md                   # Test repair
-|   +-- optimizer.md                  # Performance optimization
-|   +-- evolver.md                    # Prompt engineering
-|   +-- breeder.md                    # Ollama model evolution
-|   +-- auditor.md                    # Security scanning
-|   +-- documenter.md                 # Docs sync
-|   +-- librarian.md                  # Cross-session memory
-|   +-- scout.md                      # Web research
-|   +-- architect.md                  # Structural analysis
-|   +-- creative.md                   # Contextual media generation
-|   +-- workflow-observer.md          # Pattern recognition
-+-- skills/
-|   +-- discover/SKILL.md             # /discover
-|   +-- create-agent/SKILL.md         # /create-agent
-|   +-- unleash/SKILL.md              # /unleash
-|   +-- federate/SKILL.md             # /federate
-|   +-- iterate/SKILL.md              # /iterate
-|   +-- diagnose/SKILL.md             # /diagnose
-|   +-- govern/SKILL.md               # /govern
-|   +-- breed/SKILL.md                # /breed
-|   +-- evolve/SKILL.md               # /evolve
-|   +-- status/SKILL.md               # /status
-|   +-- onboard/SKILL.md              # /onboard
-|   +-- friday/SKILL.md               # /friday
-|   +-- remember/SKILL.md             # /remember
-|   +-- route/SKILL.md                # /route (intelligence router)
-|   +-- unlock/SKILL.md               # /friday unlock (vault)
++-- agents/                            # 16 agents (dynamic discovery + creation)
++-- skills/                            # 15 user-invokable /commands
 +-- hooks/
 |   +-- first-law.py                   # PreToolUse: protected zone enforcement
 |   +-- third-law.py                   # PostToolUse: session ledger
@@ -440,22 +393,36 @@ asimovs-mind/
 |   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore from responses
 |   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge
 +-- mcp/
-|   +-- vault-server/                  # Sovereign Vault MCP server
-|       +-- index.js                   # MCP + HTTP bridge entry point
-|       +-- vault.js                   # SovereignVault + OllamaMonitor
-|       +-- crypto.js                  # AES-256-GCM, Argon2id, Ed25519, BLAKE2b
-|       +-- package.json               # Dependencies (MCP SDK, libsodium-sumo)
+|   +-- friday-core/                   # Agent Friday MCP server (17 subsystems)
+|       +-- bootstrap.js               # Entry point: auto-installs deps, loads index
+|       +-- index.js                   # Subsystem loader + HTTP bridge + dashboard
+|       +-- dashboard.html             # Three.js holographic desktop UI
+|       +-- core/                      # Shared infrastructure
+|       |   +-- event-bus.js, subsystem.js, state-manager.js, logger.js
+|       |   +-- vault.js, crypto.js    # Cryptographic primitives
+|       +-- subsystems/                # 17 subsystems (89 tools)
+|           +-- vault/                 # 10 tools  Encrypted state
+|           +-- identity/              #  6 tools  Ed25519, X25519, attestation
+|           +-- privacy/               #  4 tools  PII engine
+|           +-- p2p/                   #  7 tools  WebSocket, ECDH channels
+|           +-- ollama/                #  1 tool   Health monitoring
+|           +-- llm/                   #  6 tools  3 providers, router
+|           +-- memory/                #  8 tools  3-tier, embeddings, search
+|           +-- context/               #  4 tools  Knowledge graph, injection
+|           +-- trust/                 #  6 tools  Person-level graph, decay
+|           +-- personality/           #  6 tools  Evolution, calibration
+|           +-- agents/                #  7 tools  Delegation, deadlock detection
+|           +-- tools/                 #  4 tools  Registry, execution
+|           +-- connectors/            # 4+72     9 connectors, dispatch
+|           +-- gateway/               #  5 tools  Trust tiers, audit
+|           +-- briefing/              #  3 tools  Daily briefing, meetings
+|           +-- voice/                 #  3 tools  State machine, fallback
+|           +-- enterprise/            #  5 tools  Consent, cloud, confidence
 +-- discovery/
 |   +-- safety_scanner.py             # AST analysis (standalone)
 |   +-- provenance.py                 # Attribution CLI
 |   +-- memory.py                     # Unified trust graph + knowledge graph + RAG
-+-- directives/
-|   +-- discover.md                    # Autonomous discovery loop
-|   +-- full-sweep.md                 # The overnight run
-|   +-- fix-tests.md                  # Test pass rate
-|   +-- fix-types.md                  # TypeScript compliance
-|   +-- optimize-startup.md           # Initialization time
-|   +-- security-hardening.md         # OWASP vulnerabilities
++-- directives/                        # 8 autoresearch-style loops
 +-- framework/
     +-- spec.json                      # Portable governance spec
     +-- adapters/                      # LangChain, CrewAI, AutoGen
@@ -467,6 +434,6 @@ asimovs-mind/
 
 **[FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, the Sovereign Vault, and the Agent Friday ecosystem.
 
-**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** -- The full AI assistant that this kernel powers. The trust graph, sovereign vault, agent network, and voice pipeline live there.
+**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** -- The full AI assistant that this kernel powers. The nexus-os intelligence stack was ported into friday-core for v2.0.0. Agent Friday (Electron) remains the reference desktop implementation with voice and GUI; Asimov's Mind is the reference CLI/server implementation with the full 17-subsystem runtime.
 
 **[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy -- The iteration pattern at the core of every directive.
