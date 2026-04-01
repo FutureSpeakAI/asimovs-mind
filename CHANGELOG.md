@@ -7,6 +7,14 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.1.1] — 2026-04-01
+
+### Fixed
+- LLM subsystem: replace raw JSON Schema objects with Zod schemas for MCP tool registration. MCP SDK v1.29.0+ requires Zod schemas in `server.tool()` calls; the raw objects caused a fatal startup crash (`Tool llm_complete expected a Zod schema or ToolAnnotations`). This prevented the entire friday-core MCP server from starting.
+- Remove dead `#registerTool` abstraction from LLM subsystem. All 6 LLM tools now register directly via `server.tool()`, consistent with every other subsystem.
+
+---
+
 ## [2.1.0] — 2026-04-01 — Neural Binding
 
 The subsystems learn to talk to each other. The system becomes one intelligence.

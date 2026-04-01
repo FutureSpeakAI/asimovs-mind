@@ -9,6 +9,7 @@
  * three providers). Electron/IPC stripped; replaced with MCP tool surface.
  */
 
+import { z } from 'zod';
 import { Subsystem } from '../../core/subsystem.js';
 import { LLMClient } from './client.js';
 import { IntelligenceRouter } from './router.js';
@@ -30,168 +31,126 @@ export class LLMSubsystem extends Subsystem {
 
   // ── MCP Tool Registration ─────────────────────────────────────────
 
+  // Zod schemas for LLM tools
+  static #messageSchema = z.object({
+    role: z.enum(['system', 'user', 'assistant', 'tool']),
+    content: z.string(),
+  });
+
   registerTools(server) {
     // ── llm_complete ────────────────────────────────────────────────
-    server.setRequestHandler?.('tools/call', async (request) => {
-      // This is a fallback; prefer the pattern below
-    });
-
-    // Use the addTool pattern if server supports it, otherwise register inline
-    this.#registerTool(server, {
-      name: 'llm_complete',
-      description: 'Send a completion request to an LLM. Returns the full response text, model used, token usage, and latency.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          messages: {
-            type: 'array',
-            description: 'Array of chat messages. Each: { role: "system"|"user"|"assistant", content: string }',
-            items: {
-              type: 'object',
-              properties: {
-                role: { type: 'string', enum: ['system', 'user', 'assistant', 'tool'] },
-                content: { type: 'string' },
-              },
-              required: ['role', 'content'],
-            },
-          },
-          model: { type: 'string', description: 'Specific model ID (e.g. "claude-sonnet-4-20250514"). Optional.' },
-          provider: { type: 'string', description: 'Provider name: "anthropic", "ollama", or "openrouter". Optional.' },
-          systemPrompt: { type: 'string', description: 'System prompt (separate from messages). Optional.' },
-          maxTokens: { type: 'number', description: 'Max output tokens. Default: 1024.' },
-          temperature: { type: 'number', description: 'Sampling temperature 0-2. Optional.' },
-        },
-        required: ['messages'],
+    server.tool(
+      'llm_complete',
+      'Send a completion request to an LLM. Returns the full response text, model used, token usage, and latency.',
+      {
+        messages: z.array(LLMSubsystem.#messageSchema).describe('Array of chat messages'),
+        model: z.string().optional().describe('Specific model ID (e.g. "claude-sonnet-4-20250514")'),
+        provider: z.string().optional().describe('Provider name: "anthropic", "ollama", or "openrouter"'),
+        systemPrompt: z.string().optional().describe('System prompt (separate from messages)'),
+        maxTokens: z.number().optional().describe('Max output tokens. Default: 1024'),
+        temperature: z.number().optional().describe('Sampling temperature 0-2'),
       },
-      handler: async (params) => {
+      async ({ messages, model, provider, systemPrompt, maxTokens, temperature }) => {
         const response = await this.client.complete({
-          messages: params.messages,
-          model: params.model,
-          systemPrompt: params.systemPrompt,
-          maxTokens: params.maxTokens || 1024,
-          temperature: params.temperature,
-        }, params.provider);
+          messages, model, systemPrompt,
+          maxTokens: maxTokens || 1024,
+          temperature,
+        }, provider);
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                content: response.content,
-                model: response.model,
-                provider: response.provider,
-                usage: response.usage,
-                stopReason: response.stopReason,
-                latencyMs: response.latencyMs,
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              content: response.content,
+              model: response.model,
+              provider: response.provider,
+              usage: response.usage,
+              stopReason: response.stopReason,
+              latencyMs: response.latencyMs,
+            }, null, 2),
+          }],
         };
       },
-    });
+    );
 
     // ── llm_stream ──────────────────────────────────────────────────
-    this.#registerTool(server, {
-      name: 'llm_stream',
-      description: 'Stream a completion request. Returns accumulated text from the full stream.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          messages: {
-            type: 'array',
-            description: 'Chat messages array',
-            items: {
-              type: 'object',
-              properties: {
-                role: { type: 'string' },
-                content: { type: 'string' },
-              },
-              required: ['role', 'content'],
-            },
-          },
-          model: { type: 'string', description: 'Model ID. Optional.' },
-          provider: { type: 'string', description: 'Provider name. Optional.' },
-          systemPrompt: { type: 'string', description: 'System prompt. Optional.' },
-          maxTokens: { type: 'number', description: 'Max output tokens. Default: 4096.' },
-          temperature: { type: 'number', description: 'Temperature. Optional.' },
-        },
-        required: ['messages'],
+    server.tool(
+      'llm_stream',
+      'Stream a completion request. Returns accumulated text from the full stream.',
+      {
+        messages: z.array(LLMSubsystem.#messageSchema).describe('Chat messages array'),
+        model: z.string().optional().describe('Model ID'),
+        provider: z.string().optional().describe('Provider name'),
+        systemPrompt: z.string().optional().describe('System prompt'),
+        maxTokens: z.number().optional().describe('Max output tokens. Default: 4096'),
+        temperature: z.number().optional().describe('Temperature'),
       },
-      handler: async (params) => {
+      async ({ messages, model, provider, systemPrompt, maxTokens, temperature }) => {
         let fullText = '';
         let finalResponse = null;
 
         for await (const chunk of this.client.stream({
-          messages: params.messages,
-          model: params.model,
-          systemPrompt: params.systemPrompt,
-          maxTokens: params.maxTokens || 4096,
-          temperature: params.temperature,
-        }, params.provider)) {
+          messages, model, systemPrompt,
+          maxTokens: maxTokens || 4096,
+          temperature,
+        }, provider)) {
           if (chunk.text) fullText += chunk.text;
           if (chunk.done && chunk.fullResponse) finalResponse = chunk.fullResponse;
         }
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                content: finalResponse?.content || fullText,
-                model: finalResponse?.model || 'unknown',
-                provider: finalResponse?.provider || 'unknown',
-                usage: finalResponse?.usage || { inputTokens: 0, outputTokens: 0 },
-                stopReason: finalResponse?.stopReason || 'end_turn',
-                latencyMs: finalResponse?.latencyMs || 0,
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              content: finalResponse?.content || fullText,
+              model: finalResponse?.model || 'unknown',
+              provider: finalResponse?.provider || 'unknown',
+              usage: finalResponse?.usage || { inputTokens: 0, outputTokens: 0 },
+              stopReason: finalResponse?.stopReason || 'end_turn',
+              latencyMs: finalResponse?.latencyMs || 0,
+            }, null, 2),
+          }],
         };
       },
-    });
+    );
 
     // ── llm_status ──────────────────────────────────────────────────
-    this.#registerTool(server, {
-      name: 'llm_status',
-      description: 'Show all registered LLM providers, their availability, and the default provider.',
-      inputSchema: { type: 'object', properties: {} },
-      handler: async () => {
+    server.tool(
+      'llm_status',
+      'Show all registered LLM providers, their availability, and the default provider.',
+      {},
+      async () => {
         const providers = this.client.getStatus();
         const stats = this.router.getStats();
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                providers,
-                defaultProvider: this.client.getDefaultProvider(),
-                routerStats: {
-                  totalDecisions: stats.totalDecisions,
-                  monthlySpent: `$${stats.monthlySpentUsd.toFixed(4)}`,
-                  monthlyBudget: stats.monthlyBudgetUsd > 0
-                    ? `$${stats.monthlyBudgetUsd.toFixed(2)}`
-                    : 'unlimited',
-                  avgLatencyMs: Math.round(stats.avgLatencyMs),
-                },
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              providers,
+              defaultProvider: this.client.getDefaultProvider(),
+              routerStats: {
+                totalDecisions: stats.totalDecisions,
+                monthlySpent: `$${stats.monthlySpentUsd.toFixed(4)}`,
+                monthlyBudget: stats.monthlyBudgetUsd > 0
+                  ? `$${stats.monthlyBudgetUsd.toFixed(2)}`
+                  : 'unlimited',
+                avgLatencyMs: Math.round(stats.avgLatencyMs),
+              },
+            }, null, 2),
+          }],
         };
       },
-    });
+    );
 
     // ── llm_model_list ──────────────────────────────────────────────
-    this.#registerTool(server, {
-      name: 'llm_model_list',
-      description: 'List all models across all providers with capabilities and availability.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          availableOnly: { type: 'boolean', description: 'Only show available models. Default: false.' },
-        },
+    server.tool(
+      'llm_model_list',
+      'List all models across all providers with capabilities and availability.',
+      {
+        availableOnly: z.boolean().optional().describe('Only show available models. Default: false'),
       },
-      handler: async (params) => {
-        const all = params.availableOnly
+      async ({ availableOnly }) => {
+        const all = availableOnly
           ? this.router.getAvailableModels()
           : this.router.getModelRegistry();
 
@@ -212,82 +171,72 @@ export class LLMSubsystem extends Subsystem {
           content: [{ type: 'text', text: JSON.stringify(models, null, 2) }],
         };
       },
-    });
+    );
 
     // ── llm_route ───────────────────────────────────────────────────
-    this.#registerTool(server, {
-      name: 'llm_route',
-      description: 'Given a task description, return the recommended model and the reasoning behind the selection.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          task: { type: 'string', description: 'Natural-language description of the task.' },
-        },
-        required: ['task'],
+    server.tool(
+      'llm_route',
+      'Given a task description, return the recommended model and the reasoning behind the selection.',
+      {
+        task: z.string().describe('Natural-language description of the task'),
       },
-      handler: async (params) => {
-        const profile = this.router.profileTask(params.task);
+      async ({ task }) => {
+        const profile = this.router.profileTask(task);
         const decision = this.router.selectModel(profile);
         const model = this.router.getModel(decision.selectedModelId);
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                recommendedModel: decision.selectedModelId,
-                modelName: model?.name || decision.selectedModelId,
-                provider: model?.provider || 'unknown',
-                taskProfile: {
-                  category: profile.category,
-                  complexity: profile.complexity,
-                  latency: profile.latency,
-                  estimatedInputTokens: profile.estimatedInputTokens,
-                },
-                reason: decision.reason,
-                budgetConstrained: decision.budgetConstrained,
-                isFallback: decision.isFallback,
-                topScores: decision.scores.slice(0, 5).map((s) => ({
-                  modelId: s.modelId,
-                  score: s.totalScore.toFixed(3),
-                  breakdown: s.breakdown,
-                })),
-              }, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              recommendedModel: decision.selectedModelId,
+              modelName: model?.name || decision.selectedModelId,
+              provider: model?.provider || 'unknown',
+              taskProfile: {
+                category: profile.category,
+                complexity: profile.complexity,
+                latency: profile.latency,
+                estimatedInputTokens: profile.estimatedInputTokens,
+              },
+              reason: decision.reason,
+              budgetConstrained: decision.budgetConstrained,
+              isFallback: decision.isFallback,
+              topScores: decision.scores.slice(0, 5).map((s) => ({
+                modelId: s.modelId,
+                score: s.totalScore.toFixed(3),
+                breakdown: s.breakdown,
+              })),
+            }, null, 2),
+          }],
         };
       },
-    });
+    );
 
     // ── llm_set_provider ────────────────────────────────────────────
-    this.#registerTool(server, {
-      name: 'llm_set_provider',
-      description: 'Set the default LLM provider. Valid: "anthropic", "ollama", "openrouter".',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          provider: { type: 'string', description: 'Provider name to set as default.' },
-        },
-        required: ['provider'],
+    server.tool(
+      'llm_set_provider',
+      'Set the default LLM provider. Valid: "anthropic", "ollama", "openrouter".',
+      {
+        provider: z.string().describe('Provider name to set as default'),
       },
-      handler: async (params) => {
+      async ({ provider }) => {
         const valid = ['anthropic', 'ollama', 'openrouter'];
-        if (!valid.includes(params.provider)) {
+        if (!valid.includes(provider)) {
           return {
             content: [
-              { type: 'text', text: `Invalid provider "${params.provider}". Valid: ${valid.join(', ')}` },
+              { type: 'text', text: `Invalid provider "${provider}". Valid: ${valid.join(', ')}` },
             ],
             isError: true,
           };
         }
-        this.client.setDefaultProvider(params.provider);
+        this.client.setDefaultProvider(provider);
         return {
           content: [
-            { type: 'text', text: `Default provider set to "${params.provider}".` },
+            { type: 'text', text: `Default provider set to "${provider}".` },
           ],
         };
       },
-    });
+    );
   }
 
   // ── Events ────────────────────────────────────────────────────────
@@ -387,25 +336,4 @@ export class LLMSubsystem extends Subsystem {
     }
   }
 
-  /**
-   * Register a single MCP tool on the server.
-   * Adapts to whichever registration pattern the server supports.
-   */
-  #registerTool(server, { name, description, inputSchema, handler }) {
-    if (typeof server.tool === 'function') {
-      // MCP SDK style: server.tool(name, description, schema, handler)
-      server.tool(name, description, inputSchema, async (params) => {
-        return handler(params);
-      });
-    } else if (typeof server.addTool === 'function') {
-      server.addTool({ name, description, inputSchema }, handler);
-    } else if (this._toolRegistry) {
-      // Fallback: store tools for bulk registration
-      this._toolRegistry.set(name, { name, description, inputSchema, handler });
-    } else {
-      // Last resort: store and let the registry pick them up
-      if (!this._pendingTools) this._pendingTools = [];
-      this._pendingTools.push({ name, description, inputSchema, handler });
-    }
-  }
 }

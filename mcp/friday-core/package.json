@@ -1,6 +1,6 @@
 {
   "name": "@asimovs-mind/friday-core",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Agent Friday Runtime — 17 subsystems, 89 MCP tools, encrypted vault, holographic dashboard",
   "type": "module",
   "main": "index.js",

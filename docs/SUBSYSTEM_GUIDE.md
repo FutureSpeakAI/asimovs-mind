@@ -168,6 +168,8 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Vault State Keys:** `llm/router-state`, `api-keys` (root-level)
 **Dependencies:** Vault (API key storage), Ollama (model discovery)
 
+**Note:** All LLM tools use Zod schemas for MCP registration (matching the pattern used by every other subsystem). MCP SDK v1.29.0+ rejects raw JSON Schema objects in `server.tool()` calls.
+
 ---
 
 ### 7. Memory
