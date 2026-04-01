@@ -8,6 +8,8 @@
  * Called once after registry.startAll() completes.
  */
 
+import { EpistemicTracker } from './eis.js';
+
 const LOG_PREFIX = '[wiring]';
 
 function warn(msg, err) {
@@ -20,6 +22,26 @@ function warn(msg, err) {
  * @param {import('./event-bus.js').FridayEventBus} eventBus
  */
 export function wireSubsystems(registry, eventBus) {
+
+  // -----------------------------------------------------------------------
+  // Epistemic Independence Score -- tracks user's critical engagement
+  // -----------------------------------------------------------------------
+  const epistemicTracker = new EpistemicTracker({ eventBus, logger: { info: (m) => process.stderr.write(`${LOG_PREFIX} ${m}\n`), warn: (m) => process.stderr.write(`${LOG_PREFIX} ${m}\n`) } });
+
+  // Feed LLM interaction completions into the EIS tracker
+  eventBus.on('llm:request-completed', (event) => {
+    try {
+      if (event.data?.signals) {
+        epistemicTracker.recordInteraction(event.data.signals);
+      }
+    } catch (e) { warn('eis on llm:request-completed', e); }
+  });
+
+  // Pass EIS tracker to personality subsystem for score access
+  try {
+    const personality = registry.get('personality');
+    if (personality) personality.epistemicTracker = epistemicTracker;
+  } catch (e) { warn('eis personality binding', e); }
 
   // -----------------------------------------------------------------------
   // vault:unlocked -> personality loads, memory loads, context loads,
@@ -180,4 +202,7 @@ export function wireSubsystems(registry, eventBus) {
     try { await registry.get('personality')?.stop?.(); } catch (e) { warn('personality on session:end', e); }
     try { await registry.get('enterprise')?.stop?.(); } catch (e) { warn('enterprise on session:end', e); }
   });
+
+  // -- Expose tracker for external access ---------------------------------
+  return { epistemicTracker };
 }

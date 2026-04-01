@@ -2,7 +2,7 @@
  * Trust Subsystem — Person-level trust graph with hermeneutic re-evaluation
  *
  * Tools: trust_person_score, trust_evidence_add, trust_evidence_list,
- *        trust_reevaluate, trust_graph_status, trust_person_resolve
+ *        trust_reevaluate, trust_graph_status, trust_person_resolve, trust_explain
  *
  * Models every person in the user's world with multi-dimensional trust scoring,
  * evidence tracking, fuzzy person resolution, and hermeneutic re-evaluation.
@@ -21,6 +21,8 @@ const EVIDENCE_TYPES = [
   'emotional_support', 'user_stated',
   'observed', 'inferred',
 ];
+
+const DECAY_THRESHOLD_DAYS = 30;
 
 export class TrustSubsystem extends Subsystem {
   #graph;
@@ -46,11 +48,92 @@ export class TrustSubsystem extends Subsystem {
     this.eventBus.on('memory:person_mentions', async (mentions) => {
       await this.#graph.processPersonMentions(mentions);
     });
+
+    // Auto-decay on vault unlock (session start equivalent)
+    this.eventBus.on('vault:unlocked', () => {
+      try {
+        this.autoDecay();
+      } catch (err) {
+        this.log.warn(`Trust auto-decay on unlock failed: ${err.message}`);
+      }
+    });
   }
 
   /** Expose the graph instance for other subsystems */
   get graph() {
     return this.#graph;
+  }
+
+  /**
+   * Auto-decay: iterate all persons in the graph. Anyone not seen in 30+ days
+   * gets a decay pass. Publishes trust:score-updated for each affected person.
+   */
+  autoDecay() {
+    const now = Date.now();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const persons = this.#graph.getAllPersons();
+    let decayCount = 0;
+
+    for (const person of persons) {
+      const daysSince = (now - person.lastSeen) / msPerDay;
+      if (daysSince < DECAY_THRESHOLD_DAYS) continue;
+
+      const beforeOverall = person.trust.overall;
+      this.#graph.recomputeTrust(person.id);
+      decayCount++;
+
+      if (this.eventBus) {
+        this.eventBus.publish('trust:score-updated', {
+          personName: person.primaryName,
+          personId: person.id,
+          overall: person.trust.overall,
+          previousOverall: beforeOverall,
+          reason: 'auto_decay',
+          daysSinceSeen: Math.floor(daysSince),
+        });
+      }
+    }
+
+    if (decayCount > 0) {
+      this.log.info(`Auto-decay applied to ${decayCount} persons`);
+    }
+  }
+
+  /**
+   * Build a natural-language explanation of a person's trust score.
+   */
+  #explainTrust(identifier) {
+    const { person } = this.#graph.resolvePerson(identifier);
+    if (!person) return { found: false, explanation: `No person found matching "${identifier}".` };
+
+    const overall = person.trust.overall;
+    const label = overall >= 0.85 ? 'very high'
+      : overall >= 0.7 ? 'high'
+      : overall >= 0.55 ? 'moderate'
+      : overall >= 0.4 ? 'developing'
+      : overall >= 0.25 ? 'low'
+      : 'very low';
+
+    const positive = person.evidence.filter(e => e.impact > 0).length;
+    const negative = person.evidence.filter(e => e.impact < 0).length;
+
+    // Top 3 evidence entries by absolute impact
+    const topEvidence = [...person.evidence]
+      .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+      .slice(0, 3)
+      .map(e => e.description);
+
+    const daysSinceSeen = Math.floor((Date.now() - person.lastSeen) / (24 * 60 * 60 * 1000));
+    const lastSeenStr = daysSinceSeen === 0 ? 'today' : `${daysSinceSeen} day${daysSinceSeen === 1 ? '' : 's'} ago`;
+
+    let explanation = `Your trust in ${person.primaryName} is ${(overall * 100).toFixed(0)}% (${label}). `;
+    explanation += `Based on: ${positive} positive evidence, ${negative} negative. `;
+    if (topEvidence.length > 0) {
+      explanation += `Key factors: ${topEvidence.join('; ')}. `;
+    }
+    explanation += `Last seen ${lastSeenStr}.`;
+
+    return { found: true, person: person.primaryName, explanation, overall, label };
   }
 
   registerTools(server) {
@@ -258,6 +341,27 @@ export class TrustSubsystem extends Subsystem {
                 interactions: person.interactionCount,
               },
             }, null, 2)
+          }]
+        };
+      }
+    );
+
+    // -- trust_explain ------------------------------------------------------
+
+    server.tool(
+      'trust_explain',
+      'Get a natural language explanation of trust for a person. Summarizes score, evidence breakdown, key factors, and last seen.',
+      {
+        identifier: z.string().describe('Person name, email, handle, or alias'),
+      },
+      async ({ identifier }) => {
+        const result = this.#explainTrust(identifier);
+        return {
+          content: [{
+            type: 'text',
+            text: result.found
+              ? JSON.stringify(result, null, 2)
+              : JSON.stringify({ found: false, explanation: result.explanation }),
           }]
         };
       }

@@ -21,11 +21,25 @@ import { CalibrationEngine } from './calibration.js';
 import { SentimentEngine } from './sentiment.js';
 import { PersonalityEvolution } from './evolution.js';
 
+// Sycophancy risk -> challenge level mapping
+const SYCOPHANCY_CHALLENGE_MAP = {
+  highest: 5,
+  high: 4,
+  moderate: 3,
+  low: 2,
+  unknown: 3,
+};
+
+const MAX_PERSONALITY_HISTORY = 20;
+
 export class PersonalitySubsystem extends Subsystem {
   #profile;
   #calibration;
   #sentiment;
   #evolution;
+
+  /** Set by wiring.js -- epistemic independence tracker */
+  epistemicTracker = null;
 
   constructor(deps) {
     super('personality', deps);
@@ -46,11 +60,84 @@ export class PersonalitySubsystem extends Subsystem {
     const profile = this.#profile.getProfile();
     await this.#evolution.incrementSession(profile.traits);
 
+    // Mother Signal Bridge: load user-profile and calibrate challenge level
+    await this.#applyMotherSignal();
+
     await super.start();
     this.log.info(`Personality loaded: ${profile.name} (mode: ${profile.mode})`);
   }
 
+  /**
+   * Read user-profile from vault root, extract mother_signal.sycophancy_risk,
+   * map to challenge level, and merge user preferences into personality.
+   */
+  async #applyMotherSignal() {
+    try {
+      // Read from vault root (not namespaced)
+      const vault = this.state?.constructor?.name === 'Object' ? null : this.vault;
+      if (!vault) return;
+
+      const result = await vault.read('user-profile');
+      const userProfile = result?.success ? result.data : result;
+      if (!userProfile) return;
+
+      // Extract sycophancy risk and map to challenge level
+      const risk = userProfile.mother_signal?.sycophancy_risk || 'unknown';
+      const challengeLevel = SYCOPHANCY_CHALLENGE_MAP[risk] || 3;
+      await this.#profile.updateProfile({ challengeLevel });
+      this.log.info(`Mother signal: sycophancy_risk=${risk} -> challengeLevel=${challengeLevel}`);
+
+      // Merge user preferences into personality if they exist
+      const prefs = userProfile.preferences || {};
+      const prefKeys = ['stuck_behavior', 'error_handling', 'quality_vs_speed', 'anti_patterns'];
+      const toMerge = {};
+      for (const key of prefKeys) {
+        if (prefs[key] !== undefined) toMerge[key] = prefs[key];
+      }
+      if (Object.keys(toMerge).length > 0) {
+        const current = this.#profile.getProfile();
+        await this.#profile.updateProfile({
+          ...current,
+          userPreferences: { ...(current.userPreferences || {}), ...toMerge },
+        });
+        this.log.info(`Merged user preferences: ${Object.keys(toMerge).join(', ')}`);
+      }
+    } catch (err) {
+      this.log.warn(`Mother signal load failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Personality versioning: snapshot current profile before overwriting.
+   * Keeps a rolling history of max 20 versions.
+   */
+  async #snapshotVersion() {
+    try {
+      if (!this.state) return;
+      const currentProfile = this.#profile.getProfile();
+      const historyResult = await this.state.read('personality-history');
+      const history = (historyResult?.success ? historyResult.data : historyResult) || [];
+      const versions = Array.isArray(history) ? history : [];
+
+      versions.push({
+        profile: currentProfile,
+        savedAt: Date.now(),
+      });
+
+      // Cap at MAX_PERSONALITY_HISTORY
+      while (versions.length > MAX_PERSONALITY_HISTORY) {
+        versions.shift();
+      }
+
+      await this.state.write('personality-history', versions);
+    } catch (err) {
+      this.log.warn(`Personality version snapshot failed: ${err.message}`);
+    }
+  }
+
   async stop() {
+    // Snapshot current personality version before shutdown
+    await this.#snapshotVersion();
     await super.stop();
   }
 
@@ -66,6 +153,15 @@ export class PersonalitySubsystem extends Subsystem {
     // Idle check-in reactions
     this.eventBus.on('checkin:dismissed', () => this.#calibration.recordDismissal());
     this.eventBus.on('checkin:engaged', () => this.#calibration.recordEngagement());
+
+    // On vault:unlocked, re-apply mother signal (in case vault was locked during start)
+    this.eventBus.on('vault:unlocked', async () => {
+      try {
+        await this.#applyMotherSignal();
+      } catch (err) {
+        this.log.warn(`Mother signal re-apply on unlock failed: ${err.message}`);
+      }
+    });
   }
 
   /** Expose components for other subsystems */

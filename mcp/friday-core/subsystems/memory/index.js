@@ -25,12 +25,16 @@ import { MemoryTiers } from './tiers.js';
 import { EpisodicMemory } from './episodic.js';
 import { MemoryConsolidation } from './consolidation.js';
 
+// Capacity caps per tier
+const TIER_CAPS = { short: 100, medium: 500, long: 1000 };
+
 export class MemorySubsystem extends Subsystem {
   #pipeline;
   #search;
   #tiers;
   #episodic;
   #consolidation;
+  #sessionBufferTimer = null;
 
   constructor(deps) {
     super('memory', deps);
@@ -51,14 +55,38 @@ export class MemorySubsystem extends Subsystem {
     // Initialize episodic memory (loads episodes from vault)
     await this.#episodic.initialize(this.state, this.#search);
 
+    // Session buffer: flush short-term to vault every 5 minutes for crash recovery
+    this.#sessionBufferTimer = setInterval(() => {
+      this.#flushSessionBuffer().catch(err =>
+        this.log.warn(`session buffer flush failed: ${err.message}`)
+      );
+    }, 5 * 60 * 1000);
+
     await super.start();
     this.log.info('Memory subsystem started');
   }
 
   async stop() {
+    // Clear session buffer interval and do final flush
+    if (this.#sessionBufferTimer) {
+      clearInterval(this.#sessionBufferTimer);
+      this.#sessionBufferTimer = null;
+    }
+    await this.#flushSessionBuffer();
     this.#tiers.clearShortTerm();
     this.#pipeline.stop();
     await super.stop();
+  }
+
+  async #flushSessionBuffer() {
+    if (!this.state) return;
+    const shortTerm = this.#tiers.getShortTerm();
+    if (shortTerm.length > 0) {
+      await this.state.write('session-buffer', {
+        entries: shortTerm,
+        flushedAt: Date.now(),
+      });
+    }
   }
 
   registerEvents() {
@@ -66,6 +94,74 @@ export class MemorySubsystem extends Subsystem {
     this.eventBus.on('session:end', () => {
       this.#tiers.clearShortTerm();
     });
+
+    // Auto-extract: trust evidence -> store observation
+    this.eventBus.on('trust:evidence-added', (event) => {
+      if (!this.started || !event.data?.description) return;
+      this.#storeWithCapacity(
+        `Trust observation: ${event.data.description}`,
+        'fact', 'medium', 0.7
+      ).catch(() => {});
+    });
+
+    // Auto-extract: agent completed -> store result observation
+    this.eventBus.on('agent:completed', (event) => {
+      if (!this.started || !event.data?.summary) return;
+      this.#storeWithCapacity(
+        `Agent result: ${event.data.summary}`,
+        'context', 'short', 0.9
+      ).catch(() => {});
+    });
+
+    // Auto-extract: connector detected -> store tool availability
+    this.eventBus.on('connector:detected', (event) => {
+      if (!this.started || !event.data?.connectorId) return;
+      this.#storeWithCapacity(
+        `Connector available: ${event.data.connectorId}`,
+        'context', 'short', 0.6
+      ).catch(() => {});
+    });
+
+    // Auto-extract: enterprise commitment -> store as memory
+    this.eventBus.on('enterprise:commitment-created', (event) => {
+      if (!this.started || !event.data?.description) return;
+      this.#storeWithCapacity(
+        `Commitment: ${event.data.description} (${event.data.personName || 'unknown'})`,
+        'fact', 'medium', 0.8
+      ).catch(() => {});
+    });
+  }
+
+  /**
+   * Store with capacity management. If a tier is over its cap, evict the
+   * oldest entry with the lowest access count before inserting.
+   */
+  async #storeWithCapacity(content, category, tier, confidence) {
+    const tierMap = { short: 'shortTerm', medium: 'mediumTerm', long: 'longTerm' };
+    const tierKey = tierMap[tier];
+    const cap = TIER_CAPS[tier];
+
+    if (tierKey && cap) {
+      const getter = {
+        shortTerm: () => this.#tiers.getShortTerm(),
+        mediumTerm: () => this.#tiers.getMediumTerm(),
+        longTerm: () => this.#tiers.getLongTerm(),
+      };
+      const entries = getter[tierKey]();
+      if (entries.length >= cap) {
+        // Evict oldest entry with lowest access count
+        const sorted = [...entries].sort((a, b) => {
+          const accessDiff = a.accessCount - b.accessCount;
+          if (accessDiff !== 0) return accessDiff;
+          return a.created - b.created;
+        });
+        if (sorted.length > 0) {
+          await this.#tiers.forget(sorted[0].id);
+        }
+      }
+    }
+
+    return this.#tiers.store(content, category, tier, confidence);
   }
 
   registerTools(server) {

@@ -277,9 +277,11 @@ export class MemoryTiers {
 
   #keywordRecall(query, limit) {
     const q = query.toLowerCase();
+    const now = Date.now();
+    const maxAgeMs = 30 * 24 * 60 * 60 * 1000; // 30 days normalization window
     const results = [];
 
-    const score = (entry, tier) => {
+    const keywordScore = (entry, tier) => {
       const text = entry.content.toLowerCase();
       if (!text.includes(q) && !q.split(/\s+/).some(w => text.includes(w))) return 0;
       let s = text.includes(q) ? 5 : 1;
@@ -288,16 +290,25 @@ export class MemoryTiers {
       return s;
     };
 
+    const blendedScore = (entry, tier) => {
+      const kw = keywordScore(entry, tier);
+      if (kw === 0) return 0;
+      // Time-weighted recall: blend keyword relevance (0.6) with recency (0.4)
+      const ageMs = Math.max(0, now - (entry.accessed || entry.created));
+      const recency = Math.max(0, 1 - ageMs / maxAgeMs);
+      return kw * 0.6 + recency * 10 * 0.4; // scale recency to comparable range
+    };
+
     for (const entry of this.#store.longTerm) {
-      const s = score(entry, 'long-term');
+      const s = blendedScore(entry, 'long-term');
       if (s > 0) results.push({ id: entry.id, content: entry.content, type: 'long-term', score: s, meta: { category: entry.category } });
     }
     for (const entry of this.#store.mediumTerm) {
-      const s = score(entry, 'medium-term');
+      const s = blendedScore(entry, 'medium-term');
       if (s > 0) results.push({ id: entry.id, content: entry.content, type: 'medium-term', score: s, meta: { category: entry.category } });
     }
     for (const entry of this.#store.shortTerm) {
-      const s = score(entry, 'short-term');
+      const s = blendedScore(entry, 'short-term');
       if (s > 0) results.push({ id: entry.id, content: entry.content, type: 'short-term', score: s, meta: { category: entry.category } });
     }
 

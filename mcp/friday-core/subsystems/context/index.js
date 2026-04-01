@@ -42,6 +42,16 @@ export class ContextSubsystem extends Subsystem {
   async start() {
     await this.#graph.load();
 
+    // Attempt to load graph from vault immediately (in case vault is already unlocked)
+    try {
+      const saved = await this.state.read('graph');
+      if (saved?.success && saved.data) {
+        this.log.info('context graph loaded from vault on start');
+      }
+    } catch {
+      // Vault may not be unlocked yet, that is fine
+    }
+
     // Auto-persist every 5 minutes
     this.#persistTimer = setInterval(() => {
       this.#graph.persist().catch(err =>
@@ -76,6 +86,68 @@ export class ContextSubsystem extends Subsystem {
         // Don't let graph errors break the event pipeline
       }
     });
+
+    // On vault:unlocked, reload graph from vault
+    this.eventBus.on('vault:unlocked', async () => {
+      try {
+        await this.#graph.load();
+        this.log.info('context graph reloaded on vault unlock');
+      } catch (err) {
+        this.log.warn(`context graph reload on unlock failed: ${err.message}`);
+      }
+    });
+
+    // On session:start, hydrate with cwd info (project name, git branch)
+    this.eventBus.on('session:start', (event) => {
+      try {
+        const data = event.data || {};
+        if (data.projectName) {
+          this.#graph.addNode({
+            id: `proj:${data.projectName}`,
+            type: 'project',
+            name: data.projectName,
+            metadata: {
+              cwd: data.cwd,
+              gitBranch: data.gitBranch || null,
+            },
+          });
+        }
+        if (data.cwd) {
+          this.#graph.addNode({
+            id: `file:${data.cwd}`,
+            type: 'file',
+            name: data.cwd.split(/[\\/]/).pop() || data.cwd,
+            metadata: { path: data.cwd, isWorkdir: true },
+          });
+        }
+        this.log.info('context hydrated with session cwd info');
+      } catch (err) {
+        this.log.warn(`context session hydration failed: ${err.message}`);
+      }
+    });
+
+    // On memory:stored, feed content into graph for entity extraction
+    this.eventBus.on('memory:stored', (event) => {
+      try {
+        if (event.data?.content) {
+          this.#graph.processEvent(event);
+        }
+      } catch {
+        // Don't let graph errors break the event pipeline
+      }
+    });
+
+    // On session:end or vault:locking, save graph to vault
+    const saveGraph = async () => {
+      try {
+        await this.#graph.persist();
+        this.log.info('context graph saved to vault');
+      } catch (err) {
+        this.log.warn(`context graph save failed: ${err.message}`);
+      }
+    };
+    this.eventBus.on('session:end', saveGraph);
+    this.eventBus.on('vault:locking', saveGraph);
   }
 
   // -- MCP tools ---------------------------------------------------------------
