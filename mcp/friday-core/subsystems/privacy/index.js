@@ -118,7 +118,14 @@ export class PrivacySubsystem extends Subsystem {
         const shield = vault.privacyShield;
         const nonce = shield.getNonce();
         const scrubbed = scrubPii(text, nonce, shield);
-        return { content: [{ type: 'text', text: JSON.stringify({ scrubbed, stats: shield.getStats() }, null, 2) }] };
+        const stats = shield.getStats();
+
+        // Emit privacy event so other subsystems can react to scrubbing activity
+        if (stats.total > 0) {
+          this.eventBus.publish('privacy:scrubbed', { categories: stats.categories, total: stats.total });
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify({ scrubbed, stats }, null, 2) }] };
       }
     );
 

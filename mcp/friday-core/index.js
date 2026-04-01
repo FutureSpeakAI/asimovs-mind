@@ -203,12 +203,17 @@ async function startHttpBridge() {
           const result = await vault.initialize(passphrase);
           res.end(JSON.stringify(result));
 
-        } else if (route.startsWith('/tool/') && req.method === 'POST') {
+        } else if (route.startsWith('/tool/') && (req.method === 'POST' || req.method === 'GET')) {
           // Generic MCP tool endpoint: POST /tool/:toolName { args: {} }
+          // Also supports GET with empty args (for dashboard and hook convenience)
           const toolName = route.slice('/tool/'.length);
           if (!toolName) { res.writeHead(400); res.end(JSON.stringify({ error: 'Missing tool name' })); return; }
-          const body = await readBody(req);
-          const { args = {} } = JSON.parse(body);
+          let args = {};
+          if (req.method === 'POST') {
+            const body = await readBody(req);
+            const parsed = JSON.parse(body);
+            args = parsed.args || {};
+          }
           // Find the tool in the registry and invoke it via the MCP server
           const result = await server.callTool(toolName, args);
           res.end(JSON.stringify(result));

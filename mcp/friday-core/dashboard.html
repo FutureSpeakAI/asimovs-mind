@@ -53,6 +53,14 @@
   .br { grid-row: 3; grid-column: 2; align-self: end; text-align: right; }
   .br .meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 
+  /* Connection indicator */
+  #conn-indicator { position: fixed; top: 12px; right: 12px; z-index: 20; display: flex; align-items: center; gap: 6px; }
+  #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; transition: background 0.4s;
+              box-shadow: 0 0 6px #2ecc7188; }
+  #conn-dot.disconnected { background: #e74c3c; box-shadow: 0 0 6px #e74c3c88; }
+  #conn-label { font-size: 0.65em; color: #e74c3c; display: none; letter-spacing: 0.08em; text-transform: uppercase; }
+  #conn-dot.disconnected + #conn-label { display: inline; }
+
   /* Center bottom subsystem bar */
   #subsystems { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
                 display: flex; gap: 6px; align-items: center; background: #0a0a0a99; border: 1px solid #00f0ff22;
@@ -95,6 +103,12 @@
 <body>
 
 <!-- Three.js canvas injected here -->
+
+<!-- Connection indicator -->
+<div id="conn-indicator">
+  <div id="conn-dot"></div>
+  <span id="conn-label">disconnected</span>
+</div>
 
 <!-- HUD Overlay -->
 <div id="hud">
@@ -150,6 +164,26 @@ const SUBS = ['vault','identity','privacy','ollama','p2p','llm','memory','contex
               'trust','personality','agents','tools','connectors','gateway','briefing','voice','enterprise'];
 const startTime = Date.now();
 let vaultUnlocked = false;
+let connected = false;
+
+// --- Particle data binding state ---
+let targetParticleCount = 400;
+let activeParticleCount = 400;
+const MAX_PARTICLES = 400;
+// Per-particle tier assignment: 0=short (cyan), 1=medium (blue), 2=long (white)
+const particleTiers = new Uint8Array(MAX_PARTICLES);
+for (let i = 0; i < MAX_PARTICLES; i++) particleTiers[i] = 0; // default: short-term cyan
+
+// --- Orb pulse rate state ---
+let orbPulseSpeed = 2.5; // base pulse speed, driven by event count
+
+// --- Connection indicator ---
+const connDot = document.getElementById('conn-dot');
+
+function setConnected(state) {
+  connected = state;
+  connDot.classList.toggle('disconnected', !state);
+}
 
 // --- Subsystem dots ---
 const subBar = document.getElementById('subsystems');
@@ -192,12 +226,13 @@ const grid = new THREE.LineSegments(gridGeo, gridMat);
 grid.position.y = -2;
 scene.add(grid);
 
-// --- Particle field ---
-const PARTICLE_COUNT = 400;
+// --- Particle field (data-bound) ---
 const pGeo = new THREE.BufferGeometry();
-const pPositions = new Float32Array(PARTICLE_COUNT * 3);
-const pVelocities = new Float32Array(PARTICLE_COUNT * 3);
-for (let i = 0; i < PARTICLE_COUNT; i++) {
+const pPositions = new Float32Array(MAX_PARTICLES * 3);
+const pVelocities = new Float32Array(MAX_PARTICLES * 3);
+const pColors = new Float32Array(MAX_PARTICLES * 3);
+const pAlphas = new Float32Array(MAX_PARTICLES); // per-particle alpha for fade in/out
+for (let i = 0; i < MAX_PARTICLES; i++) {
   const i3 = i * 3;
   pPositions[i3]     = (Math.random() - 0.5) * 30;
   pPositions[i3 + 1] = Math.random() * 12 - 2;
@@ -205,10 +240,16 @@ for (let i = 0; i < PARTICLE_COUNT; i++) {
   pVelocities[i3]     = (Math.random() - 0.5) * 0.005;
   pVelocities[i3 + 1] = (Math.random() - 0.5) * 0.003;
   pVelocities[i3 + 2] = (Math.random() - 0.5) * 0.005;
+  // Default color: cyan (short-term)
+  pColors[i3] = 0; pColors[i3 + 1] = 0.94; pColors[i3 + 2] = 1;
+  pAlphas[i] = 1.0;
 }
 pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
-const pMat = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.08, transparent: true, opacity: 0.7,
-                                        sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false });
+pGeo.setAttribute('color', new THREE.Float32BufferAttribute(pColors, 3));
+const pMat = new THREE.PointsMaterial({
+  size: 0.08, transparent: true, opacity: 0.7, vertexColors: true,
+  sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false
+});
 const particles = new THREE.Points(pGeo, pMat);
 scene.add(particles);
 
@@ -243,6 +284,59 @@ const orbLight = new THREE.PointLight(0x00f0ff, 2, 15);
 orbLight.position.copy(orb.position);
 scene.add(orbLight);
 
+/**
+ * Update particle colors and visibility based on memory tier counts.
+ * Assigns particles to tiers proportionally and sets colors.
+ * Fades out particles beyond the target count.
+ */
+function updateParticleBinding(shortCount, midCount, longCount) {
+  const total = shortCount + midCount + longCount;
+  targetParticleCount = Math.min(total, MAX_PARTICLES);
+
+  if (total === 0) {
+    // No data yet -- keep particles with default cyan
+    return;
+  }
+
+  // Proportional allocation
+  const ratio = Math.min(total, MAX_PARTICLES) / total;
+  const nShort = Math.round(shortCount * ratio);
+  const nMid = Math.round(midCount * ratio);
+  const nLong = Math.min(Math.round(longCount * ratio), MAX_PARTICLES - nShort - nMid);
+
+  // Assign tiers and colors
+  let idx = 0;
+  for (let i = 0; i < nShort && idx < MAX_PARTICLES; i++, idx++) {
+    particleTiers[idx] = 0;
+    const i3 = idx * 3;
+    pColors[i3] = 0; pColors[i3 + 1] = 0.94; pColors[i3 + 2] = 1; // cyan
+  }
+  for (let i = 0; i < nMid && idx < MAX_PARTICLES; i++, idx++) {
+    particleTiers[idx] = 1;
+    const i3 = idx * 3;
+    pColors[i3] = 0.15; pColors[i3 + 1] = 0.35; pColors[i3 + 2] = 1; // blue
+  }
+  for (let i = 0; i < nLong && idx < MAX_PARTICLES; i++, idx++) {
+    particleTiers[idx] = 2;
+    const i3 = idx * 3;
+    pColors[i3] = 0.9; pColors[i3 + 1] = 0.92; pColors[i3 + 2] = 1; // white
+  }
+
+  // Mark remaining as faded
+  for (; idx < MAX_PARTICLES; idx++) {
+    pAlphas[idx] = 0;
+  }
+
+  // Mark active as visible
+  const activeCount = nShort + nMid + nLong;
+  for (let i = 0; i < activeCount; i++) {
+    pAlphas[i] = 1.0;
+  }
+
+  activeParticleCount = activeCount;
+  pGeo.attributes.color.needsUpdate = true;
+}
+
 // --- Animation ---
 function animate(time) {
   requestAnimationFrame(animate);
@@ -250,7 +344,14 @@ function animate(time) {
 
   // Particle drift
   const pos = particles.geometry.attributes.position.array;
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    // Fade inactive particles: move them far away
+    if (pAlphas[i] <= 0 && i >= activeParticleCount) {
+      const i3 = i * 3;
+      pos[i3 + 1] = -100; // hide below scene
+      continue;
+    }
+
     const i3 = i * 3;
     pos[i3]     += pVelocities[i3];
     pos[i3 + 1] += pVelocities[i3 + 1];
@@ -265,12 +366,13 @@ function animate(time) {
   }
   particles.geometry.attributes.position.needsUpdate = true;
 
-  // Connection lines between nearby particles
+  // Connection lines between nearby active particles
   const cp = connections.geometry.attributes.position.array;
   let ci = 0, drawn = 0;
   const threshold = 4;
-  outer: for (let a = 0; a < PARTICLE_COUNT && drawn < MAX_CONNECTIONS; a++) {
-    for (let b = a + 1; b < PARTICLE_COUNT && drawn < MAX_CONNECTIONS; b++) {
+  const limit = Math.min(activeParticleCount, MAX_PARTICLES);
+  for (let a = 0; a < limit && drawn < MAX_CONNECTIONS; a++) {
+    for (let b = a + 1; b < limit && drawn < MAX_CONNECTIONS; b++) {
       const a3 = a * 3, b3 = b * 3;
       const dx = pos[a3] - pos[b3], dy = pos[a3+1] - pos[b3+1], dz = pos[a3+2] - pos[b3+2];
       const d2 = dx*dx + dy*dy + dz*dz;
@@ -284,13 +386,13 @@ function animate(time) {
   connections.geometry.setDrawRange(0, drawn * 2);
   connections.geometry.attributes.position.needsUpdate = true;
 
-  // Orb pulse
-  const pulse = 1 + 0.08 * Math.sin(t * 2.5);
+  // Orb pulse -- speed driven by event count
+  const pulse = 1 + 0.08 * Math.sin(t * orbPulseSpeed);
   orb.scale.setScalar(pulse);
   glow.scale.setScalar(pulse * 1.6);
-  orbMat.opacity = 0.3 + 0.1 * Math.sin(t * 3);
-  glowMat.opacity = 0.05 + 0.03 * Math.sin(t * 2);
-  orbLight.intensity = 1.5 + 0.8 * Math.sin(t * 2.5);
+  orbMat.opacity = 0.3 + 0.1 * Math.sin(t * (orbPulseSpeed * 1.2));
+  glowMat.opacity = 0.05 + 0.03 * Math.sin(t * (orbPulseSpeed * 0.8));
+  orbLight.intensity = 1.5 + 0.8 * Math.sin(t * orbPulseSpeed);
 
   // Grid pulse
   gridMat.opacity = 0.06 + 0.03 * Math.sin(t * 1.2);
@@ -322,15 +424,35 @@ function uptimeStr() {
   return h + 'h ' + Math.floor((sec%3600)/60) + 'm';
 }
 
-async function fetchJson(url) {
-  try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; }
+/**
+ * Call an MCP tool via the HTTP bridge using POST with empty args.
+ */
+async function callTool(name) {
+  const resp = await fetch(`/tool/${name}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ args: {} })
+  });
+  return resp.json();
 }
 
 async function poll() {
   document.getElementById('v-uptime').textContent = uptimeStr();
 
-  // Vault status
-  const status = await fetchJson('/status');
+  // Vault status (GET endpoint, not a tool)
+  let status = null;
+  try {
+    const r = await fetch('/status');
+    if (r.ok) {
+      status = await r.json();
+      setConnected(true);
+    } else {
+      setConnected(false);
+    }
+  } catch {
+    setConnected(false);
+  }
+
   if (status) {
     const locked = status.vault !== 'unlocked';
     const el = document.getElementById('v-vault');
@@ -361,36 +483,87 @@ async function poll() {
 
   if (!vaultUnlocked) return; // Skip tool endpoints when locked
 
-  // Memory status
-  const mem = await fetchJson('/tool/memory_status');
-  if (mem) {
-    document.getElementById('v-mem-short').textContent = fmt(mem.short_term);
-    document.getElementById('v-mem-mid').textContent = fmt(mem.medium_term);
-    document.getElementById('v-mem-long').textContent = fmt(mem.long_term);
-  }
+  // Memory status (POST)
+  try {
+    const memRaw = await callTool('memory_status');
+    // MCP tools return { content: [{ text: "..." }] } -- parse inner text
+    const mem = parseMcpResult(memRaw);
+    if (mem && mem.tiers) {
+      const shortCount = mem.tiers.shortTerm || 0;
+      const midCount = mem.tiers.mediumTerm || 0;
+      const longCount = mem.tiers.longTerm || 0;
+      document.getElementById('v-mem-short').textContent = shortCount;
+      document.getElementById('v-mem-mid').textContent = midCount;
+      document.getElementById('v-mem-long').textContent = longCount;
+      // Bind to particles
+      updateParticleBinding(shortCount, midCount, longCount);
+    }
+  } catch { /* memory not available */ }
 
-  // Trust graph
-  const trust = await fetchJson('/tool/trust_graph_status');
-  if (trust) {
-    document.getElementById('v-trust-persons').textContent = fmt(trust.persons);
-    document.getElementById('v-trust-avg').textContent = trust.avg_trust != null ? trust.avg_trust.toFixed(2) : '--';
-  }
+  // Trust graph (POST)
+  try {
+    const trustRaw = await callTool('trust_graph_status');
+    const trust = parseMcpResult(trustRaw);
+    if (trust) {
+      document.getElementById('v-trust-persons').textContent = fmt(trust.personCount ?? trust.persons);
+      const avg = trust.averageTrust ?? trust.avg_trust;
+      document.getElementById('v-trust-avg').textContent = avg != null ? Number(avg).toFixed(2) : '--';
+    }
+  } catch { /* trust not available */ }
 
-  // Ollama
-  const ollama = await fetchJson('/tool/ollama_status');
-  if (ollama) {
-    const el = document.getElementById('v-ollama');
-    const healthy = ollama.healthy || ollama.status === 'healthy';
-    el.textContent = (healthy ? 'healthy' : 'offline') + (ollama.models != null ? ' / ' + ollama.models + ' models' : '');
-    el.className = 'hud-value ' + (healthy ? 'hud-ok' : 'hud-warn');
-  }
+  // Ollama (POST)
+  try {
+    const ollamaRaw = await callTool('ollama_status');
+    const ollama = parseMcpResult(ollamaRaw);
+    if (ollama) {
+      const el = document.getElementById('v-ollama');
+      const healthy = ollama.healthy || ollama.status === 'healthy';
+      const modelInfo = ollama.models != null
+        ? (Array.isArray(ollama.models) ? ollama.models.length + ' models' : ollama.models + ' models')
+        : '';
+      el.textContent = (healthy ? 'healthy' : 'offline') + (modelInfo ? ' / ' + modelInfo : '');
+      el.className = 'hud-value ' + (healthy ? 'hud-ok' : 'hud-warn');
+    }
+  } catch { /* ollama not available */ }
 
-  // P2P peers
-  const peers = await fetchJson('/tool/peer_list');
-  if (peers) {
-    const count = Array.isArray(peers.peers) ? peers.peers.length : (peers.count || 0);
-    document.getElementById('v-peers').textContent = count + ' connected';
+  // P2P peers (POST)
+  try {
+    const peersRaw = await callTool('peer_list');
+    const peers = parseMcpResult(peersRaw);
+    if (peers) {
+      const channels = peers.channels;
+      const count = Array.isArray(channels) ? channels.length : (peers.count || 0);
+      document.getElementById('v-peers').textContent = count + ' connected';
+    }
+  } catch { /* peers not available */ }
+
+  // Context snapshot for orb pulse rate (POST)
+  try {
+    const ctxRaw = await callTool('context_snapshot');
+    const ctx = parseMcpResult(ctxRaw);
+    if (ctx && ctx.recentEvents) {
+      const eventCount = Array.isArray(ctx.recentEvents) ? ctx.recentEvents.length : 0;
+      // Map event count to pulse speed: 0 events = 1.5, 50+ events = 6.0
+      orbPulseSpeed = 1.5 + Math.min(eventCount / 50, 1) * 4.5;
+    }
+  } catch { /* context not available */ }
+}
+
+/**
+ * Parse MCP tool result. Tools return { content: [{ type: 'text', text: '...' }] }.
+ * The inner text is JSON-stringified data.
+ */
+function parseMcpResult(raw) {
+  if (!raw) return null;
+  // Direct data (from GET fallback or already parsed)
+  if (raw.content && Array.isArray(raw.content)) {
+    const textBlock = raw.content.find(c => c.type === 'text');
+    if (textBlock && textBlock.text) {
+      try { return JSON.parse(textBlock.text); } catch { return null; }
+    }
   }
+  // Already a plain object (from old-style GET responses)
+  return raw;
 }
 
 // Poll immediately, then every 5 seconds

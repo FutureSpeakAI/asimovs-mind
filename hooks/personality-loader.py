@@ -202,6 +202,17 @@ def main():
     except (ImportError, Exception):
         pass  # Memory system not available — skip gracefully
 
+    # Privacy Shield — check if PII was scrubbed in the previous session
+    try:
+        if _VAULT_OK:
+            privacy_data = vault_read("privacy-stats")
+            if privacy_data and isinstance(privacy_data, dict):
+                scrub_total = privacy_data.get("total", 0)
+                if scrub_total > 0:
+                    lines.append(f"Privacy Shield: {scrub_total} items scrubbed last session.")
+    except Exception:
+        pass  # Privacy stats not available — skip gracefully
+
     output = "\n".join(lines)
     if output.strip():
         print(output)
