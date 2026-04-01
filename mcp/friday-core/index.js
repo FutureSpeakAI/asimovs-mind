@@ -33,6 +33,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -45,6 +46,7 @@ import { SubsystemRegistry } from './core/subsystem.js';
 import { StateManager } from './core/state-manager.js';
 import { Logger } from './core/logger.js';
 import { wireSubsystems } from './core/wiring.js';
+import { SessionConductor } from './core/session-conductor.js';
 
 // Subsystems — Tier 0 (no deps)
 import { VaultSubsystem } from './subsystems/vault/index.js';
@@ -341,6 +343,38 @@ async function main() {
 
   // Wire cross-subsystem events (the central nervous system)
   wireSubsystems(registry, eventBus);
+
+  // Session conductor — orchestrates session start/end lifecycle
+  const conductor = new SessionConductor({ registry, eventBus, vault, logger });
+  conductor.wire();
+
+  // Register session_status MCP tool
+  server.tool(
+    'session_status',
+    'Get current session status: uptime, working directory context, greeting, and pending commitments.',
+    {},
+    async () => {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            uptime: conductor.uptime,
+            uptimeMin: Math.round(conductor.uptime / 60000),
+            cwd: conductor.cwdContext,
+            greeting: conductor.greeting,
+            pendingCommitments: conductor.pendingCommitments.length,
+            commitments: conductor.pendingCommitments.map(c => ({
+              id: c.id,
+              description: c.description,
+              personName: c.personName,
+              direction: c.direction,
+              deadline: c.deadline ? new Date(c.deadline).toISOString() : null,
+            })),
+          }, null, 2),
+        }],
+      };
+    }
+  );
 
   // Start HTTP bridge
   const port = await startHttpBridge();

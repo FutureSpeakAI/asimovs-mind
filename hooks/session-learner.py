@@ -23,6 +23,7 @@ try:
 except ImportError:
     _VAULT_OK = False
 
+PLUGIN_ROOT = Path(os.environ.get("CLAUDE_PLUGIN_ROOT", Path(__file__).parent.parent))
 ASIMOVS_DIR = Path(".asimovs-mind")
 LEDGER_FILE = ASIMOVS_DIR / "session-ledger.jsonl"
 RECENT_SESSIONS_FILE = ASIMOVS_DIR / "knowledge" / "recent-sessions.json"
@@ -189,6 +190,58 @@ def clear_ledger():
                 pass
 
 
+def feed_memory(session_record):
+    """Post a session summary to the vault HTTP bridge for memory storage.
+
+    Reads the vault port from .asimovs-mind/vault/port and POSTs a memory
+    observation. Wrapped in try/except so it never crashes the hook.
+    """
+    try:
+        import urllib.request
+        import urllib.error
+
+        port_file = ASIMOVS_DIR / "vault" / "port"
+        if not port_file.exists():
+            return
+
+        port = port_file.read_text(encoding="utf-8").strip()
+        if not port.isdigit():
+            return
+
+        files_count = session_record.get("files_modified", 0)
+        commits_count = session_record.get("git_commits", 0)
+        key_files = session_record.get("key_files", [])
+        key_files_str = ", ".join(os.path.basename(f) for f in key_files[:5])
+        if not key_files_str:
+            key_files_str = "none"
+
+        content = (
+            f"Session summary: modified {files_count} files, "
+            f"{commits_count} git commits. "
+            f"Key activity: [{key_files_str}]"
+        )
+
+        payload = json.dumps({
+            "args": {
+                "content": content,
+                "category": "context",
+                "tier": "medium",
+            }
+        }).encode("utf-8")
+
+        url = f"http://localhost:{port}/tool/memory_store"
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+
+    except Exception:
+        pass  # Never crash the hook
+
+
 def main():
     try:
         entries = read_ledger()
@@ -228,6 +281,9 @@ def main():
 
         # Clear the ledger for the next session
         clear_ledger()
+
+        # Store session observation in vault memory via HTTP bridge
+        feed_memory(record)
 
     except Exception:
         # Never block session end — exit cleanly no matter what
