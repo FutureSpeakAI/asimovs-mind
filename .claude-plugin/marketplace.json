@@ -11,11 +11,7 @@
       "name": "asimovs-mind",
       "description": "Agent Friday — the complete AI runtime for Claude Code. 17 subsystems, 92 MCP tools, encrypted vault, holographic dashboard. Governed by Asimov's cLaws. MIT licensed.",
       "category": "development",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/FutureSpeakAI/asimovs-mind.git",
-        "sha": "5007adf0bad895731de3ed47040927a7791eb84c"
-      },
+      "source": "./",
       "homepage": "https://github.com/FutureSpeakAI/asimovs-mind"
     }
   ]
