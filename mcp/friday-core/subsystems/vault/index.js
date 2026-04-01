@@ -67,6 +67,9 @@ export class VaultSubsystem extends Subsystem {
       { passphrase: z.string().describe('Vault passphrase') },
       async ({ passphrase }) => {
         const result = await vault.unlock(passphrase);
+        if (result.success) {
+          self.eventBus.publish('vault:unlocked', { timestamp: Date.now() });
+        }
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
         };
@@ -77,6 +80,7 @@ export class VaultSubsystem extends Subsystem {
       'Lock the vault. Destroys all keys in memory.',
       {},
       async () => {
+        self.eventBus.publish('vault:locking', { timestamp: Date.now() });
         vault.lock();
         return { content: [{ type: 'text', text: '{"success": true, "status": "locked"}' }] };
       }

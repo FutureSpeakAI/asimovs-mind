@@ -44,6 +44,7 @@ import { FridayEventBus } from './core/event-bus.js';
 import { SubsystemRegistry } from './core/subsystem.js';
 import { StateManager } from './core/state-manager.js';
 import { Logger } from './core/logger.js';
+import { wireSubsystems } from './core/wiring.js';
 
 // Subsystems — Tier 0 (no deps)
 import { VaultSubsystem } from './subsystems/vault/index.js';
@@ -337,6 +338,9 @@ async function main() {
 
   // Start all subsystems (lifecycle init + event subscriptions)
   await registry.startAll();
+
+  // Wire cross-subsystem events (the central nervous system)
+  wireSubsystems(registry, eventBus);
 
   // Start HTTP bridge
   const port = await startHttpBridge();
