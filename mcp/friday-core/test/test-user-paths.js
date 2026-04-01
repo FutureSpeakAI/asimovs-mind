@@ -50,28 +50,31 @@ describe('PATH 1: Brand New User — First Install', () => {
     const raw = await fs.readFile(path.join(PLUGIN_ROOT, 'plugin.json'), 'utf-8');
     const plugin = JSON.parse(raw);
     assert.ok(plugin.mcpServers, 'plugin.json should declare mcpServers');
-    assert.ok(plugin.mcpServers['sovereign-vault'], 'Should have sovereign-vault MCP server');
-    const serverPath = path.join(PLUGIN_ROOT, 'mcp', 'vault-server', 'index.js');
-    const exists = await fs.access(serverPath).then(() => true).catch(() => false);
-    assert.ok(exists, 'MCP server index.js should exist');
+    // Server may be named 'friday-core' or 'sovereign-vault'
+    const serverName = plugin.mcpServers['friday-core'] ? 'friday-core' : 'sovereign-vault';
+    assert.ok(plugin.mcpServers[serverName], `Should have ${serverName} MCP server`);
+    const args = plugin.mcpServers[serverName].args[0].replace('${CLAUDE_PLUGIN_ROOT}', PLUGIN_ROOT);
+    const exists = await fs.access(args).then(() => true).catch(() => false);
+    assert.ok(exists, `MCP server entry point should exist: ${args}`);
   });
 
-  it('vault server has bootstrap.js that auto-installs deps', async () => {
-    const bootstrapPath = path.join(PLUGIN_ROOT, 'mcp', 'vault-server', 'bootstrap.js');
+  it('friday-core has bootstrap.js that auto-installs deps', async () => {
+    const bootstrapPath = path.join(PLUGIN_ROOT, 'mcp', 'friday-core', 'bootstrap.js');
     const exists = await fs.access(bootstrapPath).then(() => true).catch(() => false);
-    assert.ok(exists, 'bootstrap.js should exist');
+    assert.ok(exists, 'bootstrap.js should exist in friday-core');
     const content = await fs.readFile(bootstrapPath, 'utf-8');
     assert.ok(content.includes('npm install'), 'bootstrap.js should run npm install');
     assert.ok(content.includes('node_modules'), 'bootstrap.js should check for node_modules');
     assert.ok(content.includes("import('./index.js')"), 'bootstrap.js should dynamically import index.js');
   });
 
-  it('plugin.json points to bootstrap.js, not index.js', async () => {
+  it('plugin.json points to friday-core bootstrap.js', async () => {
     const raw = await fs.readFile(path.join(PLUGIN_ROOT, 'plugin.json'), 'utf-8');
     const plugin = JSON.parse(raw);
-    const args = plugin.mcpServers['sovereign-vault'].args;
+    const serverName = plugin.mcpServers['friday-core'] ? 'friday-core' : 'sovereign-vault';
+    const args = plugin.mcpServers[serverName].args;
     assert.ok(args.some(a => a.includes('bootstrap.js')), 'Should reference bootstrap.js');
-    assert.ok(!args.some(a => a.includes('index.js')), 'Should NOT reference index.js directly');
+    assert.ok(args.some(a => a.includes('friday-core')), 'Should reference friday-core directory');
   });
 });
 

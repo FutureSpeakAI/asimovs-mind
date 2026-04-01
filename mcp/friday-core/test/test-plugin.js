@@ -97,10 +97,18 @@ describe('TIER B: Python Hook Compilation', () => {
     const pyFiles = files.filter(f => f.endsWith('.py'));
     assert.ok(pyFiles.length >= 8, `Expected >= 8 hook files, found ${pyFiles.length}`);
 
+    // Try python3 first, fall back to python (Windows compatibility)
+    let pythonCmd = 'python3';
+    try {
+      execSync(`${pythonCmd} --version`, { stdio: 'pipe', timeout: 5000 });
+    } catch {
+      pythonCmd = 'python';
+    }
+
     for (const file of pyFiles) {
       const fullPath = path.join(hookDir, file);
       try {
-        execSync(`python3 -c "import py_compile; py_compile.compile('${fullPath.replace(/\\/g, '/')}', doraise=True)"`, {
+        execSync(`${pythonCmd} -c "import py_compile; py_compile.compile('${fullPath.replace(/\\/g, '/')}', doraise=True)"`, {
           timeout: 10000,
           stdio: 'pipe'
         });
@@ -248,17 +256,19 @@ describe('TIER F: Directive Definitions', () => {
 // TIER G: MCP Vault Server Files
 // ============================================================
 
-describe('TIER G: MCP Vault Server Files', () => {
+describe('TIER G: MCP Friday Core Files', () => {
   const serverFiles = [
-    'mcp/vault-server/package.json',
-    'mcp/vault-server/bootstrap.js',
-    'mcp/vault-server/index.js',
-    'mcp/vault-server/crypto.js',
-    'mcp/vault-server/vault.js',
-    'mcp/vault-server/protocol.js',
-    'mcp/vault-server/transport.js',
-    'mcp/vault-server/test.js',
-    'mcp/vault-server/test-integration.js'
+    'mcp/friday-core/package.json',
+    'mcp/friday-core/bootstrap.js',
+    'mcp/friday-core/index.js',
+    'mcp/friday-core/core/crypto.js',
+    'mcp/friday-core/core/vault.js',
+    'mcp/friday-core/core/event-bus.js',
+    'mcp/friday-core/core/subsystem.js',
+    'mcp/friday-core/core/state-manager.js',
+    'mcp/friday-core/subsystems/p2p/protocol.js',
+    'mcp/friday-core/subsystems/p2p/transport.js',
+    'mcp/friday-core/dashboard.html'
   ];
 
   for (const file of serverFiles) {
@@ -268,7 +278,7 @@ describe('TIER G: MCP Vault Server Files', () => {
   }
 
   it('package.json has correct dependencies', async () => {
-    const raw = await fs.readFile(pluginPath('mcp', 'vault-server', 'package.json'), 'utf-8');
+    const raw = await fs.readFile(pluginPath('mcp', 'friday-core', 'package.json'), 'utf-8');
     const pkg = JSON.parse(raw);
     assert.ok(pkg.dependencies['@modelcontextprotocol/sdk'], 'Missing MCP SDK dependency');
     assert.ok(pkg.dependencies['libsodium-wrappers-sumo'], 'Missing libsodium dependency');
@@ -276,7 +286,20 @@ describe('TIER G: MCP Vault Server Files', () => {
   });
 
   it('node_modules exists (deps installed)', async () => {
-    assert.ok(await fileExists(pluginPath('mcp', 'vault-server', 'node_modules')));
+    assert.ok(await fileExists(pluginPath('mcp', 'friday-core', 'node_modules')));
+  });
+
+  it('all 17 subsystem directories exist with index.js', async () => {
+    const subsystems = [
+      'vault', 'identity', 'privacy', 'p2p', 'ollama',
+      'llm', 'memory', 'context', 'trust', 'personality',
+      'agents', 'tools', 'connectors', 'gateway', 'briefing',
+      'voice', 'enterprise'
+    ];
+    for (const sub of subsystems) {
+      const indexPath = pluginPath('mcp', 'friday-core', 'subsystems', sub, 'index.js');
+      assert.ok(await fileExists(indexPath), `Missing: subsystems/${sub}/index.js`);
+    }
   });
 });
 

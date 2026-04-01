@@ -27,10 +27,10 @@
     "ollama"
   ],
   "mcpServers": {
-    "sovereign-vault": {
+    "friday-core": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/vault-server/bootstrap.js"],
-      "description": "Sovereign Vault — AES-256-GCM encrypted state, Ed25519 identity, Privacy Shield, Ollama monitoring"
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/friday-core/bootstrap.js"],
+      "description": "Agent Friday Runtime — 17 subsystems: vault, identity, privacy, ollama, p2p, llm, memory, context, trust, personality, agents, tools, connectors, gateway, briefing, voice, enterprise"
     }
   },
   "hooks": {

@@ -2,14 +2,32 @@
 /**
  * Friday Core — Modular MCP Server
  *
- * Decomposed from the monolithic vault-server into subsystem modules:
- *   vault     — Encrypted state storage (AES-256-GCM)
- *   identity  — Ed25519 signing + cLaw attestation
- *   privacy   — PII scrubbing / rehydration engine
- *   p2p       — Peer-to-peer encrypted communication
- *   ollama    — Local LLM health monitoring
+ * Full Agent Friday runtime — 17 subsystems:
+ *
+ *   Tier 0 (no deps):
+ *     vault      — Encrypted state storage (AES-256-GCM)
+ *     identity   — Ed25519 signing + cLaw attestation
+ *     privacy    — PII scrubbing / rehydration engine
+ *     ollama     — Local LLM health monitoring
+ *   Tier 1:
+ *     p2p        — Peer-to-peer encrypted communication (needs identity)
+ *   Tier 2:
+ *     llm        — Multi-provider LLM routing (needs vault, ollama)
+ *     memory     — Unified memory + embeddings (needs llm)
+ *     context    — Conversation context management (needs event bus)
+ *     trust      — Trust scoring engine (needs vault)
+ *     personality— Personality state + expression (needs vault, memory)
+ *   Tier 3:
+ *     agents     — Agent spawning + orchestration (needs llm, memory, trust)
+ *     tools      — Dynamic tool registry (needs event bus)
+ *     connectors — External service connectors (needs tools, vault)
+ *     gateway    — API gateway + auth (needs trust, vault)
+ *     briefing   — Daily briefing engine (needs memory, trust, context)
+ *     voice      — Voice I/O pipeline (needs event bus)
+ *     enterprise — Enterprise features (needs vault, event bus)
  *
  * HTTP bridge preserved for Python hook compatibility.
+ * Generic /tool/:toolName endpoint lets hooks call any MCP tool via HTTP.
  * Unlock HTML page served at GET /unlock.
  */
 
@@ -27,12 +45,27 @@ import { SubsystemRegistry } from './core/subsystem.js';
 import { StateManager } from './core/state-manager.js';
 import { Logger } from './core/logger.js';
 
-// Subsystems
+// Subsystems — Tier 0 (no deps)
 import { VaultSubsystem } from './subsystems/vault/index.js';
 import { IdentitySubsystem } from './subsystems/identity/index.js';
 import { PrivacySubsystem, scrubPii, rehydratePii } from './subsystems/privacy/index.js';
-import { P2PSubsystem } from './subsystems/p2p/index.js';
 import { OllamaSubsystem } from './subsystems/ollama/index.js';
+// Tier 1
+import { P2PSubsystem } from './subsystems/p2p/index.js';
+// Tier 2
+import { LLMSubsystem } from './subsystems/llm/index.js';
+import { MemorySubsystem } from './subsystems/memory/index.js';
+import { ContextSubsystem } from './subsystems/context/index.js';
+import { TrustSubsystem } from './subsystems/trust/index.js';
+import { PersonalitySubsystem } from './subsystems/personality/index.js';
+// Tier 3
+import { AgentSubsystem } from './subsystems/agents/index.js';
+import { ToolsSubsystem } from './subsystems/tools/index.js';
+import { ConnectorSubsystem } from './subsystems/connectors/index.js';
+import { GatewaySubsystem } from './subsystems/gateway/index.js';
+import { BriefingSubsystem } from './subsystems/briefing/index.js';
+import { VoiceSubsystem } from './subsystems/voice/index.js';
+import { EnterpriseSubsystem } from './subsystems/enterprise/index.js';
 
 // --- Resolve paths ---
 
@@ -54,11 +87,30 @@ const deps = { vault, eventBus, stateManager, logger };
 
 const registry = new SubsystemRegistry();
 
+// Tier 0 — no dependencies
 registry.register(new VaultSubsystem(deps));
 registry.register(new IdentitySubsystem(deps));
 registry.register(new PrivacySubsystem(deps));
-registry.register(new P2PSubsystem(deps));
 registry.register(new OllamaSubsystem(deps));
+// Tier 1
+registry.register(new P2PSubsystem(deps));           // needs identity
+// Tier 2
+registry.register(new LLMSubsystem(deps));            // needs vault, ollama
+registry.register(new MemorySubsystem(deps));          // needs llm
+registry.register(new ContextSubsystem(deps));         // needs event bus
+registry.register(new TrustSubsystem(deps));           // needs vault
+registry.register(new PersonalitySubsystem(deps));     // needs vault, memory
+// Tier 3
+registry.register(new AgentSubsystem(deps));           // needs llm, memory, trust
+registry.register(new ToolsSubsystem(deps));           // needs event bus
+registry.register(new ConnectorSubsystem(deps));       // needs tools, vault
+registry.register(new GatewaySubsystem(deps));         // needs trust, vault
+registry.register(new BriefingSubsystem(deps));        // needs memory, trust, context
+registry.register(new VoiceSubsystem(deps));           // needs event bus
+registry.register(new EnterpriseSubsystem(deps));      // needs vault, event bus
+
+// Inject registry reference into vault subsystem for status reporting
+registry.get('vault').setRegistry(registry);
 
 // --- MCP Server ---
 
@@ -147,6 +199,27 @@ async function startHttpBridge() {
           const { passphrase } = JSON.parse(body);
           const result = await vault.initialize(passphrase);
           res.end(JSON.stringify(result));
+
+        } else if (route.startsWith('/tool/') && req.method === 'POST') {
+          // Generic MCP tool endpoint: POST /tool/:toolName { args: {} }
+          const toolName = route.slice('/tool/'.length);
+          if (!toolName) { res.writeHead(400); res.end(JSON.stringify({ error: 'Missing tool name' })); return; }
+          const body = await readBody(req);
+          const { args = {} } = JSON.parse(body);
+          // Find the tool in the registry and invoke it via the MCP server
+          const result = await server.callTool(toolName, args);
+          res.end(JSON.stringify(result));
+
+        } else if (route === '/' && req.method === 'GET') {
+          // Serve the Friday Dashboard
+          res.setHeader('Content-Type', 'text/html');
+          try {
+            const dashboardPath = path.join(import.meta.dirname, 'dashboard.html');
+            const html = await fs.readFile(dashboardPath, 'utf-8');
+            res.end(html);
+          } catch {
+            res.end('<html><body style="background:#030303;color:#00f0ff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><h1>Agent Friday</h1></body></html>');
+          }
 
         } else {
           res.writeHead(404);

@@ -12,24 +12,41 @@ import { OllamaMonitor } from '../../core/vault.js';
 
 export class VaultSubsystem extends Subsystem {
   #ollama;
+  #registryRef;
 
   constructor(deps) {
     super('vault', deps);
     this.#ollama = new OllamaMonitor();
+    this.#registryRef = null;
+  }
+
+  /** Allow index.js to inject the registry reference for stats reporting */
+  setRegistry(registry) {
+    this.#registryRef = registry;
   }
 
   registerTools(server) {
     const vault = this.vault;
     const ollama = this.#ollama;
+    const self = this;
 
-    server.tool('vault_status', 'Check vault status (locked/unlocked/uninitialized)', {}, async () => {
+    server.tool('vault_status', 'Check vault status, subsystem health, and Ollama connectivity', {}, async () => {
       const ollamaStatus = await ollama.checkHealth();
+      const registryStats = self.#registryRef ? self.#registryRef.stats : {};
+      const subsystemNames = Object.keys(registryStats);
+      const runningCount = subsystemNames.filter(n => registryStats[n].started).length;
       return {
         content: [{ type: 'text', text: JSON.stringify({
           vault: vault.status,
           meta: vault.meta,
           ollama: { healthy: ollamaStatus.healthy, modelCount: ollamaStatus.models.length },
-          privacy_shield: { active: vault.status === 'unlocked' }
+          privacy_shield: { active: vault.status === 'unlocked' },
+          subsystems: {
+            total: subsystemNames.length,
+            running: runningCount,
+            registered: subsystemNames,
+            details: registryStats
+          }
         }, null, 2) }]
       };
     });

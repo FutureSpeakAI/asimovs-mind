@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<!--
+  Agent Friday Dashboard — Holographic AI Desktop
+  Served by the friday-core HTTP bridge at GET /
+
+  NOTE: index.js should serve this file at the root route:
+    if (route === '/' && req.method === 'GET') {
+      res.setHeader('Content-Type', 'text/html');
+      const html = await fs.readFile(new URL('./dashboard.html', import.meta.url), 'utf-8');
+      res.end(html);
+      return;
+    }
+  Place this handler BEFORE the 404 fallback in the HTTP bridge request handler.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Friday</title>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js" } }
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #030303; color: #e0e0e0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+         overflow: hidden; width: 100vw; height: 100vh; }
+  canvas { display: block; position: fixed; top: 0; left: 0; z-index: 0; }
+
+  /* HUD overlay */
+  #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; padding: 20px;
+         display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 1fr; }
+  #hud > div { pointer-events: auto; }
+  .hud-label { font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.12em; color: #666; margin-bottom: 2px; }
+  .hud-value { font-size: 0.85em; color: #e0e0e0; }
+  .hud-accent { color: #00f0ff; }
+  .hud-warn { color: #ff6b35; }
+  .hud-ok { color: #2ecc71; }
+
+  /* Top left */
+  .tl { grid-row: 1; grid-column: 1; }
+  .tl h1 { font-size: 1.3em; font-weight: 600; color: #00f0ff; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .tl .meta { display: flex; flex-direction: column; gap: 4px; }
+
+  /* Top right */
+  .tr { grid-row: 1; grid-column: 2; text-align: right; }
+  .tr .meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
+  /* Bottom left */
+  .bl { grid-row: 3; grid-column: 1; align-self: end; }
+  .bl .meta { display: flex; flex-direction: column; gap: 4px; }
+
+  /* Bottom right */
+  .br { grid-row: 3; grid-column: 2; align-self: end; text-align: right; }
+  .br .meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
+  /* Center bottom subsystem bar */
+  #subsystems { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
+                display: flex; gap: 6px; align-items: center; background: #0a0a0a99; border: 1px solid #00f0ff22;
+                border-radius: 20px; padding: 8px 16px; backdrop-filter: blur(8px); }
+  .sub-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; transition: background 0.4s; }
+  .sub-dot.on { background: #2ecc71; box-shadow: 0 0 6px #2ecc7188; }
+  .sub-dot:hover::after { content: attr(data-name); position: absolute; bottom: 28px; left: 50%;
+                          transform: translateX(-50%); font-size: 0.65em; color: #aaa; white-space: nowrap;
+                          background: #111; padding: 2px 6px; border-radius: 4px; }
+  .sub-dot { position: relative; cursor: default; }
+
+  /* Passphrase gate */
+  #gate { position: fixed; inset: 0; z-index: 100; background: #030303ee; display: flex;
+          justify-content: center; align-items: center; transition: opacity 0.6s; }
+  #gate.hidden { opacity: 0; pointer-events: none; }
+  .gate-box { background: #0d0d1a; border: 1px solid #00f0ff33; border-radius: 12px;
+              padding: 36px; max-width: 400px; width: 90%; }
+  .gate-box h2 { color: #00f0ff; font-size: 1.2em; margin-bottom: 4px; }
+  .gate-box .sub { color: #666; font-size: 0.8em; margin-bottom: 20px; }
+  .gate-box input { width: 100%; padding: 11px 14px; background: #080810; border: 1px solid #333;
+                    border-radius: 6px; color: #e0e0e0; font-size: 0.95em; margin-bottom: 12px; outline: none; }
+  .gate-box input:focus { border-color: #00f0ff; }
+  .gate-box button { width: 100%; padding: 11px; background: #00f0ff15; border: 1px solid #00f0ff55;
+                     border-radius: 6px; color: #00f0ff; font-size: 0.95em; cursor: pointer; transition: background 0.2s; }
+  .gate-box button:hover { background: #00f0ff25; }
+  .gate-msg { margin-top: 12px; font-size: 0.8em; padding: 8px 10px; border-radius: 6px; }
+  .gate-msg.err { background: #2a0a0a; border: 1px solid #5a2020; color: #ff6b6b; }
+  .gate-msg.ok { background: #0a2a0a; border: 1px solid #205a20; color: #6bff6b; }
+
+  @media (max-width: 600px) {
+    #hud { padding: 12px; }
+    .tl h1 { font-size: 1em; }
+    .hud-value, .hud-label { font-size: 0.6em; }
+    #subsystems { gap: 4px; padding: 6px 10px; }
+    .sub-dot { width: 6px; height: 6px; }
+    .gate-box { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Three.js canvas injected here -->
+
+<!-- HUD Overlay -->
+<div id="hud">
+  <div class="tl">
+    <h1>AGENT FRIDAY</h1>
+    <div class="meta">
+      <div><span class="hud-label">Vault</span> <span class="hud-value" id="v-vault">--</span></div>
+      <div><span class="hud-label">Uptime</span> <span class="hud-value" id="v-uptime">0s</span></div>
+    </div>
+  </div>
+  <div class="tr">
+    <div class="meta">
+      <div><span class="hud-label">Ollama</span> <span class="hud-value" id="v-ollama">--</span></div>
+      <div><span class="hud-label">P2P Peers</span> <span class="hud-value" id="v-peers">--</span></div>
+    </div>
+  </div>
+  <div class="bl">
+    <div class="meta">
+      <div><span class="hud-label">Short-term</span> <span class="hud-value hud-accent" id="v-mem-short">--</span></div>
+      <div><span class="hud-label">Medium-term</span> <span class="hud-value hud-accent" id="v-mem-mid">--</span></div>
+      <div><span class="hud-label">Long-term</span> <span class="hud-value hud-accent" id="v-mem-long">--</span></div>
+    </div>
+  </div>
+  <div class="br">
+    <div class="meta">
+      <div><span class="hud-label">Persons tracked</span> <span class="hud-value" id="v-trust-persons">--</span></div>
+      <div><span class="hud-label">Avg trust</span> <span class="hud-value" id="v-trust-avg">--</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Subsystem status bar -->
+<div id="subsystems"></div>
+
+<!-- Passphrase gate -->
+<div id="gate">
+  <div class="gate-box">
+    <h2>Sovereign Vault</h2>
+    <div class="sub">Your passphrase never leaves this machine.</div>
+    <form id="gate-form">
+      <input type="password" id="gate-pp" placeholder="Enter passphrase..." autofocus>
+      <button type="submit" id="gate-btn">Unlock Vault</button>
+    </form>
+    <div id="gate-msg" class="gate-msg" style="display:none"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// --- State ---
+const SUBS = ['vault','identity','privacy','ollama','p2p','llm','memory','context',
+              'trust','personality','agents','tools','connectors','gateway','briefing','voice','enterprise'];
+const startTime = Date.now();
+let vaultUnlocked = false;
+
+// --- Subsystem dots ---
+const subBar = document.getElementById('subsystems');
+SUBS.forEach(name => {
+  const dot = document.createElement('div');
+  dot.className = 'sub-dot';
+  dot.dataset.name = name;
+  dot.title = name;
+  subBar.appendChild(dot);
+});
+
+// --- Three.js Scene ---
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x030303, 0.045);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 5, 12);
+camera.lookAt(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x030303);
+document.body.prepend(renderer.domElement);
+
+// Ambient light
+scene.add(new THREE.AmbientLight(0x00f0ff, 0.15));
+
+// --- Neural grid (floor plane) ---
+const gridGeo = new THREE.BufferGeometry();
+const gridLines = [];
+const gridSize = 30, gridStep = 1.5;
+for (let i = -gridSize; i <= gridSize; i += gridStep) {
+  gridLines.push(-gridSize, 0, i, gridSize, 0, i);
+  gridLines.push(i, 0, -gridSize, i, 0, gridSize);
+}
+gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridLines, 3));
+const gridMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.08 });
+const grid = new THREE.LineSegments(gridGeo, gridMat);
+grid.position.y = -2;
+scene.add(grid);
+
+// --- Particle field ---
+const PARTICLE_COUNT = 400;
+const pGeo = new THREE.BufferGeometry();
+const pPositions = new Float32Array(PARTICLE_COUNT * 3);
+const pVelocities = new Float32Array(PARTICLE_COUNT * 3);
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+  const i3 = i * 3;
+  pPositions[i3]     = (Math.random() - 0.5) * 30;
+  pPositions[i3 + 1] = Math.random() * 12 - 2;
+  pPositions[i3 + 2] = (Math.random() - 0.5) * 30;
+  pVelocities[i3]     = (Math.random() - 0.5) * 0.005;
+  pVelocities[i3 + 1] = (Math.random() - 0.5) * 0.003;
+  pVelocities[i3 + 2] = (Math.random() - 0.5) * 0.005;
+}
+pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
+const pMat = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.08, transparent: true, opacity: 0.7,
+                                        sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false });
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+// --- Connection lines (dynamic) ---
+const MAX_CONNECTIONS = 60;
+const connGeo = new THREE.BufferGeometry();
+const connPositions = new Float32Array(MAX_CONNECTIONS * 6);
+connGeo.setAttribute('position', new THREE.Float32BufferAttribute(connPositions, 3));
+connGeo.setDrawRange(0, 0);
+const connMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.12,
+                                              blending: THREE.AdditiveBlending, depthWrite: false });
+const connections = new THREE.LineSegments(connGeo, connMat);
+scene.add(connections);
+
+// --- Central orb ---
+const orbGeo = new THREE.SphereGeometry(0.7, 32, 32);
+const orbMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.35 });
+const orb = new THREE.Mesh(orbGeo, orbMat);
+orb.position.set(0, 1.5, 0);
+scene.add(orb);
+
+// Orb glow shell
+const glowGeo = new THREE.SphereGeometry(1.1, 32, 32);
+const glowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.07,
+                                               side: THREE.BackSide, blending: THREE.AdditiveBlending });
+const glow = new THREE.Mesh(glowGeo, glowMat);
+glow.position.copy(orb.position);
+scene.add(glow);
+
+// Orb inner point light
+const orbLight = new THREE.PointLight(0x00f0ff, 2, 15);
+orbLight.position.copy(orb.position);
+scene.add(orbLight);
+
+// --- Animation ---
+function animate(time) {
+  requestAnimationFrame(animate);
+  const t = time * 0.001;
+
+  // Particle drift
+  const pos = particles.geometry.attributes.position.array;
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const i3 = i * 3;
+    pos[i3]     += pVelocities[i3];
+    pos[i3 + 1] += pVelocities[i3 + 1];
+    pos[i3 + 2] += pVelocities[i3 + 2];
+    // Wrap around
+    if (pos[i3] > 15) pos[i3] = -15;
+    if (pos[i3] < -15) pos[i3] = 15;
+    if (pos[i3 + 1] > 10) pos[i3 + 1] = -2;
+    if (pos[i3 + 1] < -2) pos[i3 + 1] = 10;
+    if (pos[i3 + 2] > 15) pos[i3 + 2] = -15;
+    if (pos[i3 + 2] < -15) pos[i3 + 2] = 15;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+
+  // Connection lines between nearby particles
+  const cp = connections.geometry.attributes.position.array;
+  let ci = 0, drawn = 0;
+  const threshold = 4;
+  outer: for (let a = 0; a < PARTICLE_COUNT && drawn < MAX_CONNECTIONS; a++) {
+    for (let b = a + 1; b < PARTICLE_COUNT && drawn < MAX_CONNECTIONS; b++) {
+      const a3 = a * 3, b3 = b * 3;
+      const dx = pos[a3] - pos[b3], dy = pos[a3+1] - pos[b3+1], dz = pos[a3+2] - pos[b3+2];
+      const d2 = dx*dx + dy*dy + dz*dz;
+      if (d2 < threshold * threshold) {
+        cp[ci++] = pos[a3]; cp[ci++] = pos[a3+1]; cp[ci++] = pos[a3+2];
+        cp[ci++] = pos[b3]; cp[ci++] = pos[b3+1]; cp[ci++] = pos[b3+2];
+        drawn++;
+      }
+    }
+  }
+  connections.geometry.setDrawRange(0, drawn * 2);
+  connections.geometry.attributes.position.needsUpdate = true;
+
+  // Orb pulse
+  const pulse = 1 + 0.08 * Math.sin(t * 2.5);
+  orb.scale.setScalar(pulse);
+  glow.scale.setScalar(pulse * 1.6);
+  orbMat.opacity = 0.3 + 0.1 * Math.sin(t * 3);
+  glowMat.opacity = 0.05 + 0.03 * Math.sin(t * 2);
+  orbLight.intensity = 1.5 + 0.8 * Math.sin(t * 2.5);
+
+  // Grid pulse
+  gridMat.opacity = 0.06 + 0.03 * Math.sin(t * 1.2);
+
+  // Gentle camera orbit
+  camera.position.x = 12 * Math.sin(t * 0.05);
+  camera.position.z = 12 * Math.cos(t * 0.05);
+  camera.lookAt(0, 1, 0);
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+// Resize handler
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- Data fetching ---
+function fmt(s) { return s == null ? '--' : s; }
+
+function uptimeStr() {
+  let sec = Math.floor((Date.now() - startTime) / 1000);
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
+  const h = Math.floor(sec/3600);
+  return h + 'h ' + Math.floor((sec%3600)/60) + 'm';
+}
+
+async function fetchJson(url) {
+  try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; }
+}
+
+async function poll() {
+  document.getElementById('v-uptime').textContent = uptimeStr();
+
+  // Vault status
+  const status = await fetchJson('/status');
+  if (status) {
+    const locked = status.vault !== 'unlocked';
+    const el = document.getElementById('v-vault');
+    el.textContent = status.vault || '--';
+    el.className = 'hud-value ' + (locked ? 'hud-warn' : 'hud-ok');
+    if (!locked && !vaultUnlocked) {
+      vaultUnlocked = true;
+      document.getElementById('gate').classList.add('hidden');
+    }
+    if (locked && vaultUnlocked) {
+      vaultUnlocked = false;
+      document.getElementById('gate').classList.remove('hidden');
+    }
+    if (!locked) document.getElementById('gate').classList.add('hidden');
+  }
+
+  // Subsystem stats (from registry.stats via status endpoint if available, else mark all on)
+  const dots = subBar.querySelectorAll('.sub-dot');
+  if (status && status.meta && status.meta.subsystems) {
+    dots.forEach(d => {
+      const info = status.meta.subsystems[d.dataset.name];
+      d.classList.toggle('on', info ? info.started : false);
+    });
+  } else {
+    // If no subsystem data, assume started if vault is unlocked
+    dots.forEach(d => d.classList.toggle('on', vaultUnlocked));
+  }
+
+  if (!vaultUnlocked) return; // Skip tool endpoints when locked
+
+  // Memory status
+  const mem = await fetchJson('/tool/memory_status');
+  if (mem) {
+    document.getElementById('v-mem-short').textContent = fmt(mem.short_term);
+    document.getElementById('v-mem-mid').textContent = fmt(mem.medium_term);
+    document.getElementById('v-mem-long').textContent = fmt(mem.long_term);
+  }
+
+  // Trust graph
+  const trust = await fetchJson('/tool/trust_graph_status');
+  if (trust) {
+    document.getElementById('v-trust-persons').textContent = fmt(trust.persons);
+    document.getElementById('v-trust-avg').textContent = trust.avg_trust != null ? trust.avg_trust.toFixed(2) : '--';
+  }
+
+  // Ollama
+  const ollama = await fetchJson('/tool/ollama_status');
+  if (ollama) {
+    const el = document.getElementById('v-ollama');
+    const healthy = ollama.healthy || ollama.status === 'healthy';
+    el.textContent = (healthy ? 'healthy' : 'offline') + (ollama.models != null ? ' / ' + ollama.models + ' models' : '');
+    el.className = 'hud-value ' + (healthy ? 'hud-ok' : 'hud-warn');
+  }
+
+  // P2P peers
+  const peers = await fetchJson('/tool/peer_list');
+  if (peers) {
+    const count = Array.isArray(peers.peers) ? peers.peers.length : (peers.count || 0);
+    document.getElementById('v-peers').textContent = count + ' connected';
+  }
+}
+
+// Poll immediately, then every 5 seconds
+poll();
+setInterval(poll, 5000);
+
+// --- Passphrase gate ---
+document.getElementById('gate-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pp = document.getElementById('gate-pp').value;
+  const btn = document.getElementById('gate-btn');
+  const msg = document.getElementById('gate-msg');
+  btn.disabled = true;
+  btn.textContent = 'Deriving keys...';
+  msg.style.display = 'none';
+  try {
+    const resp = await fetch('/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase: pp })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      msg.className = 'gate-msg ok';
+      msg.textContent = 'Vault unlocked.';
+      msg.style.display = 'block';
+      vaultUnlocked = true;
+      setTimeout(() => document.getElementById('gate').classList.add('hidden'), 600);
+      poll();
+    } else {
+      msg.className = 'gate-msg err';
+      msg.textContent = data.error || 'Unlock failed';
+      msg.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Unlock Vault';
+    }
+  } catch (err) {
+    msg.className = 'gate-msg err';
+    msg.textContent = err.message;
+    msg.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Unlock Vault';
+  }
+  document.getElementById('gate-pp').value = '';
+});
+</script>
+</body>
+</html>
