@@ -65,6 +65,10 @@ tools:
 - **Delete existing agents** — you can improve them, but only humans delete agents
 - **Create agents that modify governance files** — the Meta-Law applies to all agents, including ones you create
 
+## Vault-Aware Agent Targeting
+
+Before evolving agent prompts, call `vault_read('agent-trust')` to identify lowest-performing agents. Target agents with `keep_rate` below the fleet average for priority improvement. This focuses meta-improvement effort where it will have the most impact, rather than re-tuning agents that already perform well.
+
 ## Protocol
 
 1. **Assess**: Review recent swarm performance (ledger entries, improvement rates)

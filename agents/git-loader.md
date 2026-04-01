@@ -143,6 +143,10 @@ Proceeding with integration.
 4. If tests pass → commit with message: `feat: integrate {component} from {owner/repo}`
 5. If tests fail → revert and report what went wrong
 
+### Step 7b: Log Provenance to Vault
+
+After integration, call `vault_append('provenance-ledger', {record})` to log provenance to the encrypted vault. The record should include `repo`, `component`, `license`, `trust_tier`, `scanner_verdict`, `timestamp`, and `outcome`. This creates a tamper-resistant audit trail of all external code brought into the project.
+
 ### Step 8: Record Outcome
 
 ```bash

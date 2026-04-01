@@ -1,0 +1,13 @@
+{
+  "description": "Aggregated public trust scores for federation peers. Updated during /federate verify and trust exchanges.",
+  "version": "1.0.0",
+  "peers": {},
+  "last_updated": null,
+  "total_peers": 0,
+  "trust_tiers": {
+    "high": [],
+    "moderate": [],
+    "low": [],
+    "untrusted": []
+  }
+}

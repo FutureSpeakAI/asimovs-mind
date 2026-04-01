@@ -52,6 +52,17 @@
 
   "custom_zones": {
     "description": "Project-specific protected zones. Users add patterns here for their codebase.",
-    "patterns": []
+    "patterns": [
+      {
+        "pattern": "**/vault/**",
+        "reason": "Vault contents are encrypted state — direct filesystem access bypasses encryption",
+        "severity": "critical"
+      },
+      {
+        "pattern": "**/vault/salt",
+        "reason": "Vault salt is critical to key derivation — tampering breaks all encrypted data",
+        "severity": "critical"
+      }
+    ]
   }
 }

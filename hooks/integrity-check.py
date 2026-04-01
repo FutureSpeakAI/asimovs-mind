@@ -18,6 +18,14 @@ import platform
 import sys
 from pathlib import Path
 
+# Vault integration — read HMAC manifest from vault when available
+# (governance files themselves stay plaintext for auditability)
+try:
+    from vault_bridge import vault_available, vault_read
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
 ASIMOVS_DIR = Path(".asimovs-mind")
 MANIFEST_FILE = ASIMOVS_DIR / "governance-manifest.json"
 SALT_FILE = ASIMOVS_DIR / ".salt"
@@ -50,15 +58,22 @@ def compute_file_hmac(file_path, key):
 
 
 def main():
-    # If no manifest exists, not yet federated — skip silently
-    if not MANIFEST_FILE.exists():
-        sys.exit(0)
+    manifest = None
 
-    try:
-        manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        # Can't read manifest — skip rather than block
-        sys.exit(0)
+    # Try vault first for the HMAC manifest
+    if _VAULT_OK:
+        manifest = vault_read("governance-manifest")
+
+    # Filesystem fallback
+    if manifest is None:
+        if not MANIFEST_FILE.exists():
+            # Not yet federated — skip silently
+            sys.exit(0)
+        try:
+            manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            # Can't read manifest — skip rather than block
+            sys.exit(0)
 
     files = manifest.get("files", {})
     if not files:

@@ -18,7 +18,26 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Vault integration — append to session-ledger through vault when available
+try:
+    from vault_bridge import vault_available, vault_append
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
 LEDGER_FILE = Path(".asimovs-mind") / "session-ledger.jsonl"
+
+
+def append_to_ledger(record):
+    """Append a record to the session ledger (vault, then filesystem fallback)."""
+    if _VAULT_OK:
+        if vault_append("session-ledger", record):
+            return  # Vault append succeeded
+
+    # Filesystem fallback
+    LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(LEDGER_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
 
 
 def main():
@@ -44,9 +63,7 @@ def main():
         }
 
         # Append to session ledger
-        LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(LEDGER_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
+        append_to_ledger(record)
 
     # Track bash commands that might affect the codebase
     elif tool_name == "Bash":
@@ -58,9 +75,7 @@ def main():
                 "event": "git_operation",
                 "command": command[:200],  # truncate long commands
             }
-            LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(LEDGER_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record) + "\n")
+            append_to_ledger(record)
 
     sys.exit(0)
 

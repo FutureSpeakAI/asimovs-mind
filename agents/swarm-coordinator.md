@@ -58,6 +58,10 @@ If you encounter an agent you do not recognize (a user-created or Meta-Improver-
 7. **Discovery (conditional)**: If Waves 1-2 identified needs that no existing agent can address, deploy GitScout to find external solutions
 8. **Synthesize**: Collect all results, summarize improvements, update metrics
 
+## Vault-Aware Trust Checks
+
+Before deploying agents, call `vault_read('agent-trust')` to check trust scores. Prefer agents with `keep_rate > 0.80`. Skip agents with `keep_rate < 0.50` unless no alternative exists. This ensures the swarm prioritizes reliable agents and avoids deploying agents that have a history of regressions.
+
 ## Governance
 
 Before spawning any agent, verify:

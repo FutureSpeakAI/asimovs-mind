@@ -17,11 +17,24 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Vault integration — try encrypted vault first, fall back to filesystem
+try:
+    from vault_bridge import vault_available, vault_read, vault_write
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
 TRUST_FILE = Path(".asimovs-mind") / "agent-trust.json"
 
 
 def load_trust():
-    """Load agent trust data."""
+    """Load agent trust data (vault, then filesystem fallback)."""
+    if _VAULT_OK:
+        data = vault_read("agent-trust")
+        if data is not None:
+            return data
+
+    # Filesystem fallback
     if not TRUST_FILE.exists():
         return {}
     try:
@@ -31,7 +44,12 @@ def load_trust():
 
 
 def save_trust(data):
-    """Save agent trust data."""
+    """Save agent trust data (vault, then filesystem fallback)."""
+    if _VAULT_OK:
+        if vault_write("agent-trust", data):
+            return  # Vault write succeeded
+
+    # Filesystem fallback
     TRUST_FILE.parent.mkdir(parents=True, exist_ok=True)
     TRUST_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),

@@ -16,6 +16,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Vault integration — try encrypted vault first, fall back to filesystem
+try:
+    from vault_bridge import vault_available, vault_read, vault_write, vault_append
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
 ASIMOVS_DIR = Path(".asimovs-mind")
 LEDGER_FILE = ASIMOVS_DIR / "session-ledger.jsonl"
 RECENT_SESSIONS_FILE = ASIMOVS_DIR / "knowledge" / "recent-sessions.json"
@@ -24,7 +31,14 @@ MAX_RECENT_SESSIONS = 5
 
 
 def read_ledger():
-    """Read all entries from the session ledger."""
+    """Read all entries from the session ledger (vault, then filesystem fallback)."""
+    # Try vault first
+    if _VAULT_OK:
+        data = vault_read("session-ledger")
+        if data is not None and isinstance(data, list):
+            return data
+
+    # Filesystem fallback
     entries = []
     if not LEDGER_FILE.exists():
         return entries
@@ -113,7 +127,18 @@ def create_session_record(files_modified, git_commits, discoveries):
 
 
 def update_recent_sessions(record):
-    """Append to recent sessions, keeping only the last N."""
+    """Append to recent sessions, keeping only the last N (vault, then filesystem fallback)."""
+    # Try vault first — read existing, append, trim, write back
+    if _VAULT_OK:
+        existing = vault_read("recent-sessions")
+        if existing is None or not isinstance(existing, list):
+            existing = []
+        existing.append(record)
+        existing = existing[-MAX_RECENT_SESSIONS:]
+        if vault_write("recent-sessions", existing):
+            return  # Vault write succeeded
+
+    # Filesystem fallback
     sessions = []
 
     if RECENT_SESSIONS_FILE.exists():
@@ -137,7 +162,13 @@ def update_recent_sessions(record):
 
 
 def append_to_history(record):
-    """Append to the full session history (append-only JSONL)."""
+    """Append to the full session history (vault, then filesystem fallback)."""
+    # Try vault first
+    if _VAULT_OK:
+        if vault_append("session-history", record):
+            return  # Vault append succeeded
+
+    # Filesystem fallback
     FULL_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     with open(FULL_HISTORY_FILE, "a", encoding="utf-8") as f:

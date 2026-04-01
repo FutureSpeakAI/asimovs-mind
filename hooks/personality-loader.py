@@ -14,6 +14,13 @@ import os
 import sys
 from pathlib import Path
 
+# Vault integration — try encrypted vault first, fall back to filesystem
+try:
+    from vault_bridge import vault_available, vault_read
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
 PLUGIN_ROOT = Path(os.environ.get("CLAUDE_PLUGIN_ROOT", Path(__file__).parent.parent))
 ASIMOVS_DIR = Path(".asimovs-mind")
 
@@ -27,7 +34,13 @@ def load_personality():
 
 
 def load_user_profile():
-    """Load the user's onboarding profile."""
+    """Load the user's onboarding profile (vault, then filesystem fallback)."""
+    if _VAULT_OK:
+        data = vault_read("user-profile")
+        if data is not None:
+            return data
+
+    # Filesystem fallback
     profile_file = ASIMOVS_DIR / "user-profile.json"
     if profile_file.exists():
         try:
@@ -38,7 +51,13 @@ def load_user_profile():
 
 
 def load_recent_sessions():
-    """Load the last 5 session summaries."""
+    """Load the last 5 session summaries (vault, then filesystem fallback)."""
+    if _VAULT_OK:
+        data = vault_read("recent-sessions")
+        if data is not None:
+            return data
+
+    # Filesystem fallback
     sessions_file = ASIMOVS_DIR / "knowledge" / "recent-sessions.json"
     if sessions_file.exists():
         try:
@@ -132,8 +151,20 @@ def main():
         lines.append(f"Agent Friday active. Mode: {mode}.")
         lines.append(f"User: {name}. Preferences: {prefs}.")
     else:
-        lines.append("Agent Friday active. Mode: partner.")
-        lines.append("User: not yet profiled (run /friday profile to set up).")
+        lines.append("Welcome to Asimov's Mind — Agent Friday's kernel for Claude Code.")
+        lines.append("")
+        lines.append("First-time setup required:")
+        lines.append("  1. Run /friday unlock to initialize the Sovereign Vault (encrypted storage)")
+        lines.append("  2. Run /onboard to create your user profile")
+        lines.append("  3. You're ready to work!")
+        lines.append("")
+        lines.append("The vault protects your data with AES-256-GCM encryption. Your passphrase is the only key.")
+
+        # Check if the vault port file exists; if not, warn that the server may still be starting
+        vault_port_file = ASIMOVS_DIR / "vault" / "port"
+        if not vault_port_file.exists():
+            lines.append("")
+            lines.append("Note: The vault server is starting up. If /friday unlock doesn't work, wait a moment and try again.")
 
     # Last session context
     if sessions:

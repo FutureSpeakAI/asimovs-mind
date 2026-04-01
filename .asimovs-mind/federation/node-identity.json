@@ -1,0 +1,10 @@
+{
+  "description": "Ed25519 public identity for this federation node. Private key stored in vault.",
+  "version": "1.0.0",
+  "node_id": null,
+  "public_key": null,
+  "public_key_format": "Ed25519 base64",
+  "created_at": null,
+  "rotated_at": null,
+  "key_source": "vault:identity-keypair"
+}

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Vault encrypted state (private — never commit)
+.asimovs-mind/vault/
+
+# Session artifacts
+.asimovs-mind/session-ledger.jsonl
+.asimovs-mind/*.migrated
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+/tmp/

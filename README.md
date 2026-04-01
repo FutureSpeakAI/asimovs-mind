@@ -1,10 +1,12 @@
 # Asimov's Mind
 
-### Every Claude Code instance becomes a node in a governed, self-improving software hivemind.
+### Every Claude Code instance becomes a node in a governed, sovereign, self-improving software hivemind.
 
-A Claude Code plugin that extends autonomous agents with GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. The agent swarm scales to N -- 13 skills, 6 directives, 7 governance hooks, unified memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
+A Claude Code plugin that extends autonomous agents with AES-256-GCM encrypted state, Ed25519 cryptographic identity, Privacy Shield PII scrubbing, local intelligence routing via Ollama, GitHub-scale code discovery, coordinated multi-agent improvement, unified memory, and immutable safety governance. The agent swarm scales to N -- 15 skills, 6 directives, 9 governance hooks, 1 MCP server, unified encrypted memory system. Bounded by Asimov's cLaws, a governance framework that makes unsupervised autonomous operation safe enough to deploy on production code overnight.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
+
+> **New here?** See [GETTING_STARTED.md](GETTING_STARTED.md) for installation and first-run setup in under two minutes.
 
 ---
 
@@ -44,11 +46,13 @@ claude plugin install asimovs-mind
 /iterate fix-tests                                     # autoresearch loop
 /onboard                                               # meet Agent Friday
 /friday mode creative                                  # switch modes
+/friday unlock                                         # open the encrypted vault
 /remember the auth uses JWT in httpOnly cookies         # teach Friday
 /federate init                                         # join the hivemind
 /create-agent CSS layout specialist                    # grow the swarm
 /breed "code review specialist"                        # spawn a local model
 /evolve "You are a helpful assistant..."               # evolve a prompt
+/route status                                          # check Ollama + routing
 /diagnose                                              # codebase health check
 /govern verify                                         # governance audit
 ```
@@ -76,6 +80,76 @@ Measure baseline
 
 Every agent runs this loop on its specialty. The Swarm Coordinator deploys agents in parallel waves. The Sentinel watches everyone for governance violations. What Karpathy built for one agent and one file, we run across N agents and the entire GitHub ecosystem.
 
+## Sovereign Vault
+
+All persistent state is encrypted at rest. The Sovereign Vault is an MCP server that runs as a sidecar to Claude Code, providing AES-256-GCM encrypted storage with a passphrase-derived key hierarchy:
+
+```
+Passphrase (>= 8 words)
+  -> Argon2id (opslimit=4, memlimit=256MB)
+  -> masterKey (32 bytes, destroyed after derivation)
+     +-- BLAKE2b-KDF("AF_VAULT") -> vaultKey  (AES-256-GCM for state files)
+     +-- BLAKE2b-KDF("AF_HMAC_") -> hmacKey   (HMAC-SHA256 for governance)
+     +-- BLAKE2b-KDF("AF_IDENT") -> identityKey (XSalsa20-Poly1305 for keypairs)
+```
+
+Trust scores, memory, user profiles, routing config, session history, identity keypairs -- everything that makes Friday yours is encrypted on disk. The passphrase never leaves the machine. A browser-based unlock form (`http://localhost:{port}/unlock`) keeps the passphrase out of the Claude API transcript entirely.
+
+Key material is wrapped in SecureBuffer objects that overwrite memory on destruction. The master key is destroyed immediately after sub-key derivation. Private keys are encrypted with the identity sub-key before storage. On vault lock, all keys are wiped.
+
+The `encryption_at_rest` safety floor is set to `true` and cannot be lowered. This is not optional.
+
+## Privacy Shield
+
+When Claude Code calls WebFetch or WebSearch, the outbound request passes through the Privacy Shield -- a pair of hooks that scrub PII before data leaves the machine and rehydrate it when responses come back.
+
+Detected categories: API keys (AWS, GitHub, OpenAI, Anthropic, Slack, Google), JWTs, credit card numbers (Visa, Mastercard, Amex, Discover), SSNs, email addresses, phone numbers, public IP addresses, and filesystem paths containing the OS username.
+
+Each PII match is replaced with a deterministic session-scoped placeholder (`<<PII:CATEGORY:hash>>`) using FNV-1a hashing with a random nonce. The mapping is held in memory only (never written to disk) and destroyed when the vault locks.
+
+**What the Privacy Shield covers:** WebFetch and WebSearch tool calls. All string values in the tool input are recursively scrubbed before the request is sent.
+
+**What the Privacy Shield does not cover:** Claude Code's own API channel to Anthropic. The conversation itself -- including your code, your questions, and any data you paste into the chat -- is sent to Anthropic's API outside the plugin's control. The Privacy Shield protects the tools the agent uses, not the channel the agent runs on. This is a structural limitation of running inside a cloud-dependent LLM. Full privacy requires `local_only` routing mode with Ollama.
+
+## Ed25519 Identity
+
+Each agent/node gets a cryptographic identity: an Ed25519 signing keypair and an X25519 key exchange keypair. Both are generated via libsodium, and private keys are encrypted with the vault's identity sub-key before storage.
+
+The identity enables:
+
+- **cLaw Attestation** -- Hash the laws text with SHA-256, combine with a timestamp, sign with Ed25519. Any peer can verify that this agent is governed by the same laws. Attestations expire after 5 minutes.
+- **Signed state** -- Any vault entry can be signed for integrity verification.
+- **Future federation trust** -- Public keys can be exchanged between nodes for verified communication.
+
+## Local-Only Operation
+
+Claude Code can run against local models via Ollama, eliminating all cloud API dependency. When configured this way, there is no Anthropic API involvement. Every feature of the plugin works locally.
+
+**What you need:**
+- [Ollama](https://ollama.ai) installed and running (`ollama serve`)
+- At least one chat model pulled (`ollama pull llama3.1:8b`)
+- Claude Code pointed at the local model (`claude --model ollama/llama3.1:8b`)
+
+**What works locally:** Everything. The vault encrypts state locally. P2P channels connect machines directly. Federation syncs through git. The trust graph, memory system, governance hooks, and attestation are all local operations. The agent swarm runs (quality depends on the local model). The Privacy Shield becomes unnecessary because there is no cloud traffic to scrub.
+
+**What changes:** The LLM is local instead of cloud-hosted. Agent quality depends on the local model's capability. Simple tasks (code formatting, test fixes, documentation, memory) work well on 7B models. Complex reasoning (architecture analysis, large refactors) benefits from larger models or temporary cloud routing.
+
+Run `/route local-only` to activate. This is the ultimate sovereignty configuration: not just encrypted state and scrubbed cloud requests, but zero cloud dependency entirely. Your data never leaves your machine. No API keys. No billing. No rate limits. Just your hardware and your code.
+
+See `directives/local-sovereignty.md` for the full setup guide.
+
+## Intelligence Router
+
+When Ollama is available on the local machine, Friday can route inference to local models instead of (or in addition to) the Claude API. The `/route` skill manages this.
+
+Four routing policies:
+- `auto` -- Let Friday decide per-request based on task complexity and privacy requirements (default)
+- `local_preferred` -- Prefer Ollama. Use cloud only when local lacks capability.
+- `local_only` -- All inference goes through Ollama. Maximum sovereignty, no cloud dependency.
+- `cloud_preferred` -- Prefer Claude API for quality. Route to local for privacy-sensitive tasks.
+
+The vault's MCP server monitors Ollama health and available models. The `privacy_shield_on_cloud` and `local_model_preferred` safety floors govern the routing behavior -- they can be raised but never lowered.
+
 ## Asimov's cLaws
 
 Governance is not a constraint on autonomy. It is what enables autonomy at scale.
@@ -102,6 +176,14 @@ Git commit on improvement, git revert on regression. Structured ledger logging. 
 
 The Laws are absolute. The Sentinel enforces them. Safety floors can be raised but never lowered. This is the property that makes overnight unsupervised operation possible.
 
+### Cryptographic Enforcement
+
+Governance integrity is verified cryptographically at every session start:
+
+- **HMAC-SHA256** -- Every governance file is hashed and the signatures stored in a manifest. The integrity-check hook verifies these on SessionStart. Tampering triggers a warning and safe mode.
+- **Protected zones** -- The vault directory, governance files, plugin manifest, credentials, and key files are all in the protected zones list. The First Law hook blocks writes to these paths.
+- **Safety floors** -- Minimum thresholds that agents can raise but never lower: test pass rate (95%), encryption at rest (always on), privacy shield on cloud (always on), passphrase minimum (8 words), local model preferred (when available).
+
 ### Why governance?
 
 Our research quantified what happens without it. Ungoverned agents crashed on 56% of experiments. They started with destructive changes and compounded the damage. Governed agents crashed 22% of the time, took less destructive paths, and recovered faster. The governed swarm degraded at one-third the rate of the ungoverned agent.
@@ -110,7 +192,7 @@ Governance is not a tradeoff against performance. It is a precondition for it.
 
 ## The Memory
 
-Trust graph. Knowledge graph. Vectorless RAG. One system, three views.
+Trust graph. Knowledge graph. Vectorless RAG. One system, three views. All encrypted at rest.
 
 Every session feeds the memory. Every discovery updates trust scores. Every file modification strengthens the knowledge graph. Friday doesn't just act -- it remembers.
 
@@ -120,7 +202,7 @@ Every session feeds the memory. Every discovery updates trust scores. Every file
 
 **Vectorless RAG** -- Context retrieval without embeddings or vector databases. Relevance is computed from entity matching, co-occurrence, evidence recency, and trust scores. When Ollama is available locally, semantic embeddings layer on top -- but the base system works everywhere with zero dependencies.
 
-**Tribal Knowledge** -- `/remember the payments API rate limits at 100 req/min`. Memories persist in `.asimovs-mind/knowledge/memories.json`, propagate through git, and surface automatically when Friday works on something related. One engineer teaches Friday, the whole team benefits.
+**Tribal Knowledge** -- `/remember the payments API rate limits at 100 req/min`. Memories persist encrypted in the vault, propagate through git, and surface automatically when Friday works on something related. One engineer teaches Friday, the whole team benefits.
 
 ## Capability Discovery: The Hivemind
 
@@ -169,7 +251,7 @@ The agent swarm scales to N -- The Swarm Coordinator dynamically discovers all a
 
 Every developer running this plugin on a shared repo is a node. One node discovers a retry handler via `/discover`, safety-scans it, integrates it, commits with provenance. Every other node pulls those improvements and inherits the trust scores. Agent definitions created via `/create-agent` propagate the same way. Tribal knowledge from `/remember` propagates the same way. The swarm grows across machines.
 
-The governance travels with the code. The HMAC-signed manifest detects tampering. The cLaws are the same on every node. The memory system travels with the federation -- trust scores, knowledge graph, and tribal knowledge all propagate through git.
+The governance travels with the code. The HMAC-signed manifest detects tampering. The cLaws are the same on every node. The memory system travels with the federation -- trust scores, knowledge graph, and tribal knowledge all propagate through git. Each node's vault encrypts its own state independently; federation shares governance and knowledge, not keys.
 
 ## Portable Governance
 
@@ -198,7 +280,7 @@ Autoresearch-style improvement loops, each defining an objective, metric, editab
 
 ```
 asimovs-mind/
-+-- plugin.json              # Claude Code plugin manifest (v1.0.0-beta)
++-- plugin.json              # Claude Code plugin manifest (v1.0.0)
 +-- .claude-plugin/           # Marketplace wrapper for installation
 +-- governance/              # Asimov's cLaws (immutable)
 |   +-- laws.json            # Three Laws + Meta-Law
@@ -207,10 +289,10 @@ asimovs-mind/
 |   +-- discovery-rules.json # cLaws extension for code import
 +-- personality/             # Agent Friday identity
 |   +-- friday.md            # Personality, modes, relationship model
-+-- agents/                  # N agents (dynamic discovery + creation)
-+-- skills/                  # 13 user-invokable /commands
++-- agents/                  # 16 agents (dynamic discovery + creation)
++-- skills/                  # 15 user-invokable /commands
 +-- directives/              # 6 autoresearch-style loops
-+-- hooks/                   # 7 governance enforcement hooks
++-- hooks/                   # 9 governance enforcement hooks
 |   +-- first-law.py         # PreToolUse: protected zone enforcement
 |   +-- third-law.py         # PostToolUse: session ledger
 |   +-- safety-scanner-hook.py # PreToolUse: AST scan on code write
@@ -218,6 +300,15 @@ asimovs-mind/
 |   +-- session-learner.py     # Stop: extracts learnings, feeds memory
 |   +-- integrity-check.py    # SessionStart: HMAC governance verification
 |   +-- trust-tracker.py      # PostToolUse: agent performance tracking
+|   +-- privacy-shield-scrub.py    # PreToolUse: PII scrubbing on WebFetch/WebSearch
+|   +-- privacy-shield-rehydrate.py # PostToolUse: PII restoration from responses
++-- mcp/                     # MCP servers
+|   +-- vault-server/        # Sovereign Vault MCP server
+|       +-- index.js         # MCP + HTTP bridge entry point
+|       +-- vault.js         # Encrypted state management
+|       +-- crypto.js        # AES-256-GCM, Argon2id, Ed25519, BLAKE2b
++-- hooks/
+|   +-- vault_bridge.py      # Python bridge for hooks to access vault
 +-- discovery/               # Discovery + memory system
 |   +-- safety_scanner.py    # AST-based static analysis
 |   +-- provenance.py        # Attribution + tracking CLI
@@ -227,9 +318,9 @@ asimovs-mind/
 
 ## Credits
 
-**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, the unified memory system, GitScout, GitLoader, and the capability discovery system.
+**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** created Asimov's Mind, the cLaws governance framework, the Sovereign Vault, the unified memory system, GitScout, GitLoader, and the capability discovery system.
 
-**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the trust graph, the self-improvement engines, and the GitLoader architecture that this plugin builds upon.
+**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** by FutureSpeak.AI is the origin of the cLaw governance system, the trust graph, the self-improvement engines, and the GitLoader architecture that this plugin builds upon. Agent Friday (Electron) remains the reference desktop implementation; Asimov's Mind is the reference CLI/server implementation.
 
 **[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy is the foundation -- the elegant modify-measure-keep/discard loop that started it all. We took the pattern, proved governance improves it, and extended it to ecosystem scale.
 

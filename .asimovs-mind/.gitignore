@@ -1,0 +1,13 @@
+# Encrypted private state — never commit
+vault/
+
+# Temporary session data — regenerated each session
+session-ledger.jsonl
+
+# Old plaintext files migrated to vault — safe to ignore
+*.migrated
+
+# Public state that SHOULD be committed:
+# federation/    — public identity, attestations, peer trust
+# agents/        — project-local agent overrides
+# knowledge/     — non-sensitive knowledge graph data

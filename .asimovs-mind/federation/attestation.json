@@ -1,0 +1,10 @@
+{
+  "description": "Latest cLaw attestation. Cryptographically signed proof that governance files are intact.",
+  "version": "1.0.0",
+  "attestation": null,
+  "signed_at": null,
+  "signer_public_key": null,
+  "governance_hash": null,
+  "algorithm": "Ed25519",
+  "files_attested": []
+}

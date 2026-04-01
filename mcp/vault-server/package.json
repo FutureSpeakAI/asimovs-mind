@@ -1,0 +1,18 @@
+{
+  "name": "@asimovs-mind/vault-server",
+  "version": "1.0.0",
+  "description": "Sovereign Vault MCP Server — AES-256-GCM encrypted state for Asimov's Mind",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "ws": "^8.20.0"
+  },
+  "author": "FutureSpeak.AI",
+  "license": "MIT"
+}

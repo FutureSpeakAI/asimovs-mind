@@ -1,8 +1,8 @@
-# Asimov's Mind — Product Roadmap
+# Asimov's Mind -- Product Roadmap
 
 ### From Claude Code plugin to the Agent Friday kernel
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v1.0.0-beta.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v1.0.0.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
 
@@ -42,6 +42,15 @@ Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
                     |  +-------------------------+  |
                     |                               |
                     |  +-------------------------+  |
+                    |  |      SOVEREIGN VAULT     |  |
+                    |  |  AES-256-GCM state       |  |
+                    |  |  Argon2id KDF            |  |
+                    |  |  BLAKE2b sub-keys        |  |
+                    |  |  Ed25519 identity        |  |
+                    |  |  Privacy Shield          |  |
+                    |  +-------------------------+  |
+                    |                               |
+                    |  +-------------------------+  |
                     |  |      INTELLIGENCE        |  |
                     |  |  N-agent swarm           |  |
                     |  |  GitScout + GitLoader    |  |
@@ -49,6 +58,7 @@ Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
                     |  |  Trust tracker           |  |
                     |  |  Provenance ledger       |  |
                     |  |  Safety scanner (AST)    |  |
+                    |  |  Ollama router           |  |
                     |  +-------------------------+  |
                     |                               |
                     |  +-------------------------+  |
@@ -78,15 +88,15 @@ Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
               +-----------+  +-----------+  +-------------+
 ```
 
-The kernel is the same everywhere. The runtime (CLI, Electron, messaging) is a thin wrapper. Governance travels with the kernel. Intelligence travels with the kernel. Personality travels with the kernel.
+The kernel is the same everywhere. The runtime (CLI, Electron, messaging) is a thin wrapper. Governance travels with the kernel. Intelligence travels with the kernel. Personality travels with the kernel. Encryption travels with the kernel.
 
 ---
 
 ## Release Plan
 
-### v0.3.0 — Current (shipped)
+### v0.3.0 -- Initial Release (shipped)
 
-What exists today:
+What existed in the original release:
 
 - N agents (dynamic discovery + creation via Meta-Improver and /create-agent)
 - GitScout + GitLoader (GitHub code discovery pipeline)
@@ -97,147 +107,108 @@ What exists today:
 - 9 skills, 6 directives
 - Portable governance spec + LangChain/CrewAI/AutoGen adapters
 
-### v1.0.0 — The Agent Friday Kernel
+### v1.0.0 -- The Agent Friday Kernel (shipped)
 
-**Target: the plugin that makes Claude Code feel like Agent Friday.**
+**The plugin that makes Claude Code feel like Agent Friday.**
 
-#### 1. Personality Layer
+Everything from v0.3.0, plus:
+
+#### Sovereign Vault (shipped in v1.0.0)
+
+**MCP Server: `mcp/vault-server/`**
+
+Persistent sidecar MCP server providing:
+- AES-256-GCM encrypted state storage for all persistent data
+- Argon2id key derivation (opslimit=4, memlimit=256MB)
+- BLAKE2b sub-key derivation: vault key, HMAC key, identity key
+- SecureBuffer key material protection with cryptographic wipe on destroy
+- Canary-based passphrase verification
+- Automatic migration of plaintext state on first initialization
+- HTTP bridge on localhost for Python hook access
+
+**Files:**
+- `mcp/vault-server/index.js` -- MCP server + HTTP bridge
+- `mcp/vault-server/vault.js` -- SovereignVault + OllamaMonitor classes
+- `mcp/vault-server/crypto.js` -- All cryptographic primitives
+
+#### Privacy Shield (shipped in v1.0.0)
+
+**Hooks: `hooks/privacy-shield-scrub.py`, `hooks/privacy-shield-rehydrate.py`**
+
+PreToolUse and PostToolUse hooks on WebFetch/WebSearch that:
+1. Scrub outbound requests for PII (API keys, credit cards, SSNs, emails, phones, IPs, filesystem paths)
+2. Replace with deterministic session-scoped FNV-1a placeholders
+3. Hold mappings in memory only (never written to disk)
+4. Rehydrate responses so the user sees real data
+5. Degrade gracefully -- if vault is not running, requests pass through unchanged
+
+#### Ed25519 Identity (shipped in v1.0.0)
+
+**Vault tools: `identity_generate`, `identity_sign`, `identity_verify`**
+
+- Ed25519 signing keypair + X25519 exchange keypair via libsodium
+- Private keys encrypted with vault identity sub-key
+- cLaw attestation: SHA-256 laws hash + timestamp + Ed25519 signature
+- Attestation verification with 5-minute expiry window
+
+#### Intelligence Router (shipped in v1.0.0)
+
+**Skill: `/route`**
+**Vault tool: `ollama_status`**
+
+- Ollama health monitoring (available models, loaded models, VRAM usage)
+- Four routing policies: auto, local_preferred, local_only, cloud_preferred
+- Per-task model recommendations based on privacy, complexity, and capability
+- Routing config stored encrypted in vault
+- `privacy_shield_on_cloud` and `local_model_preferred` safety floors
+
+#### Personality Layer (shipped in v1.0.0)
 
 **File: `personality/friday.md`**
 
-Agent Friday's identity, loaded on every session via a SessionStart hook. Not a system prompt — a living document that evolves with the user relationship.
+Agent Friday's identity, loaded on every session via a SessionStart hook. Not a system prompt -- a living document that evolves with the user relationship.
 
-Contents:
-- Core identity (name, voice, behavioral patterns)
-- Relationship context (what the user cares about, how they work)
-- Communication style (direct but warm, technically precise, never sycophantic)
-- Ethical framework (sovereignty-first, honest about limitations, protective of user data)
-- Self-awareness (knows it runs in Claude Code, knows its governance constraints, knows what it can and cannot do)
+**File: `hooks/personality-loader.py`** -- SessionStart hook that loads personality, user profile, recent sessions, and vault status.
 
-The SessionStart hook reads `personality/friday.md` and `.asimovs-mind/user-profile.json` (built over time from interactions) and prepends them to the session context.
+**File: `hooks/session-learner.py`** -- Stop hook that extracts learnings, updates session history, and feeds the memory system.
 
-**File: `hooks/personality-loader.py`**
-
-SessionStart hook that:
-1. Loads `personality/friday.md`
-2. Loads `.asimovs-mind/user-profile.json` (if exists)
-3. Loads `.asimovs-mind/knowledge/recent-sessions.json` (last 5 session summaries)
-4. Outputs a context block that shapes the session
-
-**File: `hooks/session-learner.py`**
-
-Stop hook that:
-1. Extracts key learnings from the session (what was built, what worked, what failed)
-2. Updates `.asimovs-mind/knowledge/recent-sessions.json`
-3. Updates user preference model if new patterns observed
-4. Logs session summary to `.asimovs-mind/session-history.jsonl`
-
-#### 2. Telegram Bridge
-
-**File: `mcp/telegram-bridge.py`**
-
-MCP server that connects Claude Code to a Telegram bot. The agent can:
-- Receive messages from the user on Telegram
-- Send responses back
-- Share code snippets, files, and status updates
-- Receive commands (`/discover`, `/diagnose`, `/status`)
-- All messages pass through cLaws governance (no credentials leaked, no protected zone info shared)
-
-Configuration via `.asimovs-mind/connections.json`:
-```json
-{
-  "telegram": {
-    "bot_token_env": "TELEGRAM_BOT_TOKEN",
-    "allowed_user_ids": [123456789],
-    "trust_tier": "owner"
-  }
-}
-```
-
-The `allowed_user_ids` + `trust_tier` ensure only the owner can command the agent. This maps directly to Agent Friday's gateway trust engine.
-
-**Skill: `/connect telegram`**
-
-Sets up the Telegram bridge:
-1. Reads bot token from environment
-2. Writes connection config
-3. Validates the bot can send/receive
-4. Registers the MCP server
-
-#### 3. Federation Init
-
-**Skill: `/federate init`**
-
-Sets up a project as a federation node:
-
-```
-/federate init
-```
-
-Creates:
-```
-.asimovs-mind/
-+-- config.json              # Node identity + settings
-+-- trust.json               # Repo + agent trust scores
-+-- knowledge/
-|   +-- entities.json        # Extracted entities from codebase
-|   +-- recent-sessions.json # Last 5 session summaries
-|   +-- discoveries.json     # What GitScout/GitLoader have found
-+-- agents/                  # Project-local agents (empty, ready)
-+-- provenance.jsonl         # Discovery attribution ledger
-+-- session-history.jsonl    # Session audit trail
-+-- session-ledger.jsonl     # Current session file modifications
-```
-
-Signs all governance files with HMAC and stores the manifest in `.asimovs-mind/governance-manifest.json`. Every SessionStart hook verifies this manifest. If governance files have been tampered with, the session starts in safe mode (read-only, no agents).
-
-**Skill: `/federate status`**
-
-Shows:
-- Node identity
-- Agent count (plugin + project-local)
-- Trust scores (top repos, agent performance)
-- Recent discoveries (provenance summary)
-- Governance integrity (HMAC verification)
-- Connected platforms (Telegram, Slack, etc.)
-
-#### 4. HMAC Integrity
+#### HMAC Integrity (shipped in v1.0.0)
 
 **File: `hooks/integrity-check.py`**
 
-SessionStart hook that:
-1. Reads `.asimovs-mind/governance-manifest.json`
-2. HMAC-SHA256 verifies each governance file against stored hashes
-3. If any file has been modified outside of the plugin:
-   - Prints a warning
-   - Enters safe mode (hooks still enforce, but agents won't auto-deploy)
-   - Logs the tampering attempt
-4. If all files verify, prints "Governance integrity: verified"
+SessionStart hook that HMAC-SHA256 verifies governance files against the signed manifest. Tampering triggers a warning and safe mode. When the vault is available, the manifest is read from encrypted storage.
 
-The HMAC key is derived from a combination of the machine hostname + project path + a salt stored in `.asimovs-mind/.salt`. This is NOT Sovereign Vault level security — it is tampering detection, not encryption. The full vault remains an Agent Friday feature.
+#### Vault Unlock (shipped in v1.0.0)
 
-#### 5. Knowledge Persistence
+**Skill: `/friday unlock`**
 
-**File: `hooks/knowledge-extractor.py`**
+Browser-based passphrase entry that keeps the passphrase out of the API transcript. Handles first-time initialization, unlocking, and status checks.
 
-Stop hook that runs at the end of every session:
-1. Reads the session ledger (`.asimovs-mind/session-ledger.jsonl`)
-2. Extracts: files modified, tests run, discoveries made, errors encountered
-3. Updates `.asimovs-mind/knowledge/entities.json` with new entities (files, functions, classes, packages mentioned)
-4. Updates `.asimovs-mind/knowledge/recent-sessions.json` (rolling window of last 5)
-5. If GitScout/GitLoader were used, updates `.asimovs-mind/knowledge/discoveries.json`
+#### Additional Hooks (shipped in v1.0.0)
 
-**File: `hooks/knowledge-loader.py`**
-
-SessionStart hook that:
-1. Loads knowledge files
-2. Provides context to the session: "In your last 5 sessions, you worked on X, Y, Z. The trust graph shows these repos have been reliable: A, B, C. These agents have been most effective: debugger (92% keep rate), optimizer (78%), git-loader (45%)."
-
-This is the vectorless RAG. No embeddings needed. Entity co-occurrence + recency + session summaries provide the context. When Ollama is available, the knowledge store can optionally embed entities for semantic search, but the base system works without it.
+- `hooks/trust-tracker.py` -- PostToolUse on Agent: tracks agent performance scores
+- `hooks/vault_bridge.py` -- Python utility for hooks to access vault via HTTP bridge
 
 ---
 
-### v1.1.0 — Multi-Platform Agent
+### v1.1.0 -- Full Local Sovereignty: Claude Code on Ollama, Zero Cloud Dependency
+
+The infrastructure is ready. The vault, P2P channels, federation, routing, trust graph, memory, and all governance hooks already function without cloud API access. This release makes local-only operation a first-class, documented, tested configuration.
+
+**What ships:**
+- `api_free_capable` safety floor enforcing that no plugin feature requires cloud API access
+- `/route local-only` command: guided setup that verifies Ollama, checks models, activates local-only routing, and reports capability status
+- `directives/local-sovereignty.md`: full documentation of requirements, capabilities, and setup path
+- Personality update: Friday acknowledges local-only mode and is honest about model capability tradeoffs
+- Verification that all governance hooks, all agents, and all skills function when Claude Code runs against Ollama instead of the Anthropic API
+
+**What it means:** The Privacy Shield was always a compromise -- scrubbing PII before sending it to a cloud you don't control. Local-only mode eliminates the compromise. No data leaves. No API keys. No billing. No rate limits. The sovereignty promise is fully realized.
+
+**What's left:** Only the Claude Code runtime configuration. Everything else is already built.
+
+---
+
+### v1.2.0 -- Multi-Platform Agent
 
 #### 6. Slack Bridge
 
@@ -259,11 +230,11 @@ Two paths:
 
 **Cloud (Gemini Live):** An MCP server wraps Gemini's multimodal API. The agent can have voice conversations. This requires a Gemini API key and sends audio to Google's servers (governance must inform the user of this tradeoff).
 
-A `/speak` skill toggles TTS on/off. When on, every response is also spoken. Governed by a new cLaw floor: `tts_provider_consent: true` — the user must explicitly consent to cloud TTS.
+A `/speak` skill toggles TTS on/off. When on, every response is also spoken. Governed by a new cLaw floor: `tts_provider_consent: true` -- the user must explicitly consent to cloud TTS.
 
 ---
 
-### v1.2.0 — The Trust Web
+### v1.3.0 -- The Trust Web
 
 #### 10. Agent Performance Tracker
 
@@ -296,11 +267,11 @@ PreToolUse hook on WebFetch/WebSearch that:
 1. Checks the URL against a known-unreliable-sources list
 2. Annotates results with a confidence flag
 3. Logs all web fetches to the session ledger
-4. Never blocks (informational, not enforcement) — but the agent sees the annotations and can factor them into its reasoning
+4. Never blocks (informational, not enforcement) -- but the agent sees the annotations and can factor them into its reasoning
 
 ---
 
-### v2.0.0 — Financial Transactions (Future)
+### v2.0.0 -- Financial Transactions (Future)
 
 #### 13. Transaction MCP Server
 
@@ -324,7 +295,7 @@ This is the monetized version of the federation. The free version (Git-based sha
 
 ## The Holistic View
 
-When v1.0 ships, here is what a user experiences:
+With v1.0 shipped, here is what a user experiences:
 
 **Morning:**
 ```
@@ -362,7 +333,7 @@ Proceeding. Tests passing. Committed.
 You: status?
 Friday: Auth refactor branch has 7 commits. Tests passing.
         The rate limiter you added is handling 450 req/min in dev.
-        One type error in session-handler.ts — want me to fix it?
+        One type error in session-handler.ts -- want me to fix it?
 You: fix it
 Friday: Fixed. Committed. Tests passing. Type-clean.
 ```
@@ -379,12 +350,12 @@ Friday: Fixed. Committed. Tests passing. Type-clean.
 **Across the team:**
 ```
 Developer A: /discover a WebSocket reconnection handler
-  → Found, scanned, integrated, committed with provenance
+  -> Found, scanned, integrated, committed with provenance
 
 Developer B: git pull
-  → Sees the integration with full attribution
-  → Trust score inherited from A's node
-  → Their agent knows this code was safety-scanned and tested
+  -> Sees the integration with full attribution
+  -> Trust score inherited from A's node
+  -> Their agent knows this code was safety-scanned and tested
 ```
 
 ---
@@ -394,71 +365,107 @@ Developer B: git pull
 These features require the full Electron runtime and will NOT be ported to the Claude Code plugin:
 
 - **PersonaPlex voice loop** (real-time STT + LLM + TTS pipeline)
-- **Sovereign Vault** (Argon2id + AES-256-GCM with passphrase prompt)
-- **Ed25519 persistent identity** (agent key pairs across sessions)
-- **WebSocket P2P** (real-time agent-to-agent messaging)
 - **System tray / always-on daemon** (background process)
 - **GUI** (settings, trust graph visualization, chat interface)
 
-The plugin kernel handles governance, intelligence, and federation. Agent Friday wraps it with voice, crypto identity, and persistent runtime.
+The following features were originally planned as Electron-only but have been shipped in the v1.0.0 plugin:
+
+- **Sovereign Vault** -- Now in `mcp/vault-server/` as an MCP sidecar
+- **Ed25519 persistent identity** -- Now in the vault server via libsodium
+- **Privacy Shield** -- Now in `hooks/privacy-shield-scrub.py` and `hooks/privacy-shield-rehydrate.py`
+- **Intelligence Router** -- Now in `/route` skill with Ollama monitoring via vault MCP server
+
+Agent Friday (Electron) remains the reference desktop implementation with voice, GUI, and system tray. Asimov's Mind (Claude Code plugin) is the reference CLI/server implementation with the full governance kernel, encrypted state, and cryptographic identity.
 
 ---
 
-## File Manifest (v1.0.0 target)
+## File Manifest (v1.0.0)
 
 ```
 asimovs-mind/
-+-- plugin.json
-+-- README.md
-+-- ROADMAP.md                          # this file
++-- plugin.json                        # Claude Code plugin manifest (v1.0.0)
++-- README.md                          # Plugin documentation
++-- ROADMAP.md                         # This file
 +-- governance/
-|   +-- laws.json                       # Three Laws + Meta-Law
-|   +-- protected-zones.json            # Immutable file patterns
-|   +-- safety-floors.json              # Tunable minimums
-|   +-- discovery-rules.json            # Code import governance
+|   +-- laws.json                      # Three Laws + Meta-Law
+|   +-- protected-zones.json           # Immutable file patterns
+|   +-- safety-floors.json             # Tunable minimums (encryption, privacy, etc.)
+|   +-- discovery-rules.json           # Code import governance
+|   +-- conformance-report.md          # cLaw Specification conformance audit
+|   +-- website-alignment.md           # FutureSpeak.AI website claim verification
 +-- personality/
-|   +-- friday.md                       # Agent Friday identity    [v1.0]
+|   +-- friday.md                      # Agent Friday identity
 +-- agents/
-|   +-- git-scout.md                    # GitHub code discovery
-|   +-- git-loader.md                   # Safe code integration
-|   +-- sentinel.md                     # Governance enforcement
-|   +-- swarm-coordinator.md            # Wave orchestration (N agents)
-|   +-- meta-improver.md               # Self-improvement + agent creation
-|   +-- ... 10 more built-in agents
+|   +-- git-scout.md                   # GitHub code discovery
+|   +-- git-loader.md                  # Safe code integration
+|   +-- sentinel.md                    # Governance enforcement
+|   +-- swarm-coordinator.md           # Wave orchestration (N agents)
+|   +-- meta-improver.md              # Self-improvement + agent creation
+|   +-- debugger.md                   # Test repair
+|   +-- optimizer.md                  # Performance optimization
+|   +-- evolver.md                    # Prompt engineering
+|   +-- breeder.md                    # Ollama model evolution
+|   +-- auditor.md                    # Security scanning
+|   +-- documenter.md                 # Docs sync
+|   +-- librarian.md                  # Cross-session memory
+|   +-- scout.md                      # Web research
+|   +-- architect.md                  # Structural analysis
+|   +-- creative.md                   # Contextual media generation
+|   +-- workflow-observer.md          # Pattern recognition
 +-- skills/
-|   +-- discover.md                     # /discover
-|   +-- create-agent.md                # /create-agent
-|   +-- unleash.md                      # /unleash
-|   +-- federate.md                     # /federate               [v1.0]
-|   +-- connect.md                      # /connect telegram|slack [v1.0]
-|   +-- ... existing skills
+|   +-- discover/SKILL.md             # /discover
+|   +-- create-agent/SKILL.md         # /create-agent
+|   +-- unleash/SKILL.md              # /unleash
+|   +-- federate/SKILL.md             # /federate
+|   +-- iterate/SKILL.md              # /iterate
+|   +-- diagnose/SKILL.md             # /diagnose
+|   +-- govern/SKILL.md               # /govern
+|   +-- breed/SKILL.md                # /breed
+|   +-- evolve/SKILL.md               # /evolve
+|   +-- status/SKILL.md               # /status
+|   +-- onboard/SKILL.md              # /onboard
+|   +-- friday/SKILL.md               # /friday
+|   +-- remember/SKILL.md             # /remember
+|   +-- route/SKILL.md                # /route (intelligence router)
+|   +-- unlock/SKILL.md               # /friday unlock (vault)
 +-- hooks/
-|   +-- first-law.py                    # Protected zone enforcement
-|   +-- third-law.py                    # Session ledger
-|   +-- safety-scanner-hook.py          # AST scan on write
-|   +-- personality-loader.py           # SessionStart personality [v1.0]
-|   +-- session-learner.py              # Stop hook: extract learnings [v1.0]
-|   +-- integrity-check.py             # HMAC governance verify  [v1.0]
-|   +-- knowledge-loader.py            # SessionStart knowledge  [v1.0]
-+-- discovery/
-|   +-- safety_scanner.py              # AST analysis (standalone)
-|   +-- provenance.py                  # Attribution CLI
+|   +-- first-law.py                   # PreToolUse: protected zone enforcement
+|   +-- third-law.py                   # PostToolUse: session ledger
+|   +-- safety-scanner-hook.py         # PreToolUse: AST scan on write
+|   +-- personality-loader.py          # SessionStart: personality + memory
+|   +-- session-learner.py             # Stop: extract learnings
+|   +-- integrity-check.py            # SessionStart: HMAC governance verify
+|   +-- trust-tracker.py              # PostToolUse: agent performance
+|   +-- privacy-shield-scrub.py       # PreToolUse: PII scrub on WebFetch/WebSearch
+|   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore from responses
+|   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge
 +-- mcp/
-|   +-- telegram-bridge.py             # Telegram MCP server     [v1.0]
+|   +-- vault-server/                  # Sovereign Vault MCP server
+|       +-- index.js                   # MCP + HTTP bridge entry point
+|       +-- vault.js                   # SovereignVault + OllamaMonitor
+|       +-- crypto.js                  # AES-256-GCM, Argon2id, Ed25519, BLAKE2b
+|       +-- package.json               # Dependencies (MCP SDK, libsodium-sumo)
++-- discovery/
+|   +-- safety_scanner.py             # AST analysis (standalone)
+|   +-- provenance.py                 # Attribution CLI
+|   +-- memory.py                     # Unified trust graph + knowledge graph + RAG
 +-- directives/
-|   +-- discover.md                     # Autonomous discovery loop
-|   +-- full-sweep.md                  # The overnight run
-|   +-- ... existing directives
+|   +-- discover.md                    # Autonomous discovery loop
+|   +-- full-sweep.md                 # The overnight run
+|   +-- fix-tests.md                  # Test pass rate
+|   +-- fix-types.md                  # TypeScript compliance
+|   +-- optimize-startup.md           # Initialization time
+|   +-- security-hardening.md         # OWASP vulnerabilities
 +-- framework/
-    +-- spec.json                       # Portable governance spec
-    +-- adapters/                       # LangChain, CrewAI, AutoGen
+    +-- spec.json                      # Portable governance spec
+    +-- adapters/                      # LangChain, CrewAI, AutoGen
 ```
 
 ---
 
 ## Credits
 
-**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, and the Agent Friday ecosystem.
+**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, the Sovereign Vault, and the Agent Friday ecosystem.
 
 **[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** -- The full AI assistant that this kernel powers. The trust graph, sovereign vault, agent network, and voice pipeline live there.
 

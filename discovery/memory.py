@@ -33,6 +33,53 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
+# Vault integration — use encrypted vault for storage when available,
+# fall back to raw file I/O otherwise.
+# ---------------------------------------------------------------------------
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
+    from vault_bridge import vault_available, vault_read, vault_write, vault_append
+    _VAULT_OK = vault_available()
+except ImportError:
+    _VAULT_OK = False
+
+
+def _vault_read_json(key, default=None):
+    """Read a JSON value from the vault, returning default on failure."""
+    if not _VAULT_OK:
+        return default
+    try:
+        data = vault_read(key)
+        if data is not None:
+            return data if isinstance(data, (dict, list)) else json.loads(data)
+    except Exception:
+        pass
+    return default
+
+
+def _vault_write_json(key, data):
+    """Write a JSON value to the vault. Returns True on success."""
+    if not _VAULT_OK:
+        return False
+    try:
+        vault_write(key, data)
+        return True
+    except Exception:
+        return False
+
+
+def _vault_append_line(key, record):
+    """Append a record to a vault ledger key. Returns True on success."""
+    if not _VAULT_OK:
+        return False
+    try:
+        vault_append(key, record)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
 
@@ -71,8 +118,10 @@ def record_evidence(evidence_type, entity, outcome, detail="", dimensions=None):
         "dimensions": dimensions or {},
     }
 
-    with open(EVIDENCE_LOG, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    # Try vault first, fall back to file
+    if not _vault_append_line("evidence-log", record):
+        with open(EVIDENCE_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     # Recompute trust for this entity
     _recompute_trust(entity)
@@ -86,7 +135,22 @@ def record_evidence(evidence_type, entity, outcome, detail="", dimensions=None):
 
 def load_evidence(entity=None, evidence_type=None, since_days=None):
     """Load evidence records, optionally filtered."""
-    if not EVIDENCE_LOG.exists():
+    # Try vault first
+    vault_records = _vault_read_json("evidence-log")
+    raw_records = None
+    if isinstance(vault_records, list) and vault_records:
+        raw_records = vault_records
+    elif EVIDENCE_LOG.exists():
+        raw_records = []
+        for line in EVIDENCE_LOG.read_text(encoding="utf-8").strip().split("\n"):
+            if not line.strip():
+                continue
+            try:
+                raw_records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    if not raw_records:
         return []
 
     records = []
@@ -94,14 +158,7 @@ def load_evidence(entity=None, evidence_type=None, since_days=None):
     if since_days:
         cutoff = datetime.now() - timedelta(days=since_days)
 
-    for line in EVIDENCE_LOG.read_text(encoding="utf-8").strip().split("\n"):
-        if not line.strip():
-            continue
-        try:
-            r = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-
+    for r in raw_records:
         if entity and r.get("entity") != entity:
             continue
         if evidence_type and r.get("type") != evidence_type:
@@ -204,6 +261,10 @@ def _recompute_trust(entity):
 
 
 def _load_trust_scores():
+    # Try vault first
+    vault_data = _vault_read_json("trust-scores")
+    if isinstance(vault_data, dict) and vault_data:
+        return vault_data
     if not TRUST_SCORES.exists():
         return {}
     try:
@@ -213,6 +274,8 @@ def _load_trust_scores():
 
 
 def _save_trust_scores(scores):
+    # Write to vault first, then file as fallback/mirror
+    _vault_write_json("trust-scores", scores)
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     TRUST_SCORES.write_text(
         json.dumps(scores, indent=2, ensure_ascii=False),
@@ -260,6 +323,10 @@ def recompute_all():
 # ---------------------------------------------------------------------------
 
 def _load_graph():
+    # Try vault first
+    vault_data = _vault_read_json("entity-graph")
+    if isinstance(vault_data, dict) and vault_data:
+        return vault_data
     if not ENTITY_GRAPH.exists():
         return {"nodes": {}, "edges": {}}
     try:
@@ -269,6 +336,8 @@ def _load_graph():
 
 
 def _save_graph(graph):
+    # Write to vault first, then file as fallback/mirror
+    _vault_write_json("entity-graph", graph)
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     ENTITY_GRAPH.write_text(
         json.dumps(graph, indent=2, ensure_ascii=False),

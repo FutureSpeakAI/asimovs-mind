@@ -1,7 +1,7 @@
 {
   "name": "asimovs-mind",
-  "version": "1.0.0-beta",
-  "description": "Agent Friday's kernel for Claude Code. The governed software hivemind. N dynamically-discovered agents, 13 skills, 6 directives, 7 governance hooks, unified memory system. Personality, onboarding, tribal knowledge (/remember), session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
+  "version": "1.0.0",
+  "description": "Agent Friday's kernel for Claude Code. The governed, sovereign software hivemind. N dynamically-discovered agents, 16 skills, 6 directives, 9 governance hooks, AES-256-GCM encrypted vault, Ed25519 cryptographic identity, encrypted P2P agent-to-agent communication, Privacy Shield PII scrubbing, Ollama intelligence routing, unified memory system. Personality, onboarding, tribal knowledge (/remember), session learning, trust earning, creative expression, workflow observation, federation, and GitHub-scale code discovery — all bounded by immutable Asimov's cLaws.",
   "author": {
     "name": "FutureSpeak.AI",
     "url": "https://github.com/FutureSpeakAI"
@@ -19,8 +19,20 @@
     "code-discovery",
     "github-scout",
     "capability-discovery",
-    "hivemind"
+    "hivemind",
+    "encrypted-vault",
+    "privacy-shield",
+    "sovereign",
+    "ed25519",
+    "ollama"
   ],
+  "mcpServers": {
+    "sovereign-vault": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/vault-server/index.js"],
+      "description": "Sovereign Vault — AES-256-GCM encrypted state, Ed25519 identity, Privacy Shield, Ollama monitoring"
+    }
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -54,6 +66,15 @@
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/safety-scanner-hook.py"
           }
         ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/privacy-shield-scrub.py"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -72,6 +93,15 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/trust-tracker.py"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/privacy-shield-rehydrate.py"
           }
         ]
       }

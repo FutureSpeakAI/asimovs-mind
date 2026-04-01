@@ -56,6 +56,10 @@ Pattern: "Pre-commit checklist"
 No automation deployed without your approval.
 ```
 
+## Vault-Backed Pattern Storage
+
+Store approved and rejected automation patterns in the vault via `vault_write('automation-patterns', data)` instead of raw filesystem files. This keeps user workflow data encrypted alongside other private state. When reading patterns, try `vault_read('automation-patterns')` first and fall back to the filesystem `.asimovs-mind/automations.json` and `.asimovs-mind/rejected-patterns.json` if the vault is unavailable.
+
 ## Rules
 
 - NEVER automate without asking

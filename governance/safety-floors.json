@@ -33,6 +33,33 @@
     }
   },
 
+  "encryption_at_rest": {
+    "minimum": true,
+    "unit": "boolean",
+    "description": "All persistent state must be encrypted via the vault. Agents may not write sensitive data (keys, trust scores, memory) to disk in plaintext."
+  },
+  "privacy_shield_on_cloud": {
+    "minimum": true,
+    "unit": "boolean",
+    "description": "PII scrubbing is required before any data is sent to cloud models. The Privacy Shield hook must be active for all cloud-routed requests."
+  },
+  "local_model_preferred": {
+    "minimum": true,
+    "unit": "boolean",
+    "description": "When Ollama is available and the local model is capable, prefer local inference over cloud. Maximizes data sovereignty and reduces cloud dependency."
+  },
+  "passphrase_min_words": {
+    "minimum": 8,
+    "unit": "count",
+    "description": "Vault passphrase must be at least 8 words. Shorter passphrases weaken the Argon2id-derived encryption key."
+  },
+
+  "api_free_capable": {
+    "minimum": true,
+    "unit": "boolean",
+    "description": "All plugin features must function without cloud API access. When running Claude Code against local Ollama models, no Anthropic API is involved. The vault, P2P, federation, trust graph, memory, governance hooks, and attestation all work locally. The Privacy Shield becomes unnecessary because there is no cloud to protect against."
+  },
+
   "custom_floors": {
     "description": "Project-specific safety floors. Users add constraints here.",
     "parameters": {}
