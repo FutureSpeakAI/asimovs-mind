@@ -70,7 +70,54 @@
   .sub-dot:hover::after { content: attr(data-name); position: absolute; bottom: 28px; left: 50%;
                           transform: translateX(-50%); font-size: 0.65em; color: #aaa; white-space: nowrap;
                           background: #111; padding: 2px 6px; border-radius: 4px; }
-  .sub-dot { position: relative; cursor: default; }
+  .sub-dot { position: relative; cursor: pointer; }
+
+  /* Subsystem tooltip popup */
+  #sub-tooltip { position: absolute; z-index: 30; background: #0d0d1aee; border: 1px solid #00f0ff44;
+                 border-radius: 8px; padding: 10px 14px; min-width: 160px; pointer-events: auto;
+                 backdrop-filter: blur(8px); display: none; }
+  #sub-tooltip .tt-name { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.1em;
+                          color: #00f0ff; margin-bottom: 6px; font-weight: 600; }
+  #sub-tooltip .tt-row { font-size: 0.7em; color: #ccc; margin-bottom: 2px; }
+  #sub-tooltip .tt-row span { color: #e0e0e0; }
+
+  /* Memory search */
+  #mem-search-wrap { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); z-index: 15;
+                     display: flex; gap: 6px; align-items: center; }
+  #mem-search { width: 260px; padding: 7px 12px; background: #0a0a0a99; border: 1px solid #00f0ff22;
+                border-radius: 16px; color: #e0e0e0; font-size: 0.75em; outline: none;
+                backdrop-filter: blur(8px); }
+  #mem-search:focus { border-color: #00f0ff66; }
+  #mem-search::placeholder { color: #555; }
+
+  /* Memory search results panel */
+  #mem-results { position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%); z-index: 15;
+                 background: #0d0d1aee; border: 1px solid #00f0ff33; border-radius: 10px;
+                 padding: 12px 16px; max-width: 420px; width: 90%; display: none;
+                 backdrop-filter: blur(8px); max-height: 260px; overflow-y: auto; }
+  #mem-results .mr-close { position: absolute; top: 6px; right: 10px; cursor: pointer; color: #666;
+                           font-size: 0.75em; }
+  #mem-results .mr-close:hover { color: #aaa; }
+  #mem-results .mr-item { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #ffffff0a; }
+  #mem-results .mr-item:last-child { margin-bottom: 0; border-bottom: none; }
+  #mem-results .mr-content { font-size: 0.75em; color: #e0e0e0; margin-bottom: 3px; }
+  #mem-results .mr-meta { font-size: 0.6em; color: #666; display: flex; gap: 10px; }
+  #mem-results .mr-meta .tier { color: #00f0ff; }
+  #mem-results .mr-empty { font-size: 0.75em; color: #555; font-style: italic; }
+
+  /* 768px tablet reflow */
+  @media (max-width: 768px) {
+    #hud { grid-template-rows: auto auto 1fr auto auto; grid-template-columns: 1fr;
+           padding: 16px; }
+    .tl { grid-row: 1; grid-column: 1; }
+    .tr { grid-row: 2; grid-column: 1; text-align: left; }
+    .tr .meta { align-items: flex-start; }
+    .bl { grid-row: 4; grid-column: 1; align-self: end; }
+    .br { grid-row: 5; grid-column: 1; align-self: end; text-align: left; }
+    .br .meta { align-items: flex-start; }
+    #subsystems { flex-wrap: wrap; max-width: 220px; justify-content: center; }
+    #mem-search { width: 200px; }
+  }
 
   /* Passphrase gate */
   #gate { position: fixed; inset: 0; z-index: 100; background: #030303ee; display: flex;
@@ -143,6 +190,21 @@
 <!-- Subsystem status bar -->
 <div id="subsystems"></div>
 
+<!-- Subsystem tooltip (absolute positioned, shown on dot click) -->
+<div id="sub-tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-body"></div>
+</div>
+
+<!-- Memory search -->
+<div id="mem-search-wrap">
+  <input type="text" id="mem-search" placeholder="Search memory..." autocomplete="off">
+</div>
+<div id="mem-results">
+  <span class="mr-close">dismiss</span>
+  <div id="mr-body"></div>
+</div>
+
 <!-- Passphrase gate -->
 <div id="gate">
   <div class="gate-box">
@@ -184,6 +246,9 @@ function setConnected(state) {
   connected = state;
   connDot.classList.toggle('disconnected', !state);
 }
+
+// --- Cached subsystem metrics for tooltip display ---
+let cachedMetrics = {};
 
 // --- Subsystem dots ---
 const subBar = document.getElementById('subsystems');
@@ -497,6 +562,8 @@ async function poll() {
       document.getElementById('v-mem-long').textContent = longCount;
       // Bind to particles
       updateParticleBinding(shortCount, midCount, longCount);
+      // Cache for tooltip
+      cachedMetrics.memory = { shortTerm: shortCount, mediumTerm: midCount, longTerm: longCount };
     }
   } catch { /* memory not available */ }
 
@@ -505,9 +572,12 @@ async function poll() {
     const trustRaw = await callTool('trust_graph_status');
     const trust = parseMcpResult(trustRaw);
     if (trust) {
-      document.getElementById('v-trust-persons').textContent = fmt(trust.personCount ?? trust.persons);
+      const personCount = trust.personCount ?? trust.persons ?? 0;
       const avg = trust.averageTrust ?? trust.avg_trust;
+      document.getElementById('v-trust-persons').textContent = fmt(personCount);
       document.getElementById('v-trust-avg').textContent = avg != null ? Number(avg).toFixed(2) : '--';
+      // Cache for tooltip
+      cachedMetrics.trust = { personCount, avgScore: avg != null ? Number(avg).toFixed(2) : '--' };
     }
   } catch { /* trust not available */ }
 
@@ -547,6 +617,24 @@ async function poll() {
       orbPulseSpeed = 1.5 + Math.min(eventCount / 50, 1) * 4.5;
     }
   } catch { /* context not available */ }
+
+  // Personality status for tooltip (POST)
+  try {
+    const pRaw = await callTool('personality_status');
+    const p = parseMcpResult(pRaw);
+    if (p) {
+      cachedMetrics.personality = { mode: p.mode || '--', challengeLevel: p.challengeLevel ?? p.challenge_level ?? '--' };
+    }
+  } catch { /* personality not available */ }
+
+  // Connectors status for tooltip (POST)
+  try {
+    const cRaw = await callTool('connector_status');
+    const c = parseMcpResult(cRaw);
+    if (c) {
+      cachedMetrics.connectors = { detected: c.detected || c.connectors || [] };
+    }
+  } catch { /* connectors not available */ }
 }
 
 /**
@@ -609,6 +697,125 @@ document.getElementById('gate-form').addEventListener('submit', async (e) => {
   }
   document.getElementById('gate-pp').value = '';
 });
+
+// --- Clickable subsystem dot tooltips ---
+const tooltip = document.getElementById('sub-tooltip');
+const ttName = tooltip.querySelector('.tt-name');
+const ttBody = tooltip.querySelector('.tt-body');
+let tooltipTimer = null;
+
+function buildTooltipContent(name) {
+  const isOn = document.querySelector(`.sub-dot[data-name="${name}"]`)?.classList.contains('on');
+  const statusText = isOn ? 'running' : 'stopped';
+
+  if (name === 'memory' && cachedMetrics.memory) {
+    const m = cachedMetrics.memory;
+    return `<div class="tt-row">Short-term: <span>${m.shortTerm}</span></div>` +
+           `<div class="tt-row">Medium-term: <span>${m.mediumTerm}</span></div>` +
+           `<div class="tt-row">Long-term: <span>${m.longTerm}</span></div>`;
+  }
+  if (name === 'trust' && cachedMetrics.trust) {
+    const t = cachedMetrics.trust;
+    return `<div class="tt-row">Persons: <span>${t.personCount}</span></div>` +
+           `<div class="tt-row">Avg score: <span>${t.avgScore}</span></div>`;
+  }
+  if (name === 'personality' && cachedMetrics.personality) {
+    const p = cachedMetrics.personality;
+    return `<div class="tt-row">Mode: <span>${p.mode}</span></div>` +
+           `<div class="tt-row">Challenge: <span>${p.challengeLevel}</span></div>`;
+  }
+  if (name === 'connectors' && cachedMetrics.connectors) {
+    const c = cachedMetrics.connectors;
+    const list = Array.isArray(c.detected) && c.detected.length > 0
+      ? c.detected.join(', ')
+      : 'none';
+    return `<div class="tt-row">Detected: <span>${list}</span></div>`;
+  }
+  return `<div class="tt-row">Status: <span>${statusText}</span></div>`;
+}
+
+function showTooltip(dot) {
+  const name = dot.dataset.name;
+  ttName.textContent = name;
+  ttBody.innerHTML = buildTooltipContent(name);
+
+  // Position near the dot
+  const rect = dot.getBoundingClientRect();
+  tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+  tooltip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  tooltip.style.transform = 'translateX(-50%)';
+  tooltip.style.display = 'block';
+
+  // Auto-dismiss after 5 seconds
+  if (tooltipTimer) clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(hideTooltip, 5000);
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+  if (tooltipTimer) { clearTimeout(tooltipTimer); tooltipTimer = null; }
+}
+
+subBar.addEventListener('click', (e) => {
+  const dot = e.target.closest('.sub-dot');
+  if (dot) {
+    showTooltip(dot);
+    e.stopPropagation();
+  }
+});
+
+// Click outside tooltip to dismiss
+document.addEventListener('click', (e) => {
+  if (!tooltip.contains(e.target) && !e.target.closest('.sub-dot')) {
+    hideTooltip();
+  }
+});
+
+// --- Memory search ---
+const memSearchInput = document.getElementById('mem-search');
+const memResultsPanel = document.getElementById('mem-results');
+const mrBody = document.getElementById('mr-body');
+const mrClose = memResultsPanel.querySelector('.mr-close');
+
+memSearchInput.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  const query = memSearchInput.value.trim();
+  if (!query || !vaultUnlocked) return;
+
+  mrBody.innerHTML = '<div class="mr-empty">Searching...</div>';
+  memResultsPanel.style.display = 'block';
+
+  try {
+    const resp = await fetch('/tool/memory_recall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ args: { query, limit: 5 } })
+    });
+    const raw = await resp.json();
+    const data = parseMcpResult(raw);
+    const results = data?.results || data?.memories || (Array.isArray(data) ? data : []);
+
+    if (results.length === 0) {
+      mrBody.innerHTML = '<div class="mr-empty">No results found.</div>';
+    } else {
+      mrBody.innerHTML = results.map(r => {
+        const content = r.content || r.text || JSON.stringify(r);
+        const tier = r.tier || '--';
+        const recency = r.timestamp ? new Date(r.timestamp).toLocaleString() : (r.recency || '--');
+        return `<div class="mr-item">` +
+               `<div class="mr-content">${escHtml(content.slice(0, 200))}</div>` +
+               `<div class="mr-meta"><span class="tier">${tier}</span><span>${recency}</span></div>` +
+               `</div>`;
+      }).join('');
+    }
+  } catch (err) {
+    mrBody.innerHTML = `<div class="mr-empty">Error: ${escHtml(err.message)}</div>`;
+  }
+});
+
+mrClose.addEventListener('click', () => { memResultsPanel.style.display = 'none'; });
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
