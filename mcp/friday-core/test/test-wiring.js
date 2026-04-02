@@ -142,53 +142,54 @@ describe('Event Wiring: memory:stored feeds context graph', () => {
   });
 });
 
-describe('Event Wiring: trust:evidence-added creates memory observation', () => {
+describe('Event Wiring: trust:evidence-added refreshes gateway', () => {
+  // ARCH-001: wiring.js must NOT publish memory:store-request on trust:evidence-added.
+  // Memory storage is handled directly by MemorySubsystem.registerEvents() to avoid double-writing.
   let bus, registry;
-  let memory;
+  let refreshCalled;
 
   beforeEach(() => {
     bus = createMockEventBus();
-    memory = createMockSubsystem('memory', { started: true });
-    const gateway = createMockSubsystem('gateway', { refresh: () => {} });
-    registry = createMockRegistry([memory, gateway]);
+    refreshCalled = false;
+    const gateway = createMockSubsystem('gateway', { refresh: () => { refreshCalled = true; } });
+    registry = createMockRegistry([gateway]);
     wireSubsystems(registry, bus);
   });
 
-  it('publishes memory:store-request with _fromWiring guard', () => {
+  it('refreshes gateway and does NOT publish memory:store-request', () => {
     bus.publish('trust:evidence-added', { description: 'user verified claim' });
 
+    assert.ok(refreshCalled, 'gateway.refresh() not called');
     const storeReq = bus._published.find(e => e.topic === 'memory:store-request');
-    assert.ok(storeReq, 'memory:store-request not published');
-    assert.ok(storeReq.data._fromWiring, '_fromWiring guard not set');
-    assert.ok(storeReq.data.content.includes('Trust evidence'), 'content missing trust evidence text');
+    assert.ok(!storeReq, 'memory:store-request must not be published from wiring.js (ARCH-001)');
   });
 });
 
-describe('Event Wiring: agent:completed records in memory and trust', () => {
+describe('Event Wiring: agent:completed updates trust graph', () => {
+  // ARCH-001: wiring.js must NOT publish memory:store-request on agent:completed.
+  // Memory storage is handled directly by MemorySubsystem.registerEvents() to avoid double-writing.
   let bus, registry;
-  let memory, trust;
+  let trust;
   let agentResults;
 
   beforeEach(() => {
     bus = createMockEventBus();
     agentResults = [];
-    memory = createMockSubsystem('memory', { started: true });
     trust = createMockSubsystem('trust', {
       graph: { processAgentResult: (data) => { agentResults.push(data); } }
     });
-    registry = createMockRegistry([memory, trust]);
+    registry = createMockRegistry([trust]);
     wireSubsystems(registry, bus);
   });
 
-  it('publishes memory:store-request and calls trust.graph.processAgentResult', () => {
+  it('calls trust.graph.processAgentResult and does NOT publish memory:store-request', () => {
     bus.publish('agent:completed', { summary: 'Debugger fixed issue', agentName: 'debugger', success: true });
-
-    const storeReq = bus._published.find(e => e.topic === 'memory:store-request');
-    assert.ok(storeReq, 'memory:store-request not published');
-    assert.ok(storeReq.data.content.includes('Agent completed'), 'memory content missing');
 
     assert.equal(agentResults.length, 1, 'trust.graph.processAgentResult not called');
     assert.equal(agentResults[0].agentName, 'debugger');
+
+    const storeReq = bus._published.find(e => e.topic === 'memory:store-request');
+    assert.ok(!storeReq, 'memory:store-request must not be published from wiring.js (ARCH-001)');
   });
 });
 

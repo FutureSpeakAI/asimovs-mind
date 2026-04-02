@@ -2,7 +2,7 @@
 
 ### From Claude Code plugin to the Agent Friday kernel
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.0.0.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.2.0.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
 
@@ -113,23 +113,26 @@ What existed in the original release:
 
 Everything from v0.3.0, plus:
 
-#### Sovereign Vault (shipped in v1.0.0)
+#### Sovereign Vault (shipped in v1.0.0, migrated to friday-core in v2.0.0)
 
-**MCP Server: `mcp/vault-server/`**
+**MCP Server: `mcp/friday-core/` (Tier 0 subsystem since v2.0.0)**
 
-Persistent sidecar MCP server providing:
+> Note: `mcp/vault-server/` was the standalone vault MCP server from v1.0.0. It was removed in v2.2.0 (dead code since v2.0.0 replaced it with the friday-core subsystem architecture). The vault capability is documented here for historical completeness.
+
+Sovereign Vault capabilities (now in friday-core vault subsystem):
 - AES-256-GCM encrypted state storage for all persistent data
 - Argon2id key derivation (opslimit=4, memlimit=256MB)
 - BLAKE2b sub-key derivation: vault key, HMAC key, identity key
 - SecureBuffer key material protection with cryptographic wipe on destroy
 - Canary-based passphrase verification
 - Automatic migration of plaintext state on first initialization
-- HTTP bridge on localhost for Python hook access
+- HTTP bridge on localhost for Python hook access (with bearer token auth since v2.2.0)
 
-**Files:**
-- `mcp/vault-server/index.js` -- MCP server + HTTP bridge
-- `mcp/vault-server/vault.js` -- SovereignVault + OllamaMonitor classes
-- `mcp/vault-server/crypto.js` -- All cryptographic primitives
+**Current files (v2.2.0):**
+- `mcp/friday-core/core/vault.js` -- SovereignVault class
+- `mcp/friday-core/core/crypto.js` -- All cryptographic primitives
+- `mcp/friday-core/core/ollama-monitor.js` -- OllamaMonitor (extracted from vault.js in v2.2.0)
+- `mcp/friday-core/subsystems/vault/index.js` -- 10 MCP tools for vault operations
 
 #### Privacy Shield (shipped in v1.0.0)
 
@@ -197,7 +200,7 @@ Browser-based passphrase entry that keeps the passphrase out of the API transcri
 
 Everything from v1.0.0, plus the complete intelligence port from nexus-os:
 
-- **friday-core MCP server** -- replaced vault-server with unified 17-subsystem runtime, loaded in 4 dependency tiers
+- **friday-core MCP server** -- replaced vault-server with unified 17-subsystem runtime, loaded in 4 dependency tiers (vault-server removed in v2.2.0)
 - **LLM subsystem** (6 tools) -- 3 providers, intelligence router, budget tracking
 - **Memory subsystem** (8 tools) -- 3-tier storage, embeddings, semantic search
 - **Context subsystem** (4 tools) -- knowledge graph, entity extraction, context injection
@@ -351,7 +354,7 @@ These features require the full Electron runtime and will NOT be ported to the C
 
 The following features were originally planned as Electron-only but have been shipped in the plugin:
 
-- **Sovereign Vault** -- Now in `mcp/friday-core/` (Tier 0 subsystem)
+- **Sovereign Vault** -- Now in `mcp/friday-core/` as the Tier 0 vault subsystem (standalone `mcp/vault-server/` removed in v2.2.0)
 - **Ed25519 persistent identity** -- Now in the identity subsystem via libsodium
 - **Privacy Shield** -- Now in `hooks/privacy-shield-scrub.py` and `hooks/privacy-shield-rehydrate.py`
 - **Intelligence Router** -- Now in the LLM subsystem with `/route` skill
@@ -362,55 +365,61 @@ Agent Friday (Electron) remains the reference desktop implementation with real-t
 
 ---
 
-## File Manifest (v2.0.0)
+## File Manifest (v2.2.0)
 
 ```
 asimovs-mind/
-+-- plugin.json                        # Claude Code plugin manifest (v2.0.0)
++-- plugin.json                        # Claude Code plugin manifest (v2.2.0)
 +-- README.md                          # Plugin documentation
 +-- CHANGELOG.md                       # Version history (Keep a Changelog format)
 +-- ROADMAP.md                         # This file
 +-- GETTING_STARTED.md                 # Installation and first-run guide
 +-- governance/
 |   +-- laws.json                      # Three Laws + Meta-Law
-|   +-- protected-zones.json           # Immutable file patterns
+|   +-- protected-zones.json           # Immutable file patterns (hooks/** in custom_zones)
 |   +-- safety-floors.json             # Tunable minimums (encryption, privacy, etc.)
 |   +-- discovery-rules.json           # Code import governance
 |   +-- conformance-report.md          # cLaw Specification conformance audit
 +-- personality/
 |   +-- friday.md                      # Agent Friday identity
 +-- agents/                            # 16 agents (dynamic discovery + creation)
-+-- skills/                            # 15 user-invokable /commands
++-- skills/                            # 19 user-invokable /commands
 +-- hooks/
-|   +-- first-law.py                   # PreToolUse: protected zone enforcement
+|   +-- first-law.py                   # PreToolUse: protected zone enforcement (absolute-path bypass fixed)
 |   +-- third-law.py                   # PostToolUse: session ledger
-|   +-- safety-scanner-hook.py         # PreToolUse: AST scan on write
+|   +-- safety-scanner-hook.py         # PreToolUse: AST scan (always runs on hooks/ and governance/ writes)
 |   +-- personality-loader.py          # SessionStart: personality + memory
 |   +-- session-learner.py             # Stop: extract learnings
 |   +-- integrity-check.py            # SessionStart: HMAC governance verify
 |   +-- trust-tracker.py              # PostToolUse: agent performance
 |   +-- privacy-shield-scrub.py       # PreToolUse: PII scrub on WebFetch/WebSearch
 |   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore from responses
-|   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge
+|   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge (bearer token auth)
 +-- mcp/
-|   +-- friday-core/                   # Agent Friday MCP server (17 subsystems)
+|   +-- friday-core/                   # Agent Friday MCP server (17 subsystems, 92 tools)
 |       +-- bootstrap.js               # Entry point: auto-installs deps, loads index
 |       +-- index.js                   # Subsystem loader + HTTP bridge + dashboard
 |       +-- dashboard.html             # Three.js holographic desktop UI
 |       +-- core/                      # Shared infrastructure
 |       |   +-- event-bus.js, subsystem.js, state-manager.js, logger.js
-|       |   +-- vault.js, crypto.js    # Cryptographic primitives
-|       +-- subsystems/                # 17 subsystems (89 tools)
+|       |   +-- vault.js               # SovereignVault class
+|       |   +-- crypto.js              # All cryptographic primitives
+|       |   +-- ollama-monitor.js      # OllamaMonitor (shared instance via deps)
+|       |   +-- wiring.js              # 10 cross-subsystem event routes
+|       |   +-- session-conductor.js   # Session lifecycle orchestration
+|       |   +-- eis.js                 # Epistemic Independence Score tracker
+|       +-- subsystems/                # 17 subsystems (92 tools)
 |           +-- vault/                 # 10 tools  Encrypted state
 |           +-- identity/              #  6 tools  Ed25519, X25519, attestation
 |           +-- privacy/               #  4 tools  PII engine
-|           +-- p2p/                   #  7 tools  WebSocket, ECDH channels
+|           +-- p2p/                   #  7 tools  WebSocket loopback, ECDH channels
 |           +-- ollama/                #  1 tool   Health monitoring
+|           +-- session/               #  1 tool   session_status (SessionSubsystem)
 |           +-- llm/                   #  6 tools  3 providers, router
 |           +-- memory/                #  8 tools  3-tier, embeddings, search
 |           +-- context/               #  4 tools  Knowledge graph, injection
-|           +-- trust/                 #  6 tools  Person-level graph, decay
-|           +-- personality/           #  6 tools  Evolution, calibration
+|           +-- trust/                 #  7 tools  Person-level graph, decay
+|           +-- personality/           #  7 tools  Evolution, calibration
 |           +-- agents/                #  7 tools  Delegation, deadlock detection
 |           +-- tools/                 #  4 tools  Registry, execution
 |           +-- connectors/            # 4+72     9 connectors, dispatch

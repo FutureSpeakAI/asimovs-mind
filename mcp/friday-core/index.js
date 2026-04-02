@@ -47,6 +47,7 @@ import { StateManager } from './core/state-manager.js';
 import { Logger } from './core/logger.js';
 import { wireSubsystems } from './core/wiring.js';
 import { SessionConductor } from './core/session-conductor.js';
+import { OllamaMonitor } from './core/ollama-monitor.js';
 
 // Subsystems — Tier 0 (no deps)
 import { VaultSubsystem } from './subsystems/vault/index.js';
@@ -69,6 +70,7 @@ import { GatewaySubsystem } from './subsystems/gateway/index.js';
 import { BriefingSubsystem } from './subsystems/briefing/index.js';
 import { VoiceSubsystem } from './subsystems/voice/index.js';
 import { EnterpriseSubsystem } from './subsystems/enterprise/index.js';
+import { SessionSubsystem } from './subsystems/session/index.js';
 
 // --- Resolve paths ---
 
@@ -84,7 +86,9 @@ const stateManager = new StateManager(vault);
 const logger = new Logger('friday');
 
 // Shared deps object passed to every subsystem
-const deps = { vault, eventBus, stateManager, logger };
+// --- TUNABLE ---
+const ollamaMonitor = new OllamaMonitor();
+const deps = { vault, eventBus, stateManager, logger, ollamaMonitor };
 
 // --- Subsystem registry ---
 
@@ -111,6 +115,7 @@ registry.register(new GatewaySubsystem(deps));         // needs trust, vault
 registry.register(new BriefingSubsystem(deps));        // needs memory, trust, context
 registry.register(new VoiceSubsystem(deps));           // needs event bus
 registry.register(new EnterpriseSubsystem(deps));      // needs vault, event bus
+registry.register(new SessionSubsystem(deps));          // needs session conductor (injected after startAll)
 
 // Inject registry reference into vault subsystem for status reporting
 registry.get('vault').setRegistry(registry);
@@ -119,7 +124,7 @@ registry.get('vault').setRegistry(registry);
 
 const server = new McpServer({
   name: 'friday-core',
-  version: '1.0.0'
+  version: '2.2.0'
 });
 
 // Register all subsystem tools on the MCP server
@@ -129,8 +134,26 @@ registry.registerAllTools(server);
 
 let httpServer = null;
 let httpPort = 0;
+let bridgeToken = null;
+
+// Tools callable via HTTP (read-only status tools only)
+const HTTP_TOOL_WHITELIST = new Set([
+  'vault_status',
+  'ollama_status',
+  'session_status',
+  'personality_status',
+]);
 
 async function startHttpBridge() {
+  // Generate a random bearer token for write-endpoint authentication
+  bridgeToken = (await import('node:crypto')).default.randomBytes(32).toString('hex');
+  try {
+    await fs.mkdir(VAULT_DIR, { recursive: true });
+    await fs.writeFile(path.join(VAULT_DIR, 'bridge-token'), bridgeToken, { encoding: 'utf-8', mode: 0o600 });
+  } catch {
+    // Vault dir may not exist yet — hooks will need to wait for initialization
+  }
+
   return new Promise((resolve) => {
     httpServer = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
@@ -145,6 +168,22 @@ async function startHttpBridge() {
 
       const url = new URL(req.url, `http://localhost`);
       const route = url.pathname;
+
+      // Require bearer token on all write endpoints and generic tool endpoint
+      const requiresAuth = (
+        (route === '/write' && req.method === 'POST') ||
+        (route === '/append' && req.method === 'POST') ||
+        (route.startsWith('/tool/') && (req.method === 'POST' || req.method === 'GET'))
+      );
+      if (requiresAuth) {
+        const authHeader = req.headers['authorization'] || '';
+        const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+        if (!bridgeToken || provided !== bridgeToken) {
+          res.writeHead(401);
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+      }
 
       try {
         if (route === '/status' && req.method === 'GET') {
@@ -208,6 +247,12 @@ async function startHttpBridge() {
           // Also supports GET with empty args (for dashboard and hook convenience)
           const toolName = route.slice('/tool/'.length);
           if (!toolName) { res.writeHead(400); res.end(JSON.stringify({ error: 'Missing tool name' })); return; }
+          // Only whitelisted read-only tools are callable via HTTP
+          if (!HTTP_TOOL_WHITELIST.has(toolName)) {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: `Tool '${toolName}' is not permitted via HTTP bridge` }));
+            return;
+          }
           let args = {};
           if (req.method === 'POST') {
             const body = await readBody(req);
@@ -253,10 +298,21 @@ async function startHttpBridge() {
   });
 }
 
+const MAX_BODY_SIZE = 4 * 1024 * 1024; // 4 MB
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', c => chunks.push(c));
+    let totalSize = 0;
+    req.on('data', (c) => {
+      totalSize += c.length;
+      if (totalSize > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('Request body exceeds 4 MB limit'));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
     req.on('error', reject);
   });
@@ -353,35 +409,10 @@ async function main() {
   const conductor = new SessionConductor({ registry, eventBus, vault, logger });
   conductor.wire();
 
-  // Register session_status MCP tool
-  server.tool(
-    'session_status',
-    'Get current session status: uptime, working directory context, greeting, and pending commitments.',
-    {},
-    async () => {
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            uptime: conductor.uptime,
-            uptimeMin: Math.round(conductor.uptime / 60000),
-            cwd: conductor.cwdContext,
-            greeting: conductor.greeting,
-            pendingCommitments: conductor.pendingCommitments.length,
-            commitments: conductor.pendingCommitments.map(c => ({
-              id: c.id,
-              description: c.description,
-              personName: c.personName,
-              direction: c.direction,
-              deadline: c.deadline ? new Date(c.deadline).toISOString() : null,
-            })),
-          }, null, 2),
-        }],
-      };
-    }
-  );
+  // Inject conductor into session subsystem (ARCH-009)
+  registry.get('session').setConductor(conductor);
 
-  // Start HTTP bridge
+    // Start HTTP bridge
   const port = await startHttpBridge();
   logger.info(`HTTP bridge on http://127.0.0.1:${port}`);
   logger.info(`Vault status: ${vault.status}`);

@@ -297,14 +297,19 @@ export class PeerChannel {
 
     try {
       const ciphertext = Buffer.from(raw.encrypted, 'base64');
-      const { plaintext, sequence } = decryptMessage(ciphertext, this.#decryptKey, Number(this.#recvSequence));
-      this.#recvSequence++;
 
-      // Verify Ed25519 signature over the ciphertext
-      if (raw.sig && this.#peerSigningPubKey) {
+      // Verify Ed25519 signature BEFORE decrypting or advancing the sequence counter.
+      // When a peer signing key is configured, a missing signature is a hard reject.
+      if (this.#peerSigningPubKey) {
+        if (!raw.sig) {
+          return { error: 'Message signature required but missing' };
+        }
         const valid = verify(ciphertext, Buffer.from(raw.sig, 'base64'), this.#peerSigningPubKey);
         if (!valid) return { error: 'Signature verification failed' };
       }
+
+      const { plaintext, sequence } = decryptMessage(ciphertext, this.#decryptKey, Number(this.#recvSequence));
+      this.#recvSequence++;
 
       const msg = JSON.parse(plaintext.toString('utf-8'));
       this.#messageLog.push({ direction: 'recv', type: msg.type, timestamp: msg.timestamp });

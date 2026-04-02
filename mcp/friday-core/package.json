@@ -1,12 +1,13 @@
 {
   "name": "@asimovs-mind/friday-core",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Agent Friday Runtime — 17 subsystems, 89 MCP tools, encrypted vault, holographic dashboard",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js && node --test --test-force-exit test/test-subsystems.js"
+    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js && node --test --test-force-exit test/test-subsystems.js",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -14,5 +15,8 @@
     "ws": "^8.20.0"
   },
   "author": "FutureSpeak.AI",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^10.1.0"
+  }
 }

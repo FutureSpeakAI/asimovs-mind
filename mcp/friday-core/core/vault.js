@@ -14,6 +14,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+export { OllamaMonitor } from './ollama-monitor.js';
 import {
   initCrypto,
   validatePassphrase,
@@ -36,6 +37,17 @@ import {
 } from './crypto.js';
 
 const VAULT_VERSION = '1.0.0';
+
+// Key validation: only alphanumeric, hyphens, underscores, colons, and single dots.
+// No path separators, no consecutive dots, max 128 chars.
+function validateKey(key) {
+  if (typeof key !== 'string') throw new Error('Vault key must be a string');
+  if (key.length === 0) throw new Error('Vault key must not be empty');
+  if (key.length > 128) throw new Error('Vault key exceeds 128-character limit');
+  if (/[/\\]/.test(key)) throw new Error('Vault key must not contain path separators');
+  if (/\.\./.test(key)) throw new Error('Vault key must not contain consecutive dots');
+  if (!/^[a-zA-Z0-9_\-:.]+$/.test(key)) throw new Error('Vault key contains invalid characters (only alphanumeric, hyphens, underscores, colons, dots allowed)');
+}
 
 export class SovereignVault {
   #vaultDir;
@@ -179,7 +191,11 @@ export class SovereignVault {
 
   async read(key) {
     if (this.#locked) return { success: false, error: 'Vault is locked' };
+    validateKey(key);
     const filePath = path.join(this.#stateDir, `${key}.enc`);
+    if (!path.resolve(filePath).startsWith(path.resolve(this.#stateDir) + path.sep)) {
+      throw new Error('Path traversal detected');
+    }
     try {
       const b64 = await fs.readFile(filePath, 'utf-8');
       const ciphertext = Buffer.from(b64.trim(), 'base64');
@@ -193,10 +209,14 @@ export class SovereignVault {
 
   async write(key, data) {
     if (this.#locked) return { success: false, error: 'Vault is locked' };
+    validateKey(key);
     await fs.mkdir(this.#stateDir, { recursive: true });
     const plaintext = Buffer.from(JSON.stringify(data), 'utf-8');
     const ciphertext = encrypt(plaintext, this.#vaultKey);
     const filePath = path.join(this.#stateDir, `${key}.enc`);
+    if (!path.resolve(filePath).startsWith(path.resolve(this.#stateDir) + path.sep)) {
+      throw new Error('Path traversal detected');
+    }
     await fs.writeFile(filePath, ciphertext.toString('base64'), 'utf-8');
     return { success: true };
   }
@@ -211,7 +231,11 @@ export class SovereignVault {
 
   async delete(key) {
     if (this.#locked) return { success: false, error: 'Vault is locked' };
+    validateKey(key);
     const filePath = path.join(this.#stateDir, `${key}.enc`);
+    if (!path.resolve(filePath).startsWith(path.resolve(this.#stateDir) + path.sep)) {
+      throw new Error('Path traversal detected');
+    }
     try {
       await fs.unlink(filePath);
       return { success: true };
@@ -444,69 +468,5 @@ export class SovereignVault {
     }
 
     return migrated;
-  }
-}
-
-// --- Ollama health monitoring ---
-
-export class OllamaMonitor {
-  #healthy = false;
-  #models = [];
-  #loadedModels = [];
-  #lastCheck = null;
-  #baseUrl;
-
-  constructor(baseUrl = 'http://localhost:11434') {
-    this.#baseUrl = baseUrl;
-  }
-
-  async checkHealth() {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const resp = await fetch(`${this.#baseUrl}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!resp.ok) { this.#healthy = false; return this.status; }
-      const data = await resp.json();
-      this.#models = (data.models || []).map(m => ({
-        name: m.name, model: m.model, size: m.size, digest: m.digest
-      }));
-      this.#healthy = true;
-      this.#lastCheck = new Date().toISOString();
-    } catch {
-      this.#healthy = false;
-      this.#models = [];
-    }
-
-    // Check loaded models
-    if (this.#healthy) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const resp = await fetch(`${this.#baseUrl}/api/ps`, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (resp.ok) {
-          const data = await resp.json();
-          this.#loadedModels = (data.models || []).map(m => ({
-            name: m.name, model: m.model, size: m.size,
-            sizeVram: m.size_vram, expiresAt: m.expires_at
-          }));
-        }
-      } catch {
-        this.#loadedModels = [];
-      }
-    }
-
-    return this.status;
-  }
-
-  get status() {
-    return {
-      healthy: this.#healthy,
-      models: this.#models,
-      loadedModels: this.#loadedModels,
-      lastCheck: this.#lastCheck,
-      baseUrl: this.#baseUrl
-    };
   }
 }

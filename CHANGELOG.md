@@ -7,11 +7,29 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.1.1] — 2026-04-01
+## [2.2.0] — 2026-04-02 — Security Hardening
 
-### Fixed
-- LLM subsystem: replace raw JSON Schema objects with Zod schemas for MCP tool registration. MCP SDK v1.29.0+ requires Zod schemas in `server.tool()` calls; the raw objects caused a fatal startup crash (`Tool llm_complete expected a Zod schema or ToolAnnotations`). This prevented the entire friday-core MCP server from starting.
-- Remove dead `#registerTool` abstraction from LLM subsystem. All 6 LLM tools now register directly via `server.tool()`, consistent with every other subsystem.
+Full security audit pass plus architectural cleanup. Closes seven vulnerability classes identified during the audit; removes 160 KB of dead code; extracts OllamaMonitor to its own module.
+
+### Security
+
+- **Path traversal (SEC-007):** Vault key validation now rejects `/`, `\`, `..`, and any character outside `[a-zA-Z0-9_\-:.]`. Keys are limited to 128 characters. Prevents crafted keys from escaping the vault state directory.
+- **Absolute-path bypass (SEC-001):** `hooks/first-law.py` strips the `CLAUDE_PLUGIN_ROOT` prefix from absolute paths before comparing against protected-zone patterns. Previously an absolute path like `/full/path/to/plugin/governance/laws.json` would not match the relative pattern `governance/**`.
+- **HTTP bridge authentication (SEC-005):** Write endpoints (`/write`, `/append`) and the generic tool endpoint (`/tool/:name`) now require a `Bearer <token>` header. A 64-hex-char random token is generated at startup and written to `.asimovs-mind/vault/bridge-token` (mode 0o600). `vault_bridge.py` reads this file and sends the token on all authenticated requests.
+- **Tool endpoint whitelist (SEC-006):** `POST /tool/:toolName` is now restricted to four read-only tools: `vault_status`, `ollama_status`, `session_status`, `personality_status`. All other tool names return HTTP 403. Previously any MCP tool could be called via HTTP.
+- **Body size limit (SEC-009):** HTTP bridge requests are rejected at 4 MB. Previously unbounded POST bodies could exhaust memory.
+- **P2P loopback binding (SEC-002):** WebSocket server in `subsystems/p2p/transport.js` now binds to `127.0.0.1` instead of `0.0.0.0`. P2P channels are tunnelled through the relay; direct network exposure was unintended.
+- **Signature-before-decrypt (SEC-003):** `subsystems/p2p/protocol.js` now verifies the Ed25519 signature on incoming messages before decrypting the ciphertext. Previously a crafted ciphertext could trigger decryption work before authenticity was established.
+- **Safety scanner forced on hooks/ and governance/ (SEC-011):** `hooks/safety-scanner-hook.py` always runs the AST scanner on writes targeting `hooks/` or `governance/` regardless of provenance markers. `hooks/**` also added to `custom_zones` in `governance/protected-zones.json` for config-level visibility (it was already hardcoded as critical in `first-law.py`).
+
+### Changed
+
+- **`mcp/vault-server/` removed:** Directory was dead code since v2.0.0 shipped friday-core. Removed 160 KB. All ROADMAP.md references updated to reflect that the vault now lives in `mcp/friday-core/` as Tier 0 subsystems.
+- **`core/ollama-monitor.js` extracted:** `OllamaMonitor` class moved from `core/vault.js` to its own module. `core/vault.js` re-exports it for backward compatibility. A single shared instance is created in `index.js`, passed via `deps`, and consumed by both `VaultSubsystem` and `OllamaSubsystem`. Previously two independent monitors ran separate polling loops.
+- **Duplicate event subscriptions removed:** `core/wiring.js` had duplicate `memory:store-request` publisher registrations that caused redundant event firings. Removed.
+- **`session_status` moved to SessionSubsystem:** The tool is now registered through the standard subsystem pipeline (`subsystems/session/index.js`) instead of directly in `main()`.
+- **MCP server version:** `index.js` McpServer version synced to `2.2.0` (was `2.1.0`).
+- **`docs/ARCHITECTURE.md`:** Version header updated to 2.2.0. HTTP bridge section now documents bearer token auth, tool whitelist, body size limit, and P2P loopback binding. File structure table updated to reflect removed `vault-server/` and new `core/ollama-monitor.js`.
 
 ---
 
@@ -197,6 +215,7 @@ The subsystems learn to talk to each other. The system becomes one intelligence.
 
 ---
 
+[2.2.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v1.0.0-beta...v1.0.0

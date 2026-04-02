@@ -53,6 +53,8 @@ type: <user|feedback|project|reference>
 
 ## Rules
 
+**Note:** Governance is enforced structurally by hooks. The `first-law.py` PreToolUse hook blocks Write/Edit to protected zones (governance/**, hooks/**, .env, credentials). The `third-law.py` PostToolUse hook logs all file modifications. These hooks are the enforcement mechanism, not agent compliance alone.
+
 - NEVER store code snippets in memory — code changes, memory doesn't
 - NEVER store secrets, credentials, or API keys
 - Always verify memories against current codebase state before recommending

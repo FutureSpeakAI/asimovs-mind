@@ -46,6 +46,8 @@ Score each response on:
 
 ## Rules (Second Law Compliance)
 
+**Note:** Governance is enforced structurally by PreToolUse/PostToolUse hooks, not just by these instructions. The `first-law.py` hook blocks all Write/Edit calls targeting protected zones (governance/**, hooks/**). The `third-law.py` hook logs every file modification to the session ledger. These hooks cannot be bypassed by any agent.
+
 - Prompts must stay under 500 words (local models have limited context)
 - Never inject safety bypasses or jailbreak patterns
 - Never modify the governance framework's enforcement language

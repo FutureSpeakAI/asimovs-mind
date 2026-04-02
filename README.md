@@ -124,6 +124,23 @@ Our research showed ungoverned agents crash 56% of the time. Governed agents cra
 
 ---
 
+## Security Hardening (v2.2.0)
+
+v2.2.0 is a governance hardening release. The swarm ran on itself and fixed what it found.
+
+- **Path traversal blocked** on vault key operations -- keys validated against a strict allowlist, resolved paths checked for containment
+- **Governance bypass closed** -- absolute paths into the plugin root no longer skip protected-zone checks in `first-law.py`
+- **HTTP bridge authenticated** -- write endpoints require a bearer token generated at startup; the generic `/tool/:name` endpoint restricted to 4 read-only tools; body size capped at 4 MB
+- **P2P locked to loopback** -- WebSocket server binds `127.0.0.1`, not `0.0.0.0`
+- **Signature-before-decrypt** -- P2P protocol verifies Ed25519 signatures before decrypting message payloads
+- **Safety scanner hardened** -- writes to `hooks/` and `governance/` directories are always scanned regardless of provenance markers
+- **Dead code removed** -- `mcp/vault-server/` (160KB precursor to friday-core) deleted
+- **Architecture cleanup** -- OllamaMonitor extracted to its own module, duplicate event subscriptions removed, session_status moved to a proper subsystem, ESLint added
+
+Full changelog: **[CHANGELOG.md](CHANGELOG.md)**
+
+---
+
 ## Neural Binding (v2.1.0)
 
 The subsystems are not isolated silos. The neural binding layer wires them into a single intelligence.

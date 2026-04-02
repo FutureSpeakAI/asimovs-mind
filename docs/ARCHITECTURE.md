@@ -1,6 +1,6 @@
 # Agent Friday -- System Architecture
 
-**Version:** 2.1.0 (Neural Binding)
+**Version:** 2.2.0 (Security Hardening)
 **Runtime:** friday-core MCP server -- 17 subsystems, 92 MCP tools, holographic dashboard
 
 This document describes the full architecture of Asimov's Mind, the Claude Code plugin that implements Agent Friday. A developer unfamiliar with the codebase should be able to read this and understand how every component fits together.
@@ -131,16 +131,28 @@ Python Hook                    friday-core HTTP Server
      +-- Read port from               |
      |   .asimovs-mind/vault/port     |
      |                                |
-     +-- GET /status      ----------->|  vault status check
-     +-- GET /read?key=X  ----------->|  read encrypted state
-     +-- POST /write      ----------->|  write encrypted state
-     +-- POST /append     ----------->|  append to array
-     +-- POST /scrub      ----------->|  PII scrubbing
-     +-- POST /rehydrate  ----------->|  PII restoration
-     +-- POST /tool/:name ----------->|  call any MCP tool
+     +-- GET  /status     ----------->|  vault status check (no auth)
+     +-- GET  /read?key=X ----------->|  read encrypted state (no auth)
+     +-- POST /write      ----------->|  write encrypted state (bearer token)
+     +-- POST /append     ----------->|  append to array (bearer token)
+     +-- POST /scrub      ----------->|  PII scrubbing (no auth)
+     +-- POST /rehydrate  ----------->|  PII restoration (no auth)
+     +-- POST /tool/:name ----------->|  call whitelisted MCP tool (bearer token)
 ```
 
 The `vault_bridge.py` module provides a Python API (`vault_read`, `vault_write`, `vault_append`, `vault_available`) that wraps these HTTP calls. Every hook imports from `vault_bridge` and degrades gracefully if the server is unreachable.
+
+**HTTP Bridge Security Model (v2.2.0):**
+
+1. **Localhost binding:** The server binds exclusively to `127.0.0.1` (not `0.0.0.0`). Any request whose `req.socket.remoteAddress` is not `127.0.0.1`, `::1`, or `::ffff:127.0.0.1` is rejected with HTTP 403 before any route is matched.
+
+2. **Bearer token authentication:** A 64-hex-char random token is generated at startup via `crypto.randomBytes(32)` and written to `.asimovs-mind/vault/bridge-token` (mode 0o600). Write endpoints (`/write`, `/append`) and the generic tool endpoint (`/tool/:name`) require `Authorization: Bearer <token>`. Requests missing or mismatching the token receive HTTP 401.
+
+3. **Tool endpoint whitelist:** `POST /tool/:toolName` is restricted to four read-only tools: `vault_status`, `ollama_status`, `session_status`, `personality_status`. Any other tool name returns HTTP 403. This prevents hooks from triggering write-capable tools via the HTTP path.
+
+4. **Body size limit:** POST request bodies are rejected at 4 MB. The `readBody()` helper counts bytes as chunks arrive and destroys the socket on overflow.
+
+The bridge is not a network-accessible service — it exists solely for in-process Python/Node IPC on the same machine.
 
 ---
 
@@ -332,6 +344,18 @@ The Enterprise subsystem enforces explicit user consent for 8 categories:
 
 Consent scopes: `once` (single use), `session` (until restart), `always` (persistent in vault).
 
+### Governance Enforcement (v2.2.0 Hardening)
+
+Four additional security controls layered over the existing model:
+
+**Vault key path traversal (SEC-007):** `validateKey()` in `core/vault.js` rejects keys containing `/`, `\`, or `..`, restricts characters to `[a-zA-Z0-9_\-:.]`, and caps length at 128 characters. Prevents crafted keys from mapping to arbitrary filesystem paths under the vault state directory.
+
+**Protected zone absolute-path bypass (SEC-001):** `hooks/first-law.py` strips the `CLAUDE_PLUGIN_ROOT` prefix before comparing a file path against protected-zone patterns. Without this, an absolute path like `/full/path/to/plugin/governance/laws.json` would not match the relative pattern `governance/**`, silently bypassing the zone.
+
+**P2P loopback binding (SEC-002):** The WebSocket server in `subsystems/p2p/transport.js` binds to `127.0.0.1`. P2P channels are relayed — the local WebSocket is an IPC surface, not an intended network service.
+
+**Signature-before-decrypt (SEC-003):** `subsystems/p2p/protocol.js` verifies the Ed25519 signature on an incoming encrypted message before passing the ciphertext to the decryption function. Prevents a peer from inducing decryption work on unauthenticated data.
+
 ---
 
 ## File Structure
@@ -343,7 +367,7 @@ asimovs-mind/
 |   +-- marketplace.json
 +-- governance/                        # Immutable cLaw governance files
 |   +-- laws.json                      # Three Laws + Meta-Law definitions
-|   +-- protected-zones.json           # File patterns agents cannot modify
+|   +-- protected-zones.json           # File patterns agents cannot modify (hooks/** in custom_zones)
 |   +-- safety-floors.json             # Minimum thresholds (can be raised, never lowered)
 |   +-- discovery-rules.json           # Code import trust tiers and pipeline rules
 |   +-- conformance-report.md          # Specification conformance audit
@@ -354,8 +378,8 @@ asimovs-mind/
 |   +-- */SKILL.md                     # Each skill: YAML frontmatter + instructions
 +-- directives/                        # 8 autoresearch-style loop definitions
 +-- hooks/                             # 9 Python enforcement hooks + 1 utility
-|   +-- first-law.py                   # PreToolUse: protected zone enforcement
-|   +-- safety-scanner-hook.py         # PreToolUse: AST scan on .py Write
+|   +-- first-law.py                   # PreToolUse: protected zone enforcement (absolute-path bypass fixed)
+|   +-- safety-scanner-hook.py         # PreToolUse: AST scan (always runs on hooks/ and governance/ writes)
 |   +-- privacy-shield-scrub.py        # PreToolUse: PII scrubbing (WebFetch/WebSearch)
 |   +-- third-law.py                   # PostToolUse: session ledger (Write/Edit/Bash)
 |   +-- trust-tracker.py              # PostToolUse: agent performance (Agent)
@@ -363,30 +387,32 @@ asimovs-mind/
 |   +-- personality-loader.py          # SessionStart: personality + memory + context
 |   +-- integrity-check.py            # SessionStart: HMAC governance verification
 |   +-- session-learner.py            # Stop: extract metrics, update memory
-|   +-- vault_bridge.py               # Utility: Python HTTP client for vault
+|   +-- vault_bridge.py               # Utility: Python HTTP client for vault (sends bearer token)
 +-- mcp/
 |   +-- friday-core/                   # The MCP server (17 subsystems, 92 tools)
-|       +-- package.json               # npm dependencies
+|       +-- package.json               # npm dependencies (version 2.2.0)
 |       +-- bootstrap.js               # Entry point: version check, npm install, import
 |       +-- index.js                   # Subsystem loader, HTTP bridge, dashboard server
 |       +-- dashboard.html             # Three.js holographic UI
 |       +-- core/                      # Shared infrastructure
-|       |   +-- vault.js               # SovereignVault + OllamaMonitor classes
+|       |   +-- vault.js               # SovereignVault class (re-exports OllamaMonitor)
 |       |   +-- crypto.js              # All cryptographic primitives (libsodium)
+|       |   +-- ollama-monitor.js      # OllamaMonitor — shared instance via deps (extracted v2.2.0)
 |       |   +-- event-bus.js           # In-process pub/sub with ring buffer
 |       |   +-- subsystem.js           # Subsystem base class + SubsystemRegistry
 |       |   +-- state-manager.js       # Namespaced vault key access
 |       |   +-- logger.js              # Structured stderr logger
-|       |   +-- wiring.js              # 10 cross-subsystem event routes
+|       |   +-- wiring.js              # 10 cross-subsystem event routes (deduped v2.2.0)
 |       |   +-- session-conductor.js   # Session lifecycle orchestration
 |       |   +-- eis.js                 # Epistemic Independence Score tracker
-|       +-- subsystems/                # 17 subsystem directories
-|           +-- vault/index.js         # 10 tools: encrypted state CRUD
+|       +-- subsystems/                # 17 subsystem directories + session
+|           +-- vault/index.js         # 10 tools: encrypted state CRUD (path traversal fixed)
 |           +-- identity/index.js      #  6 tools: Ed25519, attestation
 |           +-- privacy/index.js       #  4 tools: PII engine
-|           +-- ollama/index.js        #  1 tool:  health check
-|           +-- p2p/                   #  7 tools: WebSocket, ECDH, pairing
-|           |   +-- index.js, protocol.js, transport.js
+|           +-- ollama/index.js        #  1 tool:  health check (uses shared OllamaMonitor)
+|           +-- session/index.js       #  1 tool:  session_status (SessionSubsystem)
+|           +-- p2p/                   #  7 tools: WebSocket loopback-only, ECDH, pairing
+|           |   +-- index.js, protocol.js (sig-before-decrypt), transport.js (127.0.0.1)
 |           +-- llm/                   #  6 tools: completion, routing
 |           |   +-- index.js, client.js, router.js
 |           |   +-- providers/         # ollama.js, anthropic.js, openrouter.js

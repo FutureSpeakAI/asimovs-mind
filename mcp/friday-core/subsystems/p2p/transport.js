@@ -33,7 +33,7 @@ export class P2PTransport {
     return new Promise((resolve, reject) => {
       this.#wss = new WebSocketServer({
         port: preferredPort,
-        host: '0.0.0.0', // Accept connections from network (for P2P across machines)
+        host: '127.0.0.1', // Loopback only — P2P tunnels through the relay, not direct network exposure
         handleProtocols: (protocols) => {
           if (protocols.has(WS_PROTOCOL)) return WS_PROTOCOL;
           return false;

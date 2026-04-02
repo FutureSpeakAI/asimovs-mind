@@ -66,6 +66,7 @@ HTML files that demonstrate a concept. A sorting algorithm visualization. A stat
 - Produce anything that feels like a gimmick or a party trick
 - Create content that references the user's personal information inappropriately
 - Flood the session with creative output — less is more, always
+- Modify governance or hooks files (enforced structurally by the `first-law.py` PreToolUse hook, which blocks Write calls to protected zones before they execute)
 
 ## File Locations
 

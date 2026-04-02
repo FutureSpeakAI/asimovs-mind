@@ -60,12 +60,20 @@ def check_file_against_zones(file_path, patterns):
     # Normalize the path
     normalized = file_path.replace("\\", "/")
 
-    # Also check just the relative part
-    cwd = os.getcwd().replace("\\", "/")
+    # Strip CWD prefix to get a relative path
+    cwd = os.getcwd().replace("\\", "/").rstrip("/") + "/"
     if normalized.startswith(cwd):
-        relative = normalized[len(cwd):].lstrip("/")
+        relative = normalized[len(cwd):]
     else:
         relative = normalized
+
+    # Also strip the PLUGIN_ROOT prefix so absolute paths into the plugin
+    # cannot bypass the protected-zone patterns (SEC-001 bypass vector).
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    if plugin_root:
+        plugin_root_normalized = plugin_root.replace("\\", "/").rstrip("/") + "/"
+        if relative == normalized and normalized.startswith(plugin_root_normalized):
+            relative = normalized[len(plugin_root_normalized):]
 
     for pattern, reason, severity in patterns:
         # Check against both the full and relative path

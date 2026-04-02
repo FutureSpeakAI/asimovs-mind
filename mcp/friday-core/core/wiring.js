@@ -89,22 +89,11 @@ export function wireSubsystems(registry, eventBus) {
   });
 
   // -----------------------------------------------------------------------
-  // trust:evidence-added -> memory stores observation, gateway refreshes
+  // trust:evidence-added -> gateway refreshes
+  // NOTE (ARCH-001): memory storage is handled directly by MemorySubsystem.registerEvents()
+  // to avoid double-writing. Do NOT publish memory:store-request here.
   // -----------------------------------------------------------------------
   eventBus.on('trust:evidence-added', (event) => {
-    try {
-      const memory = registry.get('memory');
-      if (memory?.started && event.data?.description) {
-        eventBus.publish('memory:store-request', {
-          content: `Trust evidence: ${event.data.description}`,
-          category: 'fact',
-          tier: 'medium',
-          confidence: 0.7,
-          _fromWiring: true,
-        });
-      }
-    } catch (e) { warn('memory on trust:evidence-added', e); }
-
     try {
       registry.get('gateway')?.refresh?.();
     } catch (e) { warn('gateway on trust:evidence-added', e); }
@@ -127,22 +116,11 @@ export function wireSubsystems(registry, eventBus) {
   });
 
   // -----------------------------------------------------------------------
-  // agent:completed -> memory records, trust updates agent performance
+  // agent:completed -> trust updates agent performance
+  // NOTE (ARCH-001): memory storage is handled directly by MemorySubsystem.registerEvents()
+  // to avoid double-writing. Do NOT publish memory:store-request here.
   // -----------------------------------------------------------------------
   eventBus.on('agent:completed', (event) => {
-    try {
-      const memory = registry.get('memory');
-      if (memory?.started && event.data?.summary) {
-        eventBus.publish('memory:store-request', {
-          content: `Agent completed: ${event.data.summary}`,
-          category: 'context',
-          tier: 'short',
-          confidence: 0.9,
-          _fromWiring: true,
-        });
-      }
-    } catch (e) { warn('memory on agent:completed', e); }
-
     try {
       const trust = registry.get('trust');
       if (trust?.graph && event.data?.agentName && event.data?.success !== undefined) {

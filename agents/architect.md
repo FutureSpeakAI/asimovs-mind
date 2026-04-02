@@ -48,6 +48,16 @@ Recommendations:
   2. <recommendation with specific files and changes>
 ```
 
+## Architecture Context
+
+The friday-core MCP server follows a **tiered subsystem architecture** with 17 subsystems organized by dependency depth (Tier 0 through Tier 3). Key architectural patterns to be aware of:
+
+- **Subsystem base class** (`core/subsystem.js`): All subsystems extend `Subsystem`, implement `registerTools(server)`, and optionally override `start()`, `stop()`, `registerEvents()`. The `SubsystemRegistry` manages lifecycle.
+- **Shared deps injection**: A single `deps` object (`{ vault, eventBus, stateManager, logger, ollamaMonitor }`) is passed to every subsystem constructor.
+- **OllamaMonitor extraction** (`core/ollama-monitor.js`): Previously embedded in vault.js, now a standalone module shared via deps. This is the pattern to follow when extracting tightly-coupled components.
+- **Late injection pattern**: Some subsystems need references that aren't available at construction time. `VaultSubsystem.setRegistry()` and `SessionSubsystem.setConductor()` demonstrate this pattern.
+- **HTTP bridge** (`index.js`): An internal HTTP server for Python hook compatibility. Bearer-token authenticated, localhost-only, with a whitelist of callable tools. This is a security surface.
+
 ## Rules
 
 - Analyze thoroughly before recommending

@@ -64,6 +64,8 @@ Before deploying agents, call `vault_read('agent-trust')` to check trust scores.
 
 ## Governance
 
+**Structural enforcement:** Governance is not just instructional -- it is enforced by PreToolUse/PostToolUse hooks that intercept tool calls before and after execution. The `first-law.py` hook blocks all Write/Edit to protected zones. The `third-law.py` hook logs all file modifications to the session ledger. Hooks run at the Claude Code platform level and cannot be bypassed by any agent, regardless of its prompt. This means governance violations in protected zones are structurally impossible, not merely discouraged.
+
 Before spawning any agent, verify:
 - The target files are NOT in protected zones (check `${CLAUDE_PLUGIN_ROOT}/governance/protected-zones.json`)
 - The improvement has a measurable metric

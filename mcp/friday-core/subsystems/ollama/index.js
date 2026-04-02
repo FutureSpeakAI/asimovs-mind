@@ -5,7 +5,7 @@
  */
 
 import { Subsystem } from '../../core/subsystem.js';
-import { OllamaMonitor } from '../../core/vault.js';
+import { OllamaMonitor } from '../../core/ollama-monitor.js';
 
 export class OllamaSubsystem extends Subsystem {
   #ollama;

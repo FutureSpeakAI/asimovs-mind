@@ -62,7 +62,14 @@
         "pattern": "**/vault/salt",
         "reason": "Vault salt is critical to key derivation — tampering breaks all encrypted data",
         "severity": "critical"
+      },
+      {
+        "pattern": "hooks/**",
+        "reason": "Hook files enforce governance laws — tampering breaks safety guarantees",
+        "severity": "critical"
       }
     ]
-  }
+  },
+
+  "_note_hooks_protection": "hooks/** is already hardcoded as critical in first-law.py (line 53) regardless of this file. It is duplicated here in custom_zones for visibility. It cannot be added to the core zones array without violating the Meta-Law, which prohibits editing governance/**."
 }

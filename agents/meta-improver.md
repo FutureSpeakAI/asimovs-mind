@@ -87,9 +87,11 @@ Before evolving agent prompts, call `vault_read('agent-trust')` to identify lowe
 
 ## Rules
 
+**Note:** Governance is enforced structurally by hooks, not just instructionally. The `first-law.py` PreToolUse hook blocks Write/Edit to protected zones (governance/**, hooks/**). The `third-law.py` PostToolUse hook logs all file modifications. These hooks run at the platform level and cannot be bypassed. This means governance violations are structurally impossible, not merely discouraged.
+
 - ALWAYS run the Sentinel after making changes
 - NEVER lower safety floors
-- NEVER modify governance files
+- NEVER modify governance files (enforced by hooks, but respect the intent too)
 - Log all meta-improvements to the results ledger
 - One level of meta-recursion only — you don't improve yourself
 - New agents inherit all Three Laws automatically

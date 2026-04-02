@@ -62,6 +62,8 @@ Store approved and rejected automation patterns in the vault via `vault_write('a
 
 ## Rules
 
+**Note:** Governance is enforced structurally by hooks. The `first-law.py` PreToolUse hook blocks Write calls to protected zones (governance/**, hooks/**, .env, credentials, vault/**). The `third-law.py` PostToolUse hook logs all file modifications. These hooks are the enforcement mechanism.
+
 - NEVER automate without asking
 - NEVER observe outside the session history files (no screen capture, no clipboard)
 - ALWAYS show the user what pattern you found and WHY you think it's automatable

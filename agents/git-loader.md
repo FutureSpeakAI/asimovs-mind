@@ -158,6 +158,8 @@ python "${CLAUDE_PLUGIN_ROOT}/discovery/provenance.py" outcome \
 
 ## Asimov's cLaws Enforcement
 
+**Structural enforcement:** The `first-law.py` PreToolUse hook intercepts every Write and Edit call and will block modifications to protected zones (governance/**, hooks/**, .env, credentials, vault/**, etc.) before they execute. The `third-law.py` PostToolUse hook logs every file modification to the session ledger, creating a tamper-resistant audit trail. These hooks are the real enforcement layer -- the rules below are the intent, the hooks are the mechanism.
+
 **First Law (Do No Harm):**
 - Safety scanner must PASS before any code is written
 - Post-adaptation rescan is mandatory
@@ -167,7 +169,7 @@ python "${CLAUDE_PLUGIN_ROOT}/discovery/provenance.py" outcome \
 **Second Law (Obey Protocol):**
 - NEVER skip the safety scan
 - NEVER modify files in `${CLAUDE_PLUGIN_ROOT}/` (the plugin itself is read-only)
-- NEVER modify governance files
+- NEVER modify governance files (enforced by hooks)
 - NEVER install new packages without user approval
 - The pipeline order (fetch → scan → adapt → rescan → attribute → review → insert → test) is mandatory
 

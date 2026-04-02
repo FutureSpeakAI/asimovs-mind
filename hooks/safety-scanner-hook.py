@@ -40,15 +40,24 @@ def main():
     if not file_path.endswith(".py"):
         sys.exit(0)
 
-    # Skip scanning files within the plugin itself (they're trusted)
-    plugin_root_str = str(PLUGIN_ROOT).replace("\\", "/")
+    # Skip scanning files within the plugin itself (they're trusted),
+    # EXCEPT writes targeting the hooks/ or governance/ directories must
+    # always be scanned regardless of provenance markers (SEC-011).
+    plugin_root_str = str(PLUGIN_ROOT).replace("\\", "/").rstrip("/")
     file_normalized = file_path.replace("\\", "/")
-    if file_normalized.startswith(plugin_root_str):
+
+    target_is_sensitive = (
+        file_normalized.startswith(plugin_root_str + "/hooks/")
+        or file_normalized.startswith(plugin_root_str + "/governance/")
+    )
+
+    if file_normalized.startswith(plugin_root_str + "/") and not target_is_sensitive:
         sys.exit(0)
 
     # Skip if content doesn't look like it contains imported/external code
-    # (check for provenance attribution comments)
-    if "IMPORTED" not in content and "Source:" not in content:
+    # (check for provenance attribution comments), BUT always scan writes
+    # to hooks/ and governance/ regardless of these markers.
+    if not target_is_sensitive and "IMPORTED" not in content and "Source:" not in content:
         sys.exit(0)
 
     # Run the safety scanner on the content

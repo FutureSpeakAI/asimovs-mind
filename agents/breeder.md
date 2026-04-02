@@ -7,6 +7,7 @@ tools:
   - Bash
   - Read
   - Write
+  - Edit
   - Glob
 ---
 
@@ -51,6 +52,8 @@ SYSTEM """<specialized-system-prompt>"""
 | Research synthesis | 0.5 | 30 | 0.9 | 16384 |
 
 ## Rules
+
+**Note:** Governance is enforced structurally by hooks. The `first-law.py` PreToolUse hook blocks Write/Edit to protected zones. The `third-law.py` PostToolUse hook logs all file modifications. These hooks cannot be bypassed.
 
 - ALWAYS verify Ollama is running before attempting model operations
 - Clean up failed models with `ollama rm <name>`
