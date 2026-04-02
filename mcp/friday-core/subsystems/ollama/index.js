@@ -21,8 +21,13 @@ export class OllamaSubsystem extends Subsystem {
       'Check Ollama health and available models.',
       {},
       async () => {
-        const status = await ollama.checkHealth();
-        return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
+        try {
+          const status = await ollama.checkHealth();
+          return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
+        } catch (err) {
+          process.stderr.write(`[friday:ollama] Health check failed: ${err.message}\n`);
+          return { content: [{ type: 'text', text: JSON.stringify({ available: false, error: err.message }) }] };
+        }
       }
     );
   }

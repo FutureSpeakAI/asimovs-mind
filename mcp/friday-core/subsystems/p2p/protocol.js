@@ -283,6 +283,10 @@ export class PeerChannel {
       return { error: 'Expected encrypted message' };
     }
 
+    if (!this.#decryptKey) {
+      return { error: 'Decryption key not available' };
+    }
+
     try {
       const ciphertext = Buffer.from(raw.encrypted, 'base64');
 
@@ -328,6 +332,7 @@ export class PeerChannel {
 
   async #sendEncrypted(msg) {
     if (this.#state !== 'open') throw new Error(`Channel not open (state: ${this.#state})`);
+    if (!this.#encryptKey) return { success: false, error: 'Encryption key not available' };
     const plaintext = Buffer.from(JSON.stringify(msg), 'utf-8');
     if (plaintext.length > MAX_MESSAGE_SIZE) throw new Error('Message too large');
 

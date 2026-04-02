@@ -129,7 +129,7 @@ export class SemanticSearchEngine {
           });
         }
       } catch (err) {
-        console.warn('[SemanticSearch] Bulk embedding batch failed:', err.message);
+        process.stderr.write(`[SemanticSearch] Bulk embedding batch failed: ${err.message}\n`);
       }
     }
 
@@ -301,14 +301,18 @@ export class SemanticSearchEngine {
       await this.#save();
       process.stderr.write(`[SemanticSearch] Indexed ${batch.length} entries\n`);
     } catch (err) {
-      console.warn('[SemanticSearch] Batch embedding failed:', err.message);
+      process.stderr.write(`[SemanticSearch] Batch embedding failed: ${err.message}\n`);
       this.#pendingBatch.push(...batch);
     }
   }
 
   async #save() {
     if (!this.#state) return;
-    const data = Array.from(this.#entries.values());
-    await this.#state.write('embeddings', data);
+    try {
+      const data = Array.from(this.#entries.values());
+      await this.#state.write('embeddings', data);
+    } catch (err) {
+      process.stderr.write(`[SemanticSearch] Failed to persist embeddings: ${err.message}\n`);
+    }
   }
 }

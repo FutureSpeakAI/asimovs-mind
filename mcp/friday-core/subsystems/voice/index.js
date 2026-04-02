@@ -49,11 +49,19 @@ export class VoiceSubsystem extends Subsystem {
   registerEvents() {
     // friday-voice can emit these events to drive state transitions
     this.eventBus.on('voice:request-transition', ({ to, reason }) => {
-      this.#stateMachine.transition(to, reason);
+      try {
+        this.#stateMachine.transition(to, reason);
+      } catch (err) {
+        process.stderr.write(`[friday:voice] voice:request-transition failed: ${err.message}\n`);
+      }
     });
 
     this.eventBus.on('voice:path-availability', ({ path, available, reason }) => {
-      this.#fallback.setPathAvailability(path, available, reason);
+      try {
+        this.#fallback.setPathAvailability(path, available, reason);
+      } catch (err) {
+        process.stderr.write(`[friday:voice] voice:path-availability failed: ${err.message}\n`);
+      }
     });
   }
 

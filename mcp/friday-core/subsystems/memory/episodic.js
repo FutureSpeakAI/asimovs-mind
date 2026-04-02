@@ -232,7 +232,7 @@ export class EpisodicMemory {
         topics: episode.topics,
         emotionalTone: episode.emotionalTone,
         startTime: episode.startTime,
-      }).catch(() => {});
+      }).catch(err => process.stderr.write('[friday:episodic] Search index failed: ' + err.message + '\n'));
     }
 
     // Save async

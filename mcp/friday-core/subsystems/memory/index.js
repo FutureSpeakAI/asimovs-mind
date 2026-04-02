@@ -101,7 +101,7 @@ export class MemorySubsystem extends Subsystem {
       this.#storeWithCapacity(
         `Trust observation: ${event.data.description}`,
         'fact', 'medium', 0.7
-      ).catch(() => {});
+      ).catch(err => process.stderr.write('[friday:memory] trust:evidence-added store failed: ' + err.message + '\n'));
     });
 
     // Auto-extract: agent completed -> store result observation
@@ -110,7 +110,7 @@ export class MemorySubsystem extends Subsystem {
       this.#storeWithCapacity(
         `Agent result: ${event.data.summary}`,
         'context', 'short', 0.9
-      ).catch(() => {});
+      ).catch(err => process.stderr.write('[friday:memory] agent:completed store failed: ' + err.message + '\n'));
     });
 
     // Auto-extract: connector detected -> store tool availability
@@ -119,7 +119,7 @@ export class MemorySubsystem extends Subsystem {
       this.#storeWithCapacity(
         `Connector available: ${event.data.connectorId}`,
         'context', 'short', 0.6
-      ).catch(() => {});
+      ).catch(err => process.stderr.write('[friday:memory] connector:detected store failed: ' + err.message + '\n'));
     });
 
     // Auto-extract: enterprise commitment -> store as memory
@@ -128,7 +128,7 @@ export class MemorySubsystem extends Subsystem {
       this.#storeWithCapacity(
         `Commitment: ${event.data.description} (${event.data.personName || 'unknown'})`,
         'fact', 'medium', 0.8
-      ).catch(() => {});
+      ).catch(err => process.stderr.write('[friday:memory] enterprise:commitment-created store failed: ' + err.message + '\n'));
     });
   }
 

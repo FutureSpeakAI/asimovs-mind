@@ -62,7 +62,7 @@ export class MemoryTiers {
       toIndex.push({ id: entry.id, text: entry.content, type: 'long-term', meta: { category: entry.category } });
     }
     if (toIndex.length > 0 && search) {
-      search.indexBulk(toIndex).catch(() => {});
+      search.indexBulk(toIndex).catch(err => process.stderr.write('[friday:memory] Bulk re-index failed: ' + err.message + '\n'));
     }
 
     process.stderr.write(

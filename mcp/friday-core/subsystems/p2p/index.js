@@ -53,9 +53,13 @@ export class P2PSubsystem extends Subsystem {
               // For now, store the channel for manual completion
             }
           });
-          transport.onIncomingMessage((peerId, msg) => {
-            const channel = peerManager.getChannel(peerId);
-            if (channel) channel.handleIncomingMessage(msg);
+          transport.onIncomingMessage(async (peerId, msg) => {
+            try {
+              const channel = peerManager.getChannel(peerId);
+              if (channel) await channel.handleIncomingMessage(msg);
+            } catch (err) {
+              process.stderr.write(`[friday:p2p] Incoming message error: ${err.message}\n`);
+            }
           });
           return { content: [{ type: 'text', text: JSON.stringify({
             success: true, port,

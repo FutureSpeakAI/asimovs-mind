@@ -53,7 +53,11 @@ export class GatewaySubsystem extends Subsystem {
   registerEvents() {
     // Periodically prune expired sessions
     this.eventBus.on('system:tick', () => {
-      this.#sessions.pruneExpired();
+      try {
+        this.#sessions.pruneExpired();
+      } catch (err) {
+        process.stderr.write(`[friday:gateway] pruneExpired failed: ${err.message}\n`);
+      }
     });
   }
 
