@@ -29,8 +29,12 @@ export class SessionConductor {
   }
 
   wire() {
-    this.#eventBus.on('vault:unlocked', () => this.#onSessionStart());
-    this.#eventBus.on('vault:locking', () => this.#onSessionEnd());
+    this.#eventBus.on('vault:unlocked', () => {
+      this.#onSessionStart().catch((err) => this.#logger.error(`Session start failed: ${err?.message || err}`));
+    });
+    this.#eventBus.on('vault:locking', () => {
+      this.#onSessionEnd().catch((err) => this.#logger.error(`Session end failed: ${err?.message || err}`));
+    });
   }
 
   async #onSessionStart() {
@@ -71,6 +75,12 @@ export class SessionConductor {
 
     this.#eventBus.publish('session:end', { summary });
     this.#logger.info(`Session ended after ${summary.durationMin}min`);
+
+    // Reset session state so getters do not expose stale data after lock.
+    this.#sessionStartTime = null;
+    this.#greeting = null;
+    this.#cwdContext = null;
+    this.#pendingCommitments = [];
   }
 
   #detectCwd() {

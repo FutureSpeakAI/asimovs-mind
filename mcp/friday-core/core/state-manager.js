@@ -1,8 +1,11 @@
 /**
  * State Manager — Namespaced vault key access for subsystems
  *
- * Each subsystem gets a key prefix (e.g., "memory/short-term")
+ * Each subsystem gets a key prefix (e.g., "memory:short-term")
  * so subsystems cannot accidentally collide on vault keys.
+ *
+ * The separator is ":" rather than "/" because vault key validation
+ * rejects path separators (/ and \) but explicitly allows colons.
  *
  * Root-level keys (no prefix) remain accessible for backward
  * compatibility with existing hooks and skills.
@@ -17,7 +20,7 @@ export class StateManager {
 
   /** Create a namespaced accessor for a subsystem */
   namespace(subsystemName) {
-    const prefix = `${subsystemName}/`;
+    const prefix = `${subsystemName}:`;
     const vault = this.#vault;
 
     return {
