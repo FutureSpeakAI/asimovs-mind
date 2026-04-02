@@ -5,6 +5,7 @@
 - Plain JavaScript ESM (import/export). No TypeScript.
 - No external test framework. Tests use Node's built-in `node:test` and `node:assert`.
 - `npm test` must pass before any PR is submitted.
+- Review the security invariants in `CLAUDE.md` before touching vault, hooks, or governance files. Changes to any invariant listed there require explicit reviewer sign-off.
 
 ## How to Add a Connector
 
@@ -27,8 +28,14 @@ Subsystems are the major functional blocks of Agent Friday.
 2. Export a class that extends `Subsystem` (from the framework).
 3. Implement `registerTools()` to expose MCP tools.
 4. Implement `registerEvents()` to hook into lifecycle events if needed.
-5. Register the subsystem in `mcp/friday-core/subsystems/index.js`.
-6. Add tests.
+5. Register the subsystem in `mcp/friday-core/index.js` using the tier registration syntax:
+   ```js
+   registry.register(new MySubsystem(deps), { tier: 2 });
+   ```
+   Choose the tier based on your dependencies: Tier 0 (no deps), Tier 1 (needs identity), Tier 2 (needs vault/ollama/event bus), Tier 3 (needs llm/memory/trust).
+6. When constructing namespaced state keys, use `:` as the separator (not `/`). The `vault.js` key validator rejects keys containing forward slashes. Access state via `this.state.read('key')` and `this.state.write('key', value)` — the namespace prefix is added automatically.
+7. Update the subsystem count and tool count in `CLAUDE.md`, `docs/API_REFERENCE.md`, `ROADMAP.md`, and `governance/conformance-report.md`.
+8. Add tests.
 
 ## How to Add a Skill
 
@@ -61,5 +68,6 @@ All tests must pass before opening a pull request. If you add a new connector or
 1. Fork the repo and create a feature branch.
 2. Make your changes following the patterns above.
 3. Run `npm test` and confirm all tests pass.
-4. Open a PR using the provided template.
-5. Describe any safety implications in the cLaw Review section.
+4. If you added a subsystem or changed tool counts, update `CLAUDE.md`, `docs/API_REFERENCE.md`, `ROADMAP.md`, and `governance/conformance-report.md`.
+5. Open a PR using the provided template.
+6. Describe any safety implications in the cLaw Review section. Reference the security invariants table in `CLAUDE.md` for any change that touches vault, hooks, the event bus, or governance files.

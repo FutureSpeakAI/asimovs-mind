@@ -1,6 +1,6 @@
 # Agent Friday -- MCP Tool Reference
 
-Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 subsystems + 1 session tool.
+Complete reference for all MCP tools exposed by friday-core. 91 tools across 18 subsystems.
 
 ---
 
@@ -72,8 +72,8 @@ Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `memory_store` | `content` (string), `category` (enum: preference/pattern/context/fact, default fact), `tier` (enum: short/medium/long, default short), `confidence` (number 0-1, default 0.5) | Store an observation in memory. Short-term is session-only, medium persists, long is consolidated |
-| `memory_recall` | `query` (string), `limit` (int 1-50, default 5) | Recall relevant memories using semantic search or keyword matching |
+| `memory_store` | `content` (string, max 50,000 chars), `category` (enum: preference/pattern/context/fact, default fact), `tier` (enum: short/medium/long, default short), `confidence` (number 0-1, default 0.5) | Store an observation in memory. Short-term is session-only, medium persists, long is consolidated. Content is capped at 50,000 characters |
+| `memory_recall` | `query` (string, non-empty), `limit` (int 1-50, default 5) | Recall relevant memories using semantic search or keyword matching. Query must be non-empty |
 | `memory_search` | `query` (string), `tier` (enum: short-term/medium-term/long-term/episode, optional), `limit` (int 1-50, default 10) | Full semantic search across all indexed memories with optional tier filtering |
 | `memory_consolidate` | none | Trigger a consolidation pass. Promotes high-scoring medium-term to long-term |
 | `memory_status` | none | Memory system statistics: counts per tier, embedding health, episode status, consolidation candidates |
@@ -102,7 +102,7 @@ Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 
 | `trust_person_resolve` | `identifier` (string), `type` (enum: name/email/handle/phone/nickname, optional) | Resolve an identifier to a person node without modifying trust |
 | `trust_explain` | `identifier` (string) | Natural language explanation of trust: score, evidence breakdown, key factors, last seen |
 
-## Personality (7 tools)
+## Personality (6 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
@@ -134,7 +134,7 @@ Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 
 | `tool_list` | `category` (string, optional), `safety_level` (string, optional), `source` (string, optional) | List all registered tools with metadata, optionally filtered |
 | `tool_safety_check` | `name` (string), `include_audit` (boolean, default false) | Check safety level, category, and recent audit trail for a tool |
 
-## Connectors (4 tools)
+## Connectors (4 static tools + up to 65 dynamic connector tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
@@ -179,7 +179,7 @@ Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 
 | `enterprise_confidence` | `content` (string, optional), `tool_calls` (array of {name, input}, optional), `stop_reason` (string, optional), `tool_definitions` (array of {name}, optional), `threshold` (number 0-1, default 0.5, optional) | Assess confidence in an LLM response using structural signals |
 | `enterprise_commitment_track` | `action` (enum: add/complete/cancel/snooze/list/status/follow_ups/track_outbound/record_reply/context), `commitment_id` (string, optional), `description` (string, optional), `person_name` (string, optional), `direction` (enum: user_promised/other_promised/mutual, optional), `source` (enum: conversation/email/message/meeting/calendar/manual, optional), `deadline` (number, optional), `confidence` (number 0-1, default 0.8, optional), `notes` (string, optional), `snooze_until` (number, optional), `recipient` (string, optional), `channel` (string, optional), `summary` (string, optional) | Track commitments, deadlines, and follow-ups. Manages full commitment lifecycle |
 
-## Session (1 tool, registered in index.js)
+## Session (1 tool)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
@@ -200,16 +200,16 @@ Complete reference for all MCP tools exposed by friday-core. 91 tools across 17 
 | Memory | 8 |
 | Context | 4 |
 | Trust | 7 |
-| Personality | 7 |
+| Personality | 6 |
 | Agents | 7 |
 | Tools | 4 |
-| Connectors | 4 |
+| Connectors | 4 (+65 dynamic) |
 | Gateway | 5 |
 | Briefing | 3 |
 | Voice | 3 |
 | Enterprise | 5 |
 | Session | 1 |
-| **Total** | **92** |
+| **Total** | **91** |
 
 ## HTTP Bridge Endpoints
 

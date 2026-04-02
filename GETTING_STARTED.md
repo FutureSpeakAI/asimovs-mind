@@ -30,15 +30,17 @@ Three steps. Takes about two minutes.
 
 ### Step 1: Initialize the Sovereign Vault
 
-Run `/friday unlock` and choose a passphrase (minimum 8 words).
+When the MCP server starts, it prints a local URL like `http://127.0.0.1:{port}/`. Open that URL in your browser. The passphrase gate lets you unlock the vault directly -- the passphrase is sent straight to the local HTTP bridge and never appears in the Claude Code conversation transcript.
 
-The vault encrypts all your state with AES-256-GCM. Your passphrase never leaves the machine.
+This is the recommended path. Your passphrase is never exposed to the API channel.
 
-For extra security, open the browser link shown in the output to enter your passphrase there. This keeps it out of the API transcript entirely.
+Alternatively, run `/friday unlock` in the conversation and type your passphrase there (minimum 8 words). This works, but the passphrase will appear in the session transcript.
+
+The vault encrypts all state with AES-256-GCM. The passphrase never leaves your machine.
 
 ### Step 2: Open the Friday Dashboard
 
-Open `http://localhost:{port}/` in your browser (the port is shown in the unlock output). The dashboard shows system health, memory stats, trust graph, P2P peers, and all 17 subsystem status indicators in a Three.js holographic interface.
+The same URL you used for the passphrase gate is the dashboard. After unlocking, refresh it (or navigate to `http://127.0.0.1:{port}/`). The dashboard shows system health, memory stats, trust graph, P2P peers, and all 18 subsystem status indicators in a Three.js holographic interface.
 
 ### Step 3: Create Your Profile
 
@@ -63,13 +65,9 @@ Try these commands to explore what's available:
 
 ## Subsequent Sessions
 
-On each session start, unlock your vault:
+On each session start, open the browser URL shown on startup to enter your passphrase. This keeps it out of the API transcript entirely and is the recommended approach. The dashboard loads automatically after unlock -- it shows all 18 subsystem status indicators, memory stats, trust summary, and P2P peers.
 
-```
-/friday unlock
-```
-
-Or open the browser URL shown on startup to enter your passphrase without it touching the API transcript. Then open `http://localhost:{port}/` for the dashboard -- it shows all 17 subsystem status indicators, memory stats, trust summary, and P2P peers.
+If you prefer the conversation-based flow, run `/friday unlock` in the chat instead.
 
 ### Daily use
 
@@ -80,7 +78,7 @@ These three commands cover most of what you need at the start of a session:
 | `/briefing` | What happened since your last session -- commits, discoveries, test results |
 | `/memory recall "topic"` | Search Friday's 3-tier memory for anything related |
 | `/trust "PersonName" reliability` | Check or update trust graph for a person or repo |
-| `/status` | Rich system health -- vault, memory, trust, all 17 subsystems |
+| `/status` | Rich system health -- vault, memory, trust, all 18 subsystems |
 | `/help` | Categorized command reference for all skills |
 
 ## Optional: Local-Only Mode
@@ -98,6 +96,24 @@ Run everything on your machine with zero cloud dependency.
    ```
 
 All intelligence stays on your machine. No API keys, no billing, no data leaving your hardware. See `directives/local-sovereignty.md` for the full guide.
+
+## For Hook Developers
+
+Python hooks communicate with the MCP server through the HTTP bridge rather than stdio MCP. The bridge requires a bearer token for all write operations.
+
+The token is generated at startup and written to `.asimovs-mind/vault/bridge-token` (permissions 0o600). Use `vault_bridge.py` from the plugin to handle this automatically:
+
+```python
+from vault_bridge import vault_read, vault_write, vault_available
+
+if vault_available():
+    data = vault_read('my-namespace:my-key')
+    vault_write('my-namespace:my-key', {'updated': True})
+```
+
+`vault_bridge.py` reads the port from `.asimovs-mind/vault/port` and the bearer token from `.asimovs-mind/vault/bridge-token`, and includes `Authorization: Bearer <token>` on all authenticated requests automatically.
+
+Note that vault keys use `:` as the namespace separator. Keys containing `/` are rejected by the vault.
 
 ## Troubleshooting
 

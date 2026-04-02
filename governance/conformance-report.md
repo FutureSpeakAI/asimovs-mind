@@ -1,11 +1,11 @@
 # cLaw Specification Conformance Report
 
-**Plugin:** Asimov's Mind v2.1.0
-**Date:** 2026-04-01
+**Plugin:** Asimov's Mind v2.3.0
+**Date:** 2026-04-02
 **Auditor:** Automated conformance check (Neural Binding)
-**Runtime:** friday-core MCP server -- 17 subsystems, 92 MCP tools, holographic dashboard
+**Runtime:** friday-core MCP server -- 18 subsystems, 91 MCP tools, holographic dashboard
 
-This report systematically checks every section of the Asimov's cLaw Specification (`framework/spec.json`) and the full Agent Friday runtime against the shipped v2.0.0 plugin. Each section is rated CONFORMANT, PARTIAL, or NON-CONFORMANT with evidence and caveats.
+This report systematically checks every section of the Asimov's cLaw Specification (`framework/spec.json`) and the full Agent Friday runtime against the shipped v2.3.0 plugin. Each section is rated CONFORMANT, PARTIAL, or NON-CONFORMANT with evidence and caveats.
 
 ---
 
@@ -350,6 +350,22 @@ Caveat:
 
 ---
 
+## v2.2.0-v2.3.0 Security Hardening
+
+This section records all fixes applied during the 50-cycle hardening run that produced v2.3.0, with their current verification status.
+
+| Fix | Description | Verification |
+|-----|-------------|-------------|
+| State persistence API | All subsystem state access migrated from `state.get/set` to `state.read/write` to match the StateManager contract | VERIFIED — all 18 subsystems audited |
+| Namespace separator | State key separator standardised to `:` (colon). Keys using `/` (forward slash) were rejected by `vault.js` `validateKey()` and have been corrected | VERIFIED — vault key validation enforced at runtime |
+| Session subsystem | `session_status` tool extracted from `main()` into a proper `SessionSubsystem` class registered through the standard tier-3 pipeline | VERIFIED — tool registered via `registry.register(new SessionSubsystem(deps), { tier: 3 })` |
+| OllamaMonitor singleton | Confirmed single shared `OllamaMonitor` instance via `deps.ollamaMonitor`. No subsystem instantiates a second monitor | VERIFIED — `index.js` creates one instance; both `VaultSubsystem` and `OllamaSubsystem` receive it via `deps` |
+| Event bus error isolation | `FridayEventBus` uses `#safeDispatch` so a throwing subscriber cannot prevent downstream handlers or the wildcard channel from firing | VERIFIED — `core/event-bus.js` lines 53-68 |
+| HTTP bridge rate limiting | Token-bucket rate limiter (100 req/s per source IP) added to HTTP bridge; exceeding limit returns HTTP 429 | VERIFIED — `index.js` `checkRateLimit()` called before route dispatch |
+| Tool count reconciliation | Personality subsystem corrected to 6 tools (not 7). Total recounted as 91 across 18 subsystems | VERIFIED — personality/index.js registers 6 `server.tool()` calls |
+
+---
+
 ## Certification Level
 
 The cLaw Specification defines three certification levels:
@@ -362,7 +378,7 @@ The cLaw Specification defines three certification levels:
 
 **Core: ACHIEVED**
 
-All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown. The full 17-subsystem friday-core runtime (92 MCP tools) operates under governance at all times.
+All four laws are defined and enforced through hooks, protected zones, safety floors, and an AST safety scanner. HMAC integrity verification runs at session start. The governance framework is immutable via protected zones. Nine enforcement hooks cover session lifecycle, tool use, and session teardown. The full 18-subsystem friday-core runtime (91 MCP tools) operates under governance at all times.
 
 **Connected: ACHIEVED**
 
@@ -374,6 +390,6 @@ Encryption at rest is fully implemented (AES-256-GCM, Argon2id, BLAKE2b sub-keys
 
 ### Overall Certification: Core + Connected (with significant progress toward Sovereign)
 
-The plugin achieves full Core and Connected certification. The full Agent Friday runtime -- 17 subsystems exposing 92 MCP tools with a holographic dashboard -- operates under cLaw governance with encrypted state, cryptographic identity, P2P encrypted channels, person-level trust graphs, and enterprise consent gates.
+The plugin achieves full Core and Connected certification. The full Agent Friday runtime -- 18 subsystems exposing 91 MCP tools with a holographic dashboard -- operates under cLaw governance with encrypted state, cryptographic identity, P2P encrypted channels, person-level trust graphs, and enterprise consent gates.
 
 To achieve full Sovereign certification: provide a production-quality local model pipeline that can replace the Claude API for primary inference across all task types, and resolve the passphrase leakage issue structurally (e.g., by requiring browser-based unlock and rejecting conversation-based passphrase entry).

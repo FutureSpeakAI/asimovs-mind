@@ -1,10 +1,12 @@
 # Agent Friday -- Subsystem Guide
 
-Reference for all 17 subsystems in the friday-core MCP server. Each entry covers purpose, files, MCP tools, events, vault state, dependencies, and extension points.
+Reference for all 18 subsystems in the friday-core MCP server (v2.3.0). Each entry covers purpose, files, MCP tools, events, vault state, dependencies, and extension points.
 
 ---
 
 ## Tier 0: Foundation
+
+Tier 0 subsystems have no dependencies and start in parallel.
 
 ### 1. Vault
 
@@ -12,7 +14,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 
 **Files:**
 - `subsystems/vault/index.js` -- MCP tool registration, OllamaMonitor instance, registry stats
-- `core/vault.js` -- `SovereignVault` class (lifecycle, state CRUD, HMAC, identity, attestation, Privacy Shield state) + `OllamaMonitor` class
+- `core/vault.js` -- `SovereignVault` class (lifecycle, state CRUD, HMAC, identity, attestation, Privacy Shield state) + re-exports `OllamaMonitor` for backward compatibility
 - `core/crypto.js` -- All cryptographic primitives (SecureBuffer, Argon2id, BLAKE2b-KDF, AES-256-GCM, HMAC-SHA256, Ed25519, X25519, P2P message encryption)
 
 **MCP Tools (10):**
@@ -96,8 +98,8 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Purpose:** Monitors the health of a local Ollama instance. Checks available models via `/api/tags` and loaded models via `/api/ps`. Used by the LLM subsystem for routing decisions.
 
 **Files:**
-- `subsystems/ollama/index.js` -- MCP tool registration
-- `core/vault.js` -- `OllamaMonitor` class
+- `subsystems/ollama/index.js` -- MCP tool registration (uses shared OllamaMonitor from deps)
+- `core/ollama-monitor.js` -- `OllamaMonitor` class (extracted from vault.js in v2.2.0)
 
 **MCP Tools (1):**
 | Tool | Description |
@@ -108,18 +110,26 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Vault State Keys:** None.
 **Dependencies:** None (Tier 0)
 
+**Note:** `OllamaMonitor` is a single shared instance created in `index.js` and passed to all subsystems via `deps.ollamaMonitor`. Do not instantiate a second one -- it runs its own polling loop. `core/vault.js` re-exports `OllamaMonitor` for backward compatibility; prefer importing directly from `core/ollama-monitor.js`.
+
 ---
 
 ## Tier 1
 
 ### 5. P2P
 
-**Purpose:** Peer-to-peer encrypted communication between Asimov Agent instances. Provides WebSocket transport, X25519 ECDH key agreement for session key derivation, AES-256-GCM message encryption with sequence-numbered AAD (anti-replay), Ed25519 ciphertext signing, file transfer, trust score exchange, and pairing codes.
+**Purpose:** Peer-to-peer encrypted communication between Asimov Agent instances. The full handshake is implemented: X25519 ECDH key agreement, HKDF session key derivation (RFC 5869, SHA-256), AES-256-GCM message encryption with sequence-numbered AAD (anti-replay), Ed25519 ciphertext signing (signature verified before decryption), file transfer, trust score exchange, and pairing codes.
+
+**Handshake flow:**
+1. Initiator sends own X25519 exchange public key + Ed25519-signed cLaw attestation
+2. Responder verifies attestation, derives session keys, replies with own exchange key + attestation
+3. Initiator verifies the ack's Ed25519 signature before processing, then derives session keys
+4. HKDF salt = SHA-256 of the sorted pair of exchange public keys; two separate keys derived via info bytes 0x01 / 0x02
 
 **Files:**
 - `subsystems/p2p/index.js` -- MCP tools, lifecycle
-- `subsystems/p2p/protocol.js` -- `PeerManager` class (channel lifecycle, encryption)
-- `subsystems/p2p/transport.js` -- `P2PTransport` class (WebSocket server/client)
+- `subsystems/p2p/protocol.js` -- `PeerChannel` + `PeerManager` classes (complete handshake, encryption)
+- `subsystems/p2p/transport.js` -- `P2PTransport` class (WebSocket server/client, bound to 127.0.0.1)
 
 **MCP Tools (7):**
 | Tool | Description |
@@ -165,18 +175,20 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** `llm:request-completed` (with signals for EIS tracker)
 **Events Subscribed:** `vault:key-updated` (reload API keys), `config:provider-changed`
 
-**Vault State Keys:** `llm/router-state`, `api-keys` (root-level)
+**Vault State Keys:** `llm:router-state`, `api-keys` (root-level)
 **Dependencies:** Vault (API key storage), Ollama (model discovery)
 
 ---
 
 ### 7. Memory
 
-**Purpose:** 3-tier memory system with semantic search. Short-term (session-only, in-memory), medium-term (persisted in vault), long-term (consolidated insights). Embedding pipeline via Ollama `nomic-embed-text` with graceful degradation to keyword matching. Duplicate detection via Jaccard similarity. Episodic memory records session-level summaries. Consolidation engine promotes high-scoring medium-term entries to long-term.
+**Purpose:** 3-tier memory system with semantic search. Short-term (session-only, in-memory), medium-term (persisted in vault), long-term (consolidated insights). Embedding pipeline via Ollama `nomic-embed-text` with graceful degradation to keyword matching. Duplicate detection via content-hash dedup (exact) and Jaccard similarity (near-duplicate). Episodic memory records session-level summaries. Consolidation engine promotes high-scoring medium-term entries to long-term.
+
+**Capacity caps:** short=100, medium=500, long=1000 entries. LRU eviction (oldest + lowest access count) runs when a tier is full.
 
 **Files:**
 - `subsystems/memory/index.js` -- MCP tools, auto-extraction events, capacity management
-- `subsystems/memory/tiers.js` -- `MemoryTiers` (3-tier CRUD, recall)
+- `subsystems/memory/tiers.js` -- `MemoryTiers` (3-tier CRUD, recall, SHA-256 content-hash dedup)
 - `subsystems/memory/embedding.js` -- `EmbeddingPipeline` (Ollama embeddings)
 - `subsystems/memory/search.js` -- `SemanticSearchEngine` (cosine similarity + keyword fallback)
 - `subsystems/memory/episodic.js` -- `EpisodicMemory` (session episode tracking)
@@ -197,10 +209,8 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** `memory:stored`
 **Events Subscribed:** `session:end` (clear short-term), `trust:evidence-added`, `agent:completed`, `connector:detected`, `enterprise:commitment-created` (all auto-extract observations)
 
-**Vault State Keys:** `memory/short-term`, `memory/medium-term`, `memory/long-term`, `memory/episodes`, `memory/session-buffer`
+**Vault State Keys:** `memory:short-term`, `memory:medium-term`, `memory:long-term`, `memory:episodes`, `memory:session-buffer`
 **Dependencies:** LLM (for embeddings via Ollama)
-
-**Capacity Caps:** short=100, medium=500, long=1000 entries. LRU eviction (oldest + lowest access count).
 
 ---
 
@@ -224,7 +234,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** None directly
 **Events Subscribed:** `*` (all events for entity extraction), `vault:unlocked` (reload graph), `session:start` (hydrate with cwd info), `memory:stored` (feed content into graph), `session:end` + `vault:locking` (save graph)
 
-**Vault State Keys:** `context/graph`
+**Vault State Keys:** `context:graph`
 **Dependencies:** Event bus
 
 ---
@@ -251,17 +261,17 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** `trust:score-updated`, `trust:evidence-added`
 **Events Subscribed:** `memory:person_mentions`, `vault:unlocked` (auto-decay)
 
-**Vault State Keys:** `trust/persons`, `trust/evidence`
+**Vault State Keys:** `trust:persons`, `trust:evidence`
 **Dependencies:** Vault
 
 ---
 
 ### 10. Personality
 
-**Purpose:** Agent Friday's identity, adaptive communication style, sentiment tracking, and personality evolution. Combines a profile (name, mode, traits, tone, backstory, challenge level), 6 adaptive style dimensions with anti-sycophancy detection, keyword-based mood/energy tracking, and session-based personality maturation. The "mother signal" from onboarding Q8 maps sycophancy risk to challenge level.
+**Purpose:** Agent Friday's identity, adaptive communication style, sentiment tracking, and personality evolution. Combines a profile (name, mode, traits, tone, backstory, challenge level), 6 adaptive style dimensions with anti-sycophancy detection, keyword-based mood/energy tracking, and session-based personality maturation. The "mother signal" from onboarding Q8 maps sycophancy risk to challenge level. The `epistemicTracker` (set by `wiring.js`) feeds EIS score into personality -- when EIS drops, the wiring layer raises the challenge level automatically via `eis:updated`.
 
 **Files:**
-- `subsystems/personality/index.js` -- MCP tools, mother signal bridge, versioning
+- `subsystems/personality/index.js` -- MCP tools, mother signal bridge, versioning, EIS tracker hook
 - `subsystems/personality/profile.js` -- `PersonalityProfile` (get/update/condense)
 - `subsystems/personality/calibration.js` -- `CalibrationEngine` (6 dimensions, anti-sycophancy)
 - `subsystems/personality/sentiment.js` -- `SentimentEngine` (keyword mood detection, energy)
@@ -280,7 +290,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** None directly
 **Events Subscribed:** `message:user` (sentiment + calibration), `checkin:dismissed/engaged`, `vault:unlocked` (re-apply mother signal)
 
-**Vault State Keys:** `personality/profile`, `personality/calibration`, `personality/sentiment`, `personality/evolution`, `personality/personality-history` (max 20 snapshots)
+**Vault State Keys:** `personality:profile`, `personality:calibration`, `personality:sentiment`, `personality:evolution`, `personality:personality-history` (max 20 snapshots)
 **Dependencies:** Vault, Memory (for mother signal from user-profile)
 
 ---
@@ -311,7 +321,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** `agent:spawn_requested`, `agent:halt_requested`
 **Events Subscribed:** `agent:completed`, `agent:failed` (deregister from mesh, report to delegation)
 
-**Vault State Keys:** `agents/delegation-state`
+**Vault State Keys:** `agents:delegation-state`
 **Dependencies:** LLM, Memory, Trust
 
 ---
@@ -394,7 +404,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 
 **Events Subscribed:** `system:tick` (prune expired sessions)
 
-**Vault State Keys:** `gateway/trust-policies`, `gateway/sessions`, `gateway/audit`
+**Vault State Keys:** `gateway:trust-policies`, `gateway:sessions`, `gateway:audit`
 **Dependencies:** Trust, Vault
 
 ---
@@ -417,7 +427,7 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 
 **Events Subscribed:** `commitments:changed` (marks briefings stale)
 
-**Vault State Keys:** `briefing/history`, `briefing/meetings`
+**Vault State Keys:** `briefing:history`, `briefing:meetings`
 **Dependencies:** Memory, Trust, Context
 
 ---
@@ -449,9 +459,11 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 
 **Purpose:** Enterprise safety features. Consent gates require explicit user approval for 8 action categories (with once/session/always scopes). Cloud gates control which task categories can use cloud APIs. Structural confidence scoring detects malformed responses, truncation, and unknown tools. Commitment tracker manages promises, deadlines, follow-up suggestions, and outbound message tracking.
 
+`peekConsent(category)` checks consent state without consuming a `once`-scoped grant, for use when you need to check eligibility before committing to an action. The standard `checkConsent(category)` consumes `once`-scoped grants on read.
+
 **Files:**
 - `subsystems/enterprise/index.js` -- MCP tools
-- `subsystems/enterprise/consent.js` -- `ConsentTracker` (grant, revoke, audit)
+- `subsystems/enterprise/consent.js` -- `ConsentTracker` (grant, revoke, audit, peekConsent)
 - `subsystems/enterprise/cloud-gate.js` -- `CloudGate` (per-category cloud policies)
 - `subsystems/enterprise/confidence.js` -- `assessConfidence()` (structural signal analysis)
 - `subsystems/enterprise/commitments.js` -- `CommitmentTracker` (CRUD, follow-ups, outbound)
@@ -468,5 +480,65 @@ Reference for all 17 subsystems in the friday-core MCP server. Each entry covers
 **Events Published:** `enterprise:commitment-created`
 **Events Subscribed:** `memory:commitment_mentions`, `gateway:outbound_message`
 
-**Vault State Keys:** `enterprise/consent`, `enterprise/cloud-policies`, `enterprise/commitments`, `enterprise/outbound`
+**Vault State Keys:** `enterprise:consent`, `enterprise:cloud-policies`, `enterprise:commitments`, `enterprise:outbound`
 **Dependencies:** Vault, Event bus
+
+---
+
+### 18. Session
+
+**Purpose:** Session lifecycle status tool. Wraps `SessionConductor` as a proper subsystem so `session_status` is registered through the standard tool pipeline. Reports uptime, current working directory context, the session greeting, and pending commitments.
+
+Added in v2.2.0. Registered at Tier 3 alongside the other late-stage subsystems. The `SessionConductor` is injected after `registry.startAll()` via `setConductor()`, following the same late-injection pattern as `VaultSubsystem.setRegistry()`.
+
+**Files:**
+- `subsystems/session/index.js` -- `SessionSubsystem` class, `session_status` tool
+
+**MCP Tools (1):**
+| Tool | Description |
+|------|-------------|
+| `session_status` | Uptime, working directory context, session greeting, pending commitments |
+
+**Events:** None published or subscribed.
+**Vault State Keys:** None.
+**Dependencies:** SessionConductor (injected post-startup)
+
+---
+
+## Adding a New Subsystem
+
+1. Create `mcp/friday-core/subsystems/<name>/index.js` exporting a class that extends `Subsystem`.
+
+2. Override the lifecycle methods you need:
+   - `registerTools(server)` -- call `server.tool(name, description, schema, handler)` for each MCP tool
+   - `registerEvents()` -- subscribe to event bus topics
+   - `async start()` -- load state from vault, initialize internal state
+   - `async stop()` -- persist state to vault, clean up timers
+
+3. Access namespaced vault state via `this.state`, which is a `StateManager` namespace. Keys are stored as `subsystemname:key-name`. The separator is `:` (colon) -- vault key validation rejects `/` and `\` but allows colons. Example:
+
+   ```javascript
+   // In your subsystem:
+   await this.state.read('my-key');    // reads "mysubsystem:my-key" from vault
+   await this.state.write('my-key', data);
+   ```
+
+4. Import and register it in `index.js` at the correct tier:
+
+   ```javascript
+   import { MySubsystem } from './subsystems/myname/index.js';
+   // ...
+   registry.register(new MySubsystem(deps), { tier: 3 }); // or tier 0/1/2
+   ```
+
+5. If your subsystem needs cross-subsystem event routes (subscribing to another subsystem's events), add them to `core/wiring.js` -- not in your subsystem constructor. Each route must appear exactly once.
+
+6. Update the tool count comment in `index.js` and the subsystem count in the header.
+
+**Tier guidelines:**
+- **Tier 0:** No dependencies on other subsystems (vault, crypto, event bus are always available)
+- **Tier 1:** Needs identity or another Tier 0 subsystem
+- **Tier 2:** Needs vault state loaded (typically needs vault unlock to be useful), or needs Tier 1
+- **Tier 3:** Needs multiple lower-tier subsystems, or needs vault-backed state from Tier 2
+
+All subsystems within a tier start in parallel. Within a tier, do not assume any ordering between sibling subsystems.

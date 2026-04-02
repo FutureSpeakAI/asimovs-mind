@@ -7,6 +7,75 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.0] — 2026-04-02 — 50-Cycle Hardening Run
+
+50 autonomous improvement cycles on the running system. The swarm audited itself across persistence, P2P, dashboard, hooks, and testing. 159 tests at cycle 0; 442 at cycle 50, zero failures.
+
+### Security
+
+- **XSS eliminated in dashboard** -- all user-supplied values now pass through `escHtml()` before DOM insertion; previously name fields and peer IDs were rendered as raw HTML
+- **Content Security Policy** -- dashboard HTTP response now includes a CSP header; blocks inline script injection and restricts resource origins
+- **P2P signature verification hardened** -- incoming messages verified against the stored peer Ed25519 public key; previously only format was checked, not key binding
+- **Hook auth corrected** -- hooks were sending the bearer token on GET requests only; write requests now correctly include `Authorization: Bearer <token>` on all authenticated bridge calls
+
+### Architecture
+
+- **`mcp/vault-server/` confirmed removed** -- dead code deleted in v2.2.0; all remaining internal references to it cleaned up
+- **OllamaMonitor single-instance enforced** -- duplicate monitor instances that created independent polling loops eliminated; shared instance propagated via `deps.ollamaMonitor` throughout all tiers
+- **SessionSubsystem** -- 18th subsystem; `session_status` tool migrated from direct `main()` registration to the standard subsystem pipeline (`subsystems/session/index.js`)
+- **Parallel tier startup** -- subsystems within each tier now start concurrently; startup latency reduced
+- **O(1) intelligence router** -- LLM routing rewrote from a full model-list scan to a direct capability-indexed lookup
+
+### Persistence
+
+- **`state.get`/`state.set` bugs fixed across 8 subsystems** -- trust, memory, personality, context, agents, briefing, enterprise, and gateway subsystems all had cases where state was read before it was written or written to the wrong namespace; all fixed; state now survives MCP server restart correctly
+- **Namespace separator changed from `/` to `:`** -- vault now rejects any key containing `/`; all subsystem state keys updated to use `:` as the namespace delimiter; prevents any residual path-traversal surface in key construction
+
+### Performance
+
+- **Parallel tier startup** -- Tier 0, Tier 1, Tier 2, and Tier 3 subsystems each start concurrently within their tier; no sequential wait between subsystems at the same tier
+- **O(1) intelligence router** -- routing table indexed at startup; model selection no longer O(n) per request
+
+### Error Handling
+
+- **Unhandled rejection suppression removed** -- bare `.catch(() => {})` patterns replaced with structured error logging so failures surface in the logger rather than disappearing silently
+- **Silent failure paths eliminated** -- 12 subsystem methods that previously swallowed errors and returned stale data now throw or return a typed error object
+- **Hook crash safety** -- all Python hooks now wrap their main body in a try/except that exits 0 on unexpected errors, preventing a hook crash from blocking the user's tool call
+- **Hook stdin handling** -- hooks no longer block indefinitely when Claude Code closes stdin without sending data; added a non-blocking read with a 100 ms timeout
+
+### Testing
+
+- **Test count: 159 to 442** -- 264 tests in the primary suite, 178 in the integration suite, zero failures across both
+- **New test files added:** `test-p2p-handshake.js`, `test-dashboard-escaping.js`, `test-hook-edge-cases.py`, `test-subsystem-persistence.js`, `test-state-namespace.js`, `test-router-oi.js`
+- **Coverage added for:** P2P full handshake sequence, HKDF key derivation, dashboard XSS vectors, hook crash recovery, state persistence across restart, namespace separator enforcement, parallel tier startup ordering
+
+### P2P
+
+- **Handshake completes** -- ECDH + HKDF now runs to completion; session keys derived and stored correctly; previously the handshake stalled after key exchange
+- **HKDF key derivation** -- proper RFC 5869 HKDF added to `subsystems/p2p/protocol.js`; replaces the raw shared-secret truncation that was in place
+- **Peer key binding** -- signature verification now checks the received signature against the authenticated peer public key from the pairing record
+
+### Dashboard
+
+- **`escHtml()` applied globally** -- peer IDs, memory entry content, trust names, and agent labels all HTML-escaped before insertion
+- **CSP header** -- `Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'` added to dashboard response headers
+- **Memory search XSS** -- search result snippets now escaped; previously a memory entry containing `<script>` tags would execute in the browser
+
+### Hooks
+
+- **Bearer token on write calls** -- `vault_bridge.py` corrected to send the token on POST/PUT as well as GET
+- **Missing stdin guard** -- all hooks check `sys.stdin.isatty()` or use `select` before blocking on stdin read
+- **JSON parse safety** -- hooks catch `json.JSONDecodeError` and exit 0 (allow) rather than crashing
+
+### Documentation
+
+- **README.md** -- updated to 18 subsystems, 91 MCP tools, 10 hooks, 17 skills, 16 agents; combined v2.2.0/v2.3.0 security hardening section; architecture diagram updated
+- **CHANGELOG.md** -- this entry
+- **SECURITY.md** -- comprehensive security hardening section added covering all fix categories, current security invariants, and known limitations
+- **GETTING_STARTED.md** -- browser-based passphrase entry promoted to recommended path; vault bridge bearer token documented for hook developers
+
+---
+
 ## [2.2.0] — 2026-04-02 — Security Hardening
 
 Full security audit pass plus architectural cleanup. Closes seven vulnerability classes identified during the audit; removes 160 KB of dead code; extracts OllamaMonitor to its own module.
@@ -215,6 +284,7 @@ The subsystems learn to talk to each other. The system becomes one intelligence.
 
 ---
 
+[2.3.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v1.0.0...v2.0.0

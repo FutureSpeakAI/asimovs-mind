@@ -2,7 +2,7 @@
 
 ### From Claude Code plugin to the Agent Friday kernel
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.2.0.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.3.0.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
 
@@ -128,7 +128,7 @@ Sovereign Vault capabilities (now in friday-core vault subsystem):
 - Automatic migration of plaintext state on first initialization
 - HTTP bridge on localhost for Python hook access (with bearer token auth since v2.2.0)
 
-**Current files (v2.2.0):**
+**Current files (v2.3.0):**
 - `mcp/friday-core/core/vault.js` -- SovereignVault class
 - `mcp/friday-core/core/crypto.js` -- All cryptographic primitives
 - `mcp/friday-core/core/ollama-monitor.js` -- OllamaMonitor (extracted from vault.js in v2.2.0)
@@ -196,7 +196,7 @@ Browser-based passphrase entry that keeps the passphrase out of the API transcri
 
 ### v2.0.0 -- Agent Friday Complete (shipped)
 
-**The full Agent Friday runtime inside Claude Code.** 17 subsystems, 89 MCP tools, holographic dashboard.
+**The full Agent Friday runtime inside Claude Code.** 17 subsystems, 89 MCP tools at launch (grew to 91 across 18 subsystems by v2.3.0), holographic dashboard.
 
 Everything from v1.0.0, plus the complete intelligence port from nexus-os:
 
@@ -252,6 +252,36 @@ PreToolUse hook on WebFetch/WebSearch that:
 2. Annotates results with a confidence flag
 3. Logs all web fetches to the session ledger
 4. Never blocks (informational, not enforcement) -- but the agent sees the annotations and can factor them into its reasoning
+
+---
+
+### v2.3.0 -- Security Hardening (shipped)
+
+**18 subsystems, 91 MCP tools, 442 tests.** A 50-cycle automated hardening run that exercised the full runtime and resolved a class of persistence, namespace, and architectural inconsistencies.
+
+#### Persistence Layer Fix
+
+All subsystem state access migrated from the informal `state.get/set` API to the correct `state.read/write` contract required by `StateManager`. Affected subsystems: memory, context, trust, personality, agents, briefing, enterprise, and session.
+
+#### Namespace Separator Standardisation
+
+State keys now consistently use `:` as the namespace separator between the subsystem prefix and the key name (e.g. `memory:observations`). Keys using `/` were rejected by `vault.js` `validateKey()` at runtime; all affected call sites have been corrected.
+
+#### Session Subsystem (18th subsystem)
+
+`session_status` was previously registered directly in `main()`, outside the subsystem pipeline. It is now a proper `SessionSubsystem` class registered at Tier 3. The `SessionConductor` is injected into the subsystem after `startAll()` via `setConductor()`.
+
+#### Event Bus Error Isolation
+
+`FridayEventBus` now uses an internal `#safeDispatch` method that wraps each listener in a try/catch. A throwing subscriber no longer prevents downstream subscribers or the wildcard `*` channel from receiving the event.
+
+#### HTTP Bridge Rate Limiting
+
+A token-bucket rate limiter (100 requests per second per source IP) was added to the HTTP bridge. Requests exceeding the limit receive HTTP 429. This closes a potential denial-of-service vector from a misbehaving hook.
+
+#### Tool Count Reconciliation
+
+The Personality subsystem was audited and confirmed to expose 6 tools (not 7 as previously documented). The total across all 18 subsystems is 91 static tools plus up to 65 dynamic connector tools.
 
 ---
 
@@ -361,15 +391,15 @@ The following features were originally planned as Electron-only but have been sh
 - **Full intelligence stack** -- LLM, Memory, Context, Trust, Personality, Agent, Tools, Connectors, Gateway, Briefing, Voice, Enterprise all ported from nexus-os in v2.0.0
 - **Holographic Dashboard** -- Three.js desktop served at `http://localhost:{port}/`
 
-Agent Friday (Electron) remains the reference desktop implementation with real-time voice and native GUI. Asimov's Mind (Claude Code plugin) is the reference CLI/server implementation with the full 17-subsystem runtime, 89 MCP tools, and holographic dashboard.
+Agent Friday (Electron) remains the reference desktop implementation with real-time voice and native GUI. Asimov's Mind (Claude Code plugin) is the reference CLI/server implementation with the full 18-subsystem runtime, 91 MCP tools, and holographic dashboard.
 
 ---
 
-## File Manifest (v2.2.0)
+## File Manifest (v2.3.0)
 
 ```
 asimovs-mind/
-+-- plugin.json                        # Claude Code plugin manifest (v2.2.0)
++-- plugin.json                        # Claude Code plugin manifest (v2.3.0)
 +-- README.md                          # Plugin documentation
 +-- CHANGELOG.md                       # Version history (Keep a Changelog format)
 +-- ROADMAP.md                         # This file
@@ -396,7 +426,7 @@ asimovs-mind/
 |   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore from responses
 |   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge (bearer token auth)
 +-- mcp/
-|   +-- friday-core/                   # Agent Friday MCP server (17 subsystems, 92 tools)
+|   +-- friday-core/                   # Agent Friday MCP server (18 subsystems, 91 tools)
 |       +-- bootstrap.js               # Entry point: auto-installs deps, loads index
 |       +-- index.js                   # Subsystem loader + HTTP bridge + dashboard
 |       +-- dashboard.html             # Three.js holographic desktop UI
@@ -408,7 +438,7 @@ asimovs-mind/
 |       |   +-- wiring.js              # 10 cross-subsystem event routes
 |       |   +-- session-conductor.js   # Session lifecycle orchestration
 |       |   +-- eis.js                 # Epistemic Independence Score tracker
-|       +-- subsystems/                # 17 subsystems (92 tools)
+|       +-- subsystems/                # 18 subsystems (91 tools)
 |           +-- vault/                 # 10 tools  Encrypted state
 |           +-- identity/              #  6 tools  Ed25519, X25519, attestation
 |           +-- privacy/               #  4 tools  PII engine

@@ -1,8 +1,8 @@
 # Asimov's Mind
 
-### Agent Friday lives here. 17 subsystems. 92 MCP tools. One holographic dashboard.
+### Agent Friday lives here. 18 subsystems. 91 MCP tools. One holographic dashboard.
 
-A Claude Code plugin that is Agent Friday: a full AI runtime with 17 subsystems, 3-provider LLM routing, 3-tier memory with semantic search, person-level trust graphs, personality evolution with anti-sycophancy calibration, recursive agent delegation, 8 connectors with 72+ tools, enterprise consent gates, daily briefings, meeting intelligence, and a Three.js holographic dashboard. All state AES-256-GCM encrypted. Ed25519 cryptographic identity. Privacy Shield PII scrubbing. Ollama local-first routing. Coordinated N-agent swarm. Bounded by Asimov's cLaws.
+A Claude Code plugin that is Agent Friday: a full AI runtime with 18 subsystems, 3-provider LLM routing, 3-tier memory with semantic search, person-level trust graphs, personality evolution with anti-sycophancy calibration, recursive agent delegation, 8 connectors with ~65 dynamic tools, enterprise consent gates, daily briefings, meeting intelligence, and a Three.js holographic dashboard. All state AES-256-GCM encrypted. Ed25519 cryptographic identity. Privacy Shield PII scrubbing. Ollama local-first routing. Coordinated N-agent swarm. Bounded by Asimov's cLaws.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
@@ -38,7 +38,7 @@ Every piece of state is encrypted on your machine. The passphrase never leaves. 
 
 ## Architecture
 
-The `friday-core` MCP server loads 17 subsystems in dependency order, exposing 92 MCP tools and a holographic dashboard.
+The `friday-core` MCP server loads 18 subsystems in dependency order, exposing 91 MCP tools (plus 4 connector meta-tools that dispatch to ~65 dynamic connector tools) and a holographic dashboard.
 
 ```
                       friday-core MCP Server
@@ -62,20 +62,19 @@ Tier 2 (Intelligence)
 Tier 3 (Services)
   +-- Agents          7 tools   Recursive delegation, deadlock detection
   +-- Tools           4 tools   Registry, execution delegate, safety gates
-  +-- Connectors      4+72      8 connectors, dynamic dispatch
+  +-- Connectors    4+~65       8 connectors, dynamic dispatch
   +-- Gateway         5 tools   Trust tiers, session mgmt, audit logging
   +-- Briefing        3 tools   Daily briefing, meeting prep, meeting intel
   +-- Voice           3 tools   State machine, fallback manager
   +-- Enterprise      5 tools   Consent gate, cloud gate, confidence, commitments
-
-Session              1 tool    Uptime, cwd context, greeting, commitments
+  +-- Session         1 tool    Uptime, cwd context, greeting, commitments
                    ------
-                   92 tools + holographic dashboard
+                   91 tools + holographic dashboard
 ```
 
-9 Python hooks enforce governance at the Claude Code level: protected zone enforcement, AST safety scanning, PII scrubbing/rehydration, session ledger, agent performance tracking, personality loading, governance integrity verification, and session learning.
+10 Python hooks enforce governance at the Claude Code level: protected zone enforcement, AST safety scanning, PII scrubbing/rehydration, session ledger, agent performance tracking, personality loading, governance integrity verification, session learning, vault bridge auth, and crash safety.
 
-19 slash commands (`/friday unlock`, `/onboard`, `/discover`, `/unleash`, `/remember`, `/status`, `/help`, and more) provide the user-facing interface.
+17 slash commands (`/friday unlock`, `/onboard`, `/discover`, `/unleash`, `/remember`, `/status`, `/help`, and more) provide the user-facing interface.
 
 Full architecture documentation: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
@@ -97,7 +96,7 @@ Full architecture documentation: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)*
 | Personality | 7 | Profile, 6 adaptive dimensions, anti-sycophancy, mood, evolution |
 | Agents | 7 | Recursive delegation, awareness mesh, deadlock detection, teams |
 | Tools | 4 | Dynamic tool registry with safety levels and audit trail |
-| Connectors | 4 | 8 connector modules (~72 tools): git, terminal, powershell, perplexity, firecrawl, comms |
+| Connectors | 4+~65 | 8 connector modules (~65 dynamic tools): git, terminal, powershell, perplexity, firecrawl, comms |
 | Gateway | 5 | 5-tier trust hierarchy, session management, append-only audit log |
 | Briefing | 3 | Daily briefings, meeting prep, post-meeting intelligence |
 | Voice | 3 | Voice pipeline state machine and fallback coordination |
@@ -105,6 +104,48 @@ Full architecture documentation: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)*
 | Session | 1 | Uptime, working directory context, greeting, pending commitments |
 
 Per-subsystem deep dive: **[docs/SUBSYSTEM_GUIDE.md](docs/SUBSYSTEM_GUIDE.md)**
+
+---
+
+## Security Hardening (v2.2.0 -- v2.3.0)
+
+v2.2.0 opened with a full security audit. v2.3.0 continued with 50 improvement cycles -- covering persistence, P2P, dashboard, hooks, and testing. The swarm ran on itself.
+
+### Security (v2.2.0)
+
+- **Path traversal blocked** -- vault keys validated against strict allowlist; resolved paths checked for containment; keys capped at 128 characters
+- **Governance bypass closed** -- absolute paths into the plugin root no longer skip protected-zone checks in `first-law.py`
+- **HTTP bridge authenticated** -- write endpoints require a bearer token generated at startup; `/tool/:name` restricted to 4 read-only tools; body size capped at 4 MB
+- **P2P locked to loopback** -- WebSocket server binds `127.0.0.1`, not `0.0.0.0`
+- **Signature-before-decrypt** -- P2P protocol verifies Ed25519 signatures before decrypting message payloads
+- **Safety scanner hardened** -- writes to `hooks/` and `governance/` always scanned regardless of provenance markers
+- **Dead code removed** -- `mcp/vault-server/` (160 KB precursor to friday-core) deleted
+
+### Architecture and Persistence (v2.3.0)
+
+- **OllamaMonitor extracted** -- single shared instance via `deps`; no more duplicate polling loops
+- **SessionSubsystem** added as the 18th subsystem; `session_status` tool no longer registered directly in `main()`
+- **State persistence fixed** -- `state.get`/`state.set` bugs resolved across 8 subsystems; state now survives restarts correctly
+- **Namespace separator** -- vault key namespace separator changed from `/` to `:`; vault now rejects `/` in key names
+- **Parallel tier startup** -- subsystem tiers start concurrently within each tier; startup time reduced
+- **O(1) intelligence router** -- LLM routing no longer iterates all models on every request
+
+### P2P and Dashboard (v2.3.0)
+
+- **P2P handshake completes** -- full ECDH + HKDF key derivation now runs to completion; session keys derived correctly
+- **HKDF key derivation** -- proper HKDF added to P2P channel setup
+- **Ed25519 signature verification** -- incoming P2P message signatures verified against stored peer public keys
+- **XSS fixed in dashboard** -- all user-supplied values rendered through `escHtml()` before insertion into the DOM
+- **Content Security Policy** -- dashboard now emits a CSP header blocking inline script injection
+
+### Hooks and Testing (v2.3.0)
+
+- **Hook auth fix** -- hooks correctly read and send the vault bridge bearer token on all authenticated requests
+- **Crash safety** -- hooks handle missing stdin, malformed JSON, and vault-unavailable gracefully without crashing the tool call
+- **Stdin handling** -- hooks no longer block indefinitely when stdin is closed
+- **Test count** -- 159 tests at v2.2.0 start; 442 tests (264 + 178) at v2.3.0, zero failures; new files cover P2P handshake, dashboard escaping, hook edge cases, and subsystem persistence
+
+Full changelog: **[CHANGELOG.md](CHANGELOG.md)**
 
 ---
 
@@ -121,23 +162,6 @@ Governance is not a constraint on autonomy. It is what enables autonomy at scale
 **Meta-Law -- Governance Immutability.** No agent can modify the governance framework. Safety floors can be raised but never lowered. HMAC-SHA256 integrity verification runs at every session start.
 
 Our research showed ungoverned agents crash 56% of the time. Governed agents crash 22%. The governed swarm degrades 3x slower. Paper and code: [asimovs-mind-research](https://github.com/FutureSpeakAI/asimovs-mind-research).
-
----
-
-## Security Hardening (v2.2.0)
-
-v2.2.0 is a governance hardening release. The swarm ran on itself and fixed what it found.
-
-- **Path traversal blocked** on vault key operations -- keys validated against a strict allowlist, resolved paths checked for containment
-- **Governance bypass closed** -- absolute paths into the plugin root no longer skip protected-zone checks in `first-law.py`
-- **HTTP bridge authenticated** -- write endpoints require a bearer token generated at startup; the generic `/tool/:name` endpoint restricted to 4 read-only tools; body size capped at 4 MB
-- **P2P locked to loopback** -- WebSocket server binds `127.0.0.1`, not `0.0.0.0`
-- **Signature-before-decrypt** -- P2P protocol verifies Ed25519 signatures before decrypting message payloads
-- **Safety scanner hardened** -- writes to `hooks/` and `governance/` directories are always scanned regardless of provenance markers
-- **Dead code removed** -- `mcp/vault-server/` (160KB precursor to friday-core) deleted
-- **Architecture cleanup** -- OllamaMonitor extracted to its own module, duplicate event subscriptions removed, session_status moved to a proper subsystem, ESLint added
-
-Full changelog: **[CHANGELOG.md](CHANGELOG.md)**
 
 ---
 
@@ -158,7 +182,7 @@ The subsystems are not isolated silos. The neural binding layer wires them into 
 Open `http://localhost:{port}/` after unlocking the vault. The holographic dashboard shows:
 
 - Vault status and Ollama health indicators
-- 17 subsystem status dots (clickable for detail)
+- 18 subsystem status dots (clickable for detail)
 - Memory particle field (400 particles colored by tier, bound to real memory entries)
 - Neural grid with connection lines and a central orb (pulse rate tracks event activity)
 - P2P peer list and trust summary
@@ -202,10 +226,10 @@ Built with Three.js. Live-polling every 5 seconds. Mobile-responsive via Tailsca
 |----------|---------------|
 | [GETTING_STARTED.md](GETTING_STARTED.md) | Installation, first-run setup, troubleshooting |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full system architecture, data flow, event wiring, security model |
-| [docs/SUBSYSTEM_GUIDE.md](docs/SUBSYSTEM_GUIDE.md) | Deep dive into each of the 17 subsystems |
-| [docs/HOOKS_GUIDE.md](docs/HOOKS_GUIDE.md) | All 9 Python hooks: triggers, behavior, vault bridge |
-| [docs/SKILLS_GUIDE.md](docs/SKILLS_GUIDE.md) | All 19 slash commands: usage, MCP tools called |
-| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | Complete MCP tool reference (92 tools, all parameters) |
+| [docs/SUBSYSTEM_GUIDE.md](docs/SUBSYSTEM_GUIDE.md) | Deep dive into each of the 18 subsystems |
+| [docs/HOOKS_GUIDE.md](docs/HOOKS_GUIDE.md) | All 10 Python hooks: triggers, behavior, vault bridge |
+| [docs/SKILLS_GUIDE.md](docs/SKILLS_GUIDE.md) | All 17 slash commands: usage, MCP tools called |
+| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | Complete MCP tool reference (91 tools, all parameters) |
 | [governance/conformance-report.md](governance/conformance-report.md) | cLaw Specification conformance audit |
 | [ROADMAP.md](ROADMAP.md) | Product roadmap from v0.1.0 through v3.0.0 |
 | [CHANGELOG.md](CHANGELOG.md) | Version history (Keep a Changelog format) |

@@ -1,7 +1,7 @@
 # Asimov's Mind — Developer Reference
 
-**Current version:** 2.2.0 (Security Hardening)
-**MCP server:** `mcp/friday-core/` — 17 subsystems, 92 tools, HTTP bridge, holographic dashboard
+**Current version:** 2.3.0 (Security Hardening + 50-cycle Hardening Run)
+**MCP server:** `mcp/friday-core/` — 18 subsystems, 91 tools, HTTP bridge, holographic dashboard
 
 ---
 
@@ -40,7 +40,7 @@ Claude Code
   v
 mcp/friday-core/
   bootstrap.js             Node version check, npm install if needed, then imports index.js
-  index.js                 Creates vault, event bus, OllamaMonitor, registers 17 subsystems,
+  index.js                 Creates vault, event bus, OllamaMonitor, registers 18 subsystems,
                            starts HTTP bridge on random 127.0.0.1 port, writes port file
   core/
     vault.js               SovereignVault (AES-256-GCM state, Argon2id KDF)
@@ -50,17 +50,17 @@ mcp/friday-core/
     wiring.js              10 cross-subsystem event subscriptions
     session-conductor.js   Session lifecycle: greeting, commitments, project detection
     eis.js                 Epistemic Independence Score tracker
-  subsystems/              17 directories, each exports a Subsystem subclass
+  subsystems/              18 directories, each exports a Subsystem subclass
 ```
 
 **Subsystem load order (4 tiers):**
 
 | Tier | Subsystems |
 |------|-----------|
-| 0 (no deps) | vault, identity, privacy, ollama |
+| 0 | vault, identity, privacy, ollama |
 | 1 | p2p (needs identity) |
 | 2 | llm, memory, context, trust, personality (need vault/ollama/event bus) |
-| 3 + session | agents, tools, connectors, gateway, briefing, voice, enterprise, session |
+| 3 | agents, tools, connectors, gateway, briefing, voice, enterprise, session |
 
 ---
 
@@ -70,8 +70,12 @@ mcp/friday-core/
 
 1. Create `mcp/friday-core/subsystems/<name>/index.js` exporting a class that extends `Subsystem`.
 2. Override `registerTools(server)` to call `server.tool(...)` for each MCP tool.
-3. Import and register it in `index.js` at the correct tier.
+3. Import and register it in `index.js` at the correct tier using the tier registration syntax:
+   ```js
+   registry.register(new MySubsystem(deps), { tier: 2 });
+   ```
 4. Add it to the tool count comment in `index.js`.
+5. Update the subsystem count in `CLAUDE.md`, `docs/API_REFERENCE.md`, `ROADMAP.md`, and `governance/conformance-report.md`.
 
 ### Subsystem constructor
 
@@ -82,6 +86,8 @@ Every subsystem receives `deps = { vault, eventBus, stateManager, logger, ollama
 Publish: `deps.eventBus.publish('topic:action', { ...data })`.
 Subscribe: `deps.eventBus.subscribe('topic:action', handler)` — wrap in try/catch.
 All 10 cross-subsystem routes live in `core/wiring.js`. Add new routes there, not in subsystem constructors.
+
+The event bus uses `#safeDispatch` internally so a throwing subscriber never prevents downstream subscribers or the wildcard channel from running. Each listener is called individually with its own try/catch; errors are re-emitted on the `error` channel if a listener exists, otherwise swallowed. This means event handlers do not need to be wrapped in try/catch for error isolation, but should still handle errors they intend to act on.
 
 ### HTTP bridge (Python hooks)
 
@@ -96,6 +102,8 @@ if vault_available():
 ```
 
 `vault_bridge.py` reads the port from `.asimovs-mind/vault/port` and the bearer token from `.asimovs-mind/vault/bridge-token`. It sends `Authorization: Bearer <token>` on all write requests automatically.
+
+**Rate limiting:** The HTTP bridge enforces a token-bucket rate limiter of 100 requests per second per source IP. Requests that exceed this limit receive HTTP 429 `{ "error": "Rate limit exceeded" }`. Python hooks should handle 429 responses with a brief back-off before retrying. The rate limit only applies to the localhost bridge — it is not a concern under normal hook operation.
 
 ### Hook return protocol
 
@@ -141,6 +149,8 @@ These must not be broken. If a PR changes any of these, it needs explicit review
 **Protected-zone patterns are relative.** `governance/**` matches `governance/laws.json`, not `/abs/path/governance/laws.json`. The absolute-path bypass fix in `first-law.py` handles this by stripping `CLAUDE_PLUGIN_ROOT` before comparison.
 
 **The `.asimovs-mind/` directory is per-project.** It is created in `process.env.CLAUDE_PROJECT_ROOT || process.cwd()` at MCP server startup. Each project gets its own encrypted vault, port file, and federation state.
+
+**State namespace separator is `:` not `/`.** When constructing namespaced state keys, the separator between the subsystem namespace and the key name is a colon, e.g. `memory:observations`. Using a forward slash will conflict with vault key validation, which treats `/` as a path separator and rejects keys containing it. Always use `this.state.read('my-key')` and `this.state.write('my-key', value)` within a subsystem — the namespace prefix is added automatically.
 
 ---
 
