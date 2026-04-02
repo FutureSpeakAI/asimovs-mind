@@ -129,7 +129,8 @@ export class TrustGraph {
   /** Initialize from persisted state */
   async initialize(state) {
     this.#state = state;
-    const saved = await state.read('graph');
+    const result = await state.read('graph');
+    const saved = result?.success ? result.data : null;
     if (saved) {
       this.#persons = saved.persons || [];
     }
