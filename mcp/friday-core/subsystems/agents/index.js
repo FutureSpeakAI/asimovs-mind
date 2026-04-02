@@ -55,6 +55,11 @@ export class AgentSubsystem extends Subsystem {
   }
 
   async stop() {
+    // Cancel the periodic cleanup interval registered in registerEvents()
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
     // Halt all active trees on shutdown
     await this.#delegation.haltAll();
     this.#mesh.cleanup();

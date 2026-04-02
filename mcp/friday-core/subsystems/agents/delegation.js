@@ -207,12 +207,20 @@ export class DelegationEngine {
     node.taskId = newId;
     this.#nodes.set(newId, node);
 
-    // Update parent's children
+    // Update parent's children list
     if (node.parentId) {
       const parent = this.#nodes.get(node.parentId);
       if (parent) {
         const idx = parent.children.indexOf(oldId);
         if (idx >= 0) parent.children[idx] = newId;
+      }
+    }
+
+    // Update each child's parentId to point to the new ID
+    for (const childId of node.children) {
+      const child = this.#nodes.get(childId);
+      if (child && child.parentId === oldId) {
+        child.parentId = newId;
       }
     }
   }

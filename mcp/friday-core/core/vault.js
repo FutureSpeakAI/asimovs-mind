@@ -390,6 +390,17 @@ export class SovereignVault {
     };
   }
 
+  /**
+   * Verify a cLaw attestation.
+   *
+   * Security note: this verifies that the attestation was signed by
+   * attestation.signerPublicKey, but it does NOT verify that signerPublicKey
+   * belongs to a known/trusted identity. A caller that needs to pin a specific
+   * peer's key must compare attestation.signerPublicKey against a pre-registered
+   * public key before calling this method. The P2P subsystem currently passes
+   * verifyAttestationFn=null for incoming handshakes, meaning peer attestations
+   * are accepted without a trust anchor check.
+   */
   verifyAttestation(attestation, lawsText) {
     const expectedHash = crypto.createHash('sha256').update(lawsText).digest('hex');
     if (attestation.lawsHash !== expectedHash) return { valid: false, reason: 'Laws hash mismatch' };
