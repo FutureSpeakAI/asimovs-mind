@@ -381,6 +381,3 @@ export function decryptMessage(ciphertextBuf, sessionKey, expectedSequence) {
   return { plaintext, sequence };
 }
 
-export function generateNonce(size = 8) {
-  return crypto.randomBytes(size);
-}

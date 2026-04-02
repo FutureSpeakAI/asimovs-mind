@@ -8,7 +8,6 @@
 
 import { z } from 'zod';
 import { Subsystem } from '../../core/subsystem.js';
-import { OllamaMonitor } from '../../core/ollama-monitor.js';
 
 export class VaultSubsystem extends Subsystem {
   #ollama;
@@ -16,7 +15,7 @@ export class VaultSubsystem extends Subsystem {
 
   constructor(deps) {
     super('vault', deps);
-    this.#ollama = new OllamaMonitor();
+    this.#ollama = deps.ollamaMonitor;
     this.#registryRef = null;
   }
 

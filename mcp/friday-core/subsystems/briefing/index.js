@@ -41,13 +41,6 @@ export class BriefingSubsystem extends Subsystem {
     this.log.info(`Briefing started: ${status.totalBriefings} briefings, ${mStats.total} meetings`);
   }
 
-  registerEvents() {
-    // Listen for commitment/calendar changes to mark briefings stale
-    this.eventBus.on('commitments:changed', () => {
-      // Briefing staleness is checked on demand, no action needed here
-    });
-  }
-
   /** Expose engines for other subsystems */
   get daily() { return this.#daily; }
   get meetings() { return this.#meetings; }

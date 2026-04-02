@@ -44,11 +44,6 @@ export class TrustSubsystem extends Subsystem {
   }
 
   registerEvents() {
-    // Listen for person mentions from memory extraction
-    this.eventBus.on('memory:person_mentions', async (mentions) => {
-      await this.#graph.processPersonMentions(mentions);
-    });
-
     // Auto-decay on vault unlock (session start equivalent)
     this.eventBus.on('vault:unlocked', () => {
       try {

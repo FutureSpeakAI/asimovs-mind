@@ -5,14 +5,13 @@
  */
 
 import { Subsystem } from '../../core/subsystem.js';
-import { OllamaMonitor } from '../../core/ollama-monitor.js';
 
 export class OllamaSubsystem extends Subsystem {
   #ollama;
 
   constructor(deps) {
     super('ollama', deps);
-    this.#ollama = new OllamaMonitor();
+    this.#ollama = deps.ollamaMonitor;
   }
 
   registerTools(server) {

@@ -419,14 +419,6 @@ export class PeerManager {
     return true;
   }
 
-  // Clean expired codes
-  cleanupPairingCodes() {
-    const now = Date.now();
-    for (const [code, entry] of this.#pairingCodes) {
-      if (now > entry.expires) this.#pairingCodes.delete(code);
-    }
-  }
-
   // --- Shutdown ---
 
   async closeAll() {

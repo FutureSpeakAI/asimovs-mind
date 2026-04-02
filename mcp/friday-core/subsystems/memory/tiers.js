@@ -77,14 +77,6 @@ export class MemoryTiers {
   getMediumTerm() { return [...this.#store.mediumTerm]; }
   getLongTerm() { return [...this.#store.longTerm]; }
 
-  getAll() {
-    return {
-      shortTerm: this.getShortTerm(),
-      mediumTerm: this.getMediumTerm(),
-      longTerm: this.getLongTerm(),
-    };
-  }
-
   // -- Store a memory --------------------------------------------------
 
   /**
@@ -238,28 +230,6 @@ export class MemoryTiers {
 
   clearShortTerm() {
     this.#store.shortTerm = [];
-  }
-
-  // -- Build context string for LLM injection --------------------------
-
-  buildContext() {
-    const parts = [];
-
-    if (this.#store.longTerm.length > 0) {
-      const facts = this.#store.longTerm.map(e => `- ${e.content}`).join('\n');
-      parts.push(`## Long-Term Knowledge\n${facts}`);
-    }
-
-    if (this.#store.mediumTerm.length > 0) {
-      const observations = [...this.#store.mediumTerm]
-        .sort((a, b) => b.accessCount - a.accessCount)
-        .slice(0, 10)
-        .map(e => `- ${e.content}`)
-        .join('\n');
-      parts.push(`## Recent Observations\n${observations}`);
-    }
-
-    return parts.join('\n\n');
   }
 
   // -- Internal --------------------------------------------------------

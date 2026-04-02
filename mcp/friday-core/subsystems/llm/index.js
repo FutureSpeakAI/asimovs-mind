@@ -239,28 +239,6 @@ export class LLMSubsystem extends Subsystem {
     );
   }
 
-  // ── Events ────────────────────────────────────────────────────────
-
-  registerEvents() {
-    if (!this.eventBus) return;
-
-    // Listen for API key updates from vault
-    this.eventBus.on?.('vault:key-updated', (data) => {
-      if (data?.key === 'api-keys') {
-        this.#loadApiKeys(data.value).catch((err) =>
-          this.log.warn?.('Failed to reload API keys:', err?.message),
-        );
-      }
-    });
-
-    // Listen for provider config changes
-    this.eventBus.on?.('config:provider-changed', (data) => {
-      if (data?.provider) {
-        this.client.setDefaultProvider(data.provider);
-      }
-    });
-  }
-
   // ── Lifecycle ─────────────────────────────────────────────────────
 
   async start() {

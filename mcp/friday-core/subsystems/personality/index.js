@@ -150,10 +150,6 @@ export class PersonalitySubsystem extends Subsystem {
       }
     });
 
-    // Idle check-in reactions
-    this.eventBus.on('checkin:dismissed', () => this.#calibration.recordDismissal());
-    this.eventBus.on('checkin:engaged', () => this.#calibration.recordEngagement());
-
     // On vault:unlocked, re-apply mother signal (in case vault was locked during start)
     this.eventBus.on('vault:unlocked', async () => {
       try {
