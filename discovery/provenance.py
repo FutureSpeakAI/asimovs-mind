@@ -47,8 +47,12 @@ def get_log_path():
 def append_record(record: dict):
     """Append a record to the provenance log."""
     log_path = get_log_path()
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        print(f"ERROR: Could not write provenance log {log_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
     return log_path
 
 
@@ -89,7 +93,13 @@ def cmd_history(args):
         return
 
     records = []
-    for line in log_path.read_text(encoding="utf-8").strip().split("\n"):
+    try:
+        raw = log_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"ERROR: Could not read provenance log {log_path}: {exc}", file=sys.stderr)
+        return
+
+    for line in raw.strip().split("\n"):
         if line.strip():
             try:
                 records.append(json.loads(line))

@@ -37,7 +37,9 @@ from pathlib import Path
 # fall back to raw file I/O otherwise.
 # ---------------------------------------------------------------------------
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
+    # Use resolve() so __file__ relative invocations still find the right directory.
+    _hooks_dir = str(Path(__file__).resolve().parent.parent / "hooks")
+    sys.path.insert(0, _hooks_dir)
     from vault_bridge import vault_available, vault_read, vault_write, vault_append
     _VAULT_OK = vault_available()
 except ImportError:
@@ -120,8 +122,13 @@ def record_evidence(evidence_type, entity, outcome, detail="", dimensions=None):
 
     # Try vault first, fall back to file
     if not _vault_append_line("evidence-log", record):
-        with open(EVIDENCE_LOG, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        try:
+            with open(EVIDENCE_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            # Non-fatal: log to stderr and continue so callers do not crash.
+            import sys as _sys
+            print(f"[memory] Warning: could not write evidence log: {exc}", file=_sys.stderr)
 
     # Recompute trust for this entity
     _recompute_trust(entity)
@@ -277,10 +284,14 @@ def _save_trust_scores(scores):
     # Write to vault first, then file as fallback/mirror
     _vault_write_json("trust-scores", scores)
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
-    TRUST_SCORES.write_text(
-        json.dumps(scores, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    try:
+        TRUST_SCORES.write_text(
+            json.dumps(scores, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        import sys as _sys
+        print(f"[memory] Warning: could not write trust scores: {exc}", file=_sys.stderr)
 
 
 def get_trust(entity):
@@ -303,7 +314,14 @@ def recompute_all():
         return 0
 
     entities = set()
-    for line in EVIDENCE_LOG.read_text(encoding="utf-8").strip().split("\n"):
+    try:
+        raw = EVIDENCE_LOG.read_text(encoding="utf-8")
+    except OSError as exc:
+        import sys as _sys
+        print(f"[memory] Warning: could not read evidence log: {exc}", file=_sys.stderr)
+        return 0
+
+    for line in raw.strip().split("\n"):
         if line.strip():
             try:
                 r = json.loads(line)
