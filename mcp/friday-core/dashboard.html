@@ -16,6 +16,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self'; style-src 'self' 'unsafe-inline';">
 <title>Agent Friday</title>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js" } }
@@ -211,7 +212,7 @@
     <h2>Sovereign Vault</h2>
     <div class="sub">Your passphrase never leaves this machine.</div>
     <form id="gate-form">
-      <input type="password" id="gate-pp" placeholder="Enter passphrase..." autofocus>
+      <input type="password" id="gate-pp" placeholder="Enter passphrase..." autofocus autocomplete="new-password">
       <button type="submit" id="gate-btn">Unlock Vault</button>
     </form>
     <div id="gate-msg" class="gate-msg" style="display:none"></div>
@@ -710,28 +711,28 @@ function buildTooltipContent(name) {
 
   if (name === 'memory' && cachedMetrics.memory) {
     const m = cachedMetrics.memory;
-    return `<div class="tt-row">Short-term: <span>${m.shortTerm}</span></div>` +
-           `<div class="tt-row">Medium-term: <span>${m.mediumTerm}</span></div>` +
-           `<div class="tt-row">Long-term: <span>${m.longTerm}</span></div>`;
+    return `<div class="tt-row">Short-term: <span>${escHtml(m.shortTerm)}</span></div>` +
+           `<div class="tt-row">Medium-term: <span>${escHtml(m.mediumTerm)}</span></div>` +
+           `<div class="tt-row">Long-term: <span>${escHtml(m.longTerm)}</span></div>`;
   }
   if (name === 'trust' && cachedMetrics.trust) {
     const t = cachedMetrics.trust;
-    return `<div class="tt-row">Persons: <span>${t.personCount}</span></div>` +
-           `<div class="tt-row">Avg score: <span>${t.avgScore}</span></div>`;
+    return `<div class="tt-row">Persons: <span>${escHtml(t.personCount)}</span></div>` +
+           `<div class="tt-row">Avg score: <span>${escHtml(t.avgScore)}</span></div>`;
   }
   if (name === 'personality' && cachedMetrics.personality) {
     const p = cachedMetrics.personality;
-    return `<div class="tt-row">Mode: <span>${p.mode}</span></div>` +
-           `<div class="tt-row">Challenge: <span>${p.challengeLevel}</span></div>`;
+    return `<div class="tt-row">Mode: <span>${escHtml(p.mode)}</span></div>` +
+           `<div class="tt-row">Challenge: <span>${escHtml(p.challengeLevel)}</span></div>`;
   }
   if (name === 'connectors' && cachedMetrics.connectors) {
     const c = cachedMetrics.connectors;
     const list = Array.isArray(c.detected) && c.detected.length > 0
-      ? c.detected.join(', ')
+      ? c.detected.map(escHtml).join(', ')
       : 'none';
     return `<div class="tt-row">Detected: <span>${list}</span></div>`;
   }
-  return `<div class="tt-row">Status: <span>${statusText}</span></div>`;
+  return `<div class="tt-row">Status: <span>${escHtml(statusText)}</span></div>`;
 }
 
 function showTooltip(dot) {
@@ -804,7 +805,7 @@ memSearchInput.addEventListener('keydown', async (e) => {
         const recency = r.timestamp ? new Date(r.timestamp).toLocaleString() : (r.recency || '--');
         return `<div class="mr-item">` +
                `<div class="mr-content">${escHtml(content.slice(0, 200))}</div>` +
-               `<div class="mr-meta"><span class="tier">${tier}</span><span>${recency}</span></div>` +
+               `<div class="mr-meta"><span class="tier">${escHtml(tier)}</span><span>${escHtml(recency)}</span></div>` +
                `</div>`;
       }).join('');
     }
@@ -815,7 +816,7 @@ memSearchInput.addEventListener('keydown', async (e) => {
 
 mrClose.addEventListener('click', () => { memResultsPanel.style.display = 'none'; });
 
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
 </script>
 </body>
 </html>
