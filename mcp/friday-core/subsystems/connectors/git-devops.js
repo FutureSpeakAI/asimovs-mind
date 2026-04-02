@@ -86,7 +86,7 @@ function gitStatus(args) {
 
 function gitLog(args) {
   const repoPath = args.repo_path;
-  const count = args.count ?? 20;
+  const count = Math.min(args.count ?? 20, 500);
   const oneline = args.oneline ?? true;
   try {
     const gitArgs = ['log', `--max-count=${count}`];
@@ -200,8 +200,13 @@ function gitBlame(args) {
   try {
     const ga = ['blame'];
     if (args.lines) {
-      const [start, end] = args.lines.split(',').map(s => s.trim());
-      if (start && end) ga.push('-L', `${start},${end}`);
+      const [rawStart, rawEnd] = args.lines.split(',').map(s => s.trim());
+      const start = parseInt(rawStart, 10);
+      const end = parseInt(rawEnd, 10);
+      if (!Number.isInteger(start) || start <= 0 || !Number.isInteger(end) || end <= 0) {
+        return fail('git blame: lines must be two positive integers in the format "start,end"');
+      }
+      ga.push('-L', `${start},${end}`);
     }
     ga.push('--', args.file);
     return ok(runArgs('git', ga, { cwd: args.repo_path }) || 'No blame output.');
@@ -264,7 +269,16 @@ function dockerCompose(args) {
   } catch (err) { return fail(`docker compose ${args.action} failed: ${err.message}`); }
 }
 
+const DOCKER_CONTAINER_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+const DOCKER_EXEC_MAX_CMD_LENGTH = 10_000;
+
 function dockerExec(args) {
+  if (!DOCKER_CONTAINER_PATTERN.test(args.container)) {
+    return fail('Invalid container name: must start with alphanumeric and contain only alphanumeric, underscore, dot, or hyphen.');
+  }
+  if (String(args.command).length > DOCKER_EXEC_MAX_CMD_LENGTH) {
+    return fail(`Command exceeds maximum length of ${DOCKER_EXEC_MAX_CMD_LENGTH} characters.`);
+  }
   try {
     const da = ['exec', '-i', args.container, ...args.command.split(/\s+/).filter(Boolean)];
     return ok(runArgs('docker', da) || 'Command executed.');

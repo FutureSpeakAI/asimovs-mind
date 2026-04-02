@@ -101,6 +101,9 @@ export class VaultSubsystem extends Subsystem {
         data: z.any().describe('JSON data to encrypt and store')
       },
       async ({ key, data }) => {
+        if (JSON.stringify(data).length > 1_048_576) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Data exceeds maximum size of 1 MB' }) }] };
+        }
         const result = await vault.write(key, data);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
@@ -113,6 +116,9 @@ export class VaultSubsystem extends Subsystem {
         entry: z.any().describe('Entry to append')
       },
       async ({ key, entry }) => {
+        if (JSON.stringify(entry).length > 1_048_576) {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Entry exceeds maximum size of 1 MB' }) }] };
+        }
         const result = await vault.append(key, entry);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }

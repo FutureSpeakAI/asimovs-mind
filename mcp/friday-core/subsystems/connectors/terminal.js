@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 
 const MAX_SESSIONS = 10;
+const MAX_INPUT_CHARS = 1_048_576;
 const MAX_OUTPUT_LINES = 10_000;
 const MAX_RESPONSE_CHARS = 5_000;
 const DEAD_SESSION_TTL_MS = 5 * 60 * 1000;
@@ -153,6 +154,8 @@ async function terminalSend(args) {
   if (typeof args.input !== 'string') return { error: 'Missing: input' };
 
   const waitMs = typeof args.wait_ms === 'number' && args.wait_ms >= 0 ? Math.min(args.wait_ms, 60_000) : DEFAULT_WAIT_MS;
+
+  if (args.input.length > MAX_INPUT_CHARS) return { error: `Input exceeds maximum allowed length of ${MAX_INPUT_CHARS} characters.` };
 
   let session;
   try { session = getSession(args.session_id); } catch (err) { return { error: err.message }; }

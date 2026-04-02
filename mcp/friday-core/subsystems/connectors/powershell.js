@@ -133,10 +133,13 @@ async function registryWrite(args) {
   return safeRun(script);
 }
 
+const WMI_NAMESPACE_PATTERN = /^[a-zA-Z0-9_/\\]+$/;
+
 async function wmiQuery(args) {
   const query = String(args.query ?? '');
   if (!query) return { error: 'WMI query required.' };
   const namespace = String(args.namespace ?? 'root/cimv2');
+  if (!WMI_NAMESPACE_PATTERN.test(namespace)) return { error: 'Invalid WMI namespace: only alphanumeric, underscore, forward slash, and backslash are allowed.' };
   return safeRun(`Get-CimInstance -Query '${psEsc(query)}' -Namespace '${psEsc(namespace)}' | Format-List | Out-String -Width 300`);
 }
 

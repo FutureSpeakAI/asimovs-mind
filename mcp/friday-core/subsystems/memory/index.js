@@ -177,7 +177,7 @@ export class MemorySubsystem extends Subsystem {
       'memory_store',
       'Store an observation in memory. Short-term is session-only, medium-term persists, long-term is for confirmed facts.',
       {
-        content: z.string().describe('The observation or fact to remember'),
+        content: z.string().max(50000).describe('The observation or fact to remember'),
         category: z.enum(['preference', 'pattern', 'context', 'fact'])
           .default('fact')
           .describe('Category: preference, pattern, context, or fact'),
@@ -311,11 +311,11 @@ export class MemorySubsystem extends Subsystem {
       'End the current episode and store it with a summary.',
       {
         summary: z.string().describe('Summary of what happened in this episode'),
-        topics: z.array(z.string()).default([])
+        topics: z.array(z.string().max(200)).max(20).default([])
           .describe('Topic tags (1-3 words each)'),
         emotionalTone: z.string().default('neutral')
           .describe('Emotional tone: positive, neutral, frustrated, excited, focused, etc.'),
-        keyDecisions: z.array(z.string()).default([])
+        keyDecisions: z.array(z.string().max(500)).max(20).default([])
           .describe('Key decisions or action items from this episode'),
       },
       async ({ summary, topics, emotionalTone, keyDecisions }) => {

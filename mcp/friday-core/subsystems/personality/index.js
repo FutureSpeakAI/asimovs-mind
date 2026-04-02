@@ -361,7 +361,7 @@ export class PersonalitySubsystem extends Subsystem {
       'personality_sentiment',
       'Analyse a specific text for sentiment/mood. Returns detected mood, confidence, and energy without updating internal state.',
       {
-        text: z.string().describe('Text to analyse for sentiment'),
+        text: z.string().max(50000).describe('Text to analyse for sentiment'),
       },
       async ({ text }) => {
         // Create a temporary engine to analyse without side effects

@@ -42,6 +42,7 @@ function validateWebhookUrl(raw, allowHttp = false) {
 }
 
 function psEscape(s) { return s.replace(/'/g, "''"); }
+function xmlEsc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 // -- HTTP helper --
 
@@ -199,14 +200,15 @@ async function webhookSend(args) {
 
 async function notificationToast(args) {
   if (!args.title || !args.body) throw new Error('title and body are required.');
-  const t = psEscape(args.title), b = psEscape(args.body);
+  const tXml = xmlEsc(args.title), bXml = xmlEsc(args.body);
+  const tPs = psEscape(args.title), bPs = psEscape(args.body);
   try {
     const script = `
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
 $toastXml = @"
-<toast><visual><binding template="ToastGeneric"><text>${t}</text><text>${b}</text></binding></visual></toast>
+<toast><visual><binding template="ToastGeneric"><text>${tXml}</text><text>${bXml}</text></binding></visual></toast>
 "@
 $xml.LoadXml($toastXml)
 $appId = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe'
@@ -215,7 +217,7 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 Write-Output 'Toast shown.'`.trim();
     return await runPowerShell(script) || 'Toast displayed.';
   } catch {
-    const fallback = `Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.BalloonTipTitle='${t}'; $n.BalloonTipText='${b}'; $n.Visible=$true; $n.ShowBalloonTip(5000); Start-Sleep -Milliseconds 5500; $n.Dispose(); Write-Output 'Balloon shown.'`;
+    const fallback = `Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.BalloonTipTitle='${tPs}'; $n.BalloonTipText='${bPs}'; $n.Visible=$true; $n.ShowBalloonTip(5000); Start-Sleep -Milliseconds 5500; $n.Dispose(); Write-Output 'Balloon shown.'`;
     return await runPowerShell(fallback) || 'Balloon notification displayed.';
   }
 }
