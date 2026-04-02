@@ -65,9 +65,9 @@ export class MemoryTiers {
       search.indexBulk(toIndex).catch(() => {});
     }
 
-    console.log(
+    process.stderr.write(
       `[MemoryTiers] Loaded: short=${this.#store.shortTerm.length}, ` +
-      `medium=${this.#store.mediumTerm.length}, long=${this.#store.longTerm.length}`
+      `medium=${this.#store.mediumTerm.length}, long=${this.#store.longTerm.length}\n`
     );
   }
 
@@ -372,7 +372,7 @@ export class MemoryTiers {
     );
     const pruned = before - this.#store.mediumTerm.length;
     if (pruned > 0) {
-      console.log(`[MemoryTiers] Pruned ${pruned} expired medium-term entries`);
+      process.stderr.write(`[MemoryTiers] Pruned ${pruned} expired medium-term entries\n`);
     }
 
     if (this.#store.shortTerm.length > MAX_SHORT_TERM) {

@@ -41,10 +41,12 @@ describe('TIER A: plugin.json Structure', () => {
     assert.ok(plugin.version);
   });
 
-  it('version is 2.1.0', async () => {
+  it('version matches package.json', async () => {
     const raw = await fs.readFile(pluginPath('plugin.json'), 'utf-8');
     const p = JSON.parse(raw);
-    assert.equal(p.version, '2.1.0');
+    const pkgRaw = await fs.readFile(pluginPath('mcp', 'friday-core', 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgRaw);
+    assert.equal(p.version, pkg.version, 'plugin.json version should match package.json version');
   });
 
   it('all hook commands reference existing Python files', async () => {
@@ -300,6 +302,42 @@ describe('TIER G: MCP Friday Core Files', () => {
       const indexPath = pluginPath('mcp', 'friday-core', 'subsystems', sub, 'index.js');
       assert.ok(await fileExists(indexPath), `Missing: subsystems/${sub}/index.js`);
     }
+  });
+});
+
+// ============================================================
+// TIER G2: MCP Protocol Safety
+// ============================================================
+
+describe('TIER G2: MCP Protocol Safety', () => {
+  it('no console.log in production source (would corrupt MCP stdout)', async () => {
+    const srcDir = pluginPath('mcp', 'friday-core');
+    const violations = [];
+
+    async function scanDir(dir) {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === 'node_modules' || entry.name === 'test') continue;
+          await scanDir(fullPath);
+        } else if (entry.name.endsWith('.js')) {
+          const content = await fs.readFile(fullPath, 'utf-8');
+          const lines = content.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes('console.log(')) {
+              violations.push(`${path.relative(srcDir, fullPath)}:${i + 1}`);
+            }
+          }
+        }
+      }
+    }
+
+    await scanDir(srcDir);
+    assert.equal(
+      violations.length, 0,
+      `console.log found in production code (use process.stderr.write instead):\n  ${violations.join('\n  ')}`
+    );
   });
 });
 

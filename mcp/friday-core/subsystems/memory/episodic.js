@@ -53,7 +53,7 @@ export class EpisodicMemory {
     this.#state = state;
     this.#search = search;
     await this.#load();
-    console.log(`[EpisodicMemory] Loaded ${this.#episodes.length} episodes`);
+    process.stderr.write(`[EpisodicMemory] Loaded ${this.#episodes.length} episodes\n`);
   }
 
   // -- Accessors -------------------------------------------------------
@@ -96,7 +96,7 @@ export class EpisodicMemory {
     };
     this.#observations = [];
 
-    console.log(`[EpisodicMemory] Started episode: "${title}"`);
+    process.stderr.write(`[EpisodicMemory] Started episode: "${title}"\n`);
     return { ...this.#active };
   }
 
@@ -242,7 +242,7 @@ export class EpisodicMemory {
     this.#active = null;
     this.#observations = [];
 
-    console.log(`[EpisodicMemory] Completed episode ${episode.id.slice(0, 8)}: "${summary.slice(0, 80)}"`);
+    process.stderr.write(`[EpisodicMemory] Completed episode ${episode.id.slice(0, 8)}: "${summary.slice(0, 80)}"\n`);
     return episode;
   }
 

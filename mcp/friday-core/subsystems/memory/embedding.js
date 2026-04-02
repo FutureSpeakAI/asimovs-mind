@@ -40,7 +40,7 @@ export class EmbeddingPipeline {
 
       this.#model = model;
       this.#ready = true;
-      console.log(`[EmbeddingPipeline] Ready with model: ${model}`);
+      process.stderr.write(`[EmbeddingPipeline] Ready with model: ${model}\n`);
     } catch (err) {
       console.warn('[EmbeddingPipeline] Start failed:', err.message);
       this.#ready = false;

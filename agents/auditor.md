@@ -32,7 +32,7 @@ You are the Auditor, responsible for security scanning, quality review, and gove
 - Functions over 50 lines (complexity risk)
 - Deeply nested callbacks (>3 levels)
 - Missing error handling on async operations
-- Console.log statements that may leak data in production
+- Console.log statements in MCP servers (corrupts stdout JSON-RPC stream; use process.stderr.write instead)
 
 ### 4. Governance Compliance
 - Protected zone integrity (no unauthorized modifications)

@@ -21,7 +21,7 @@ export class LLMClient {
 
   registerProvider(provider) {
     this.#providers.set(provider.name, provider);
-    console.log(`[LLMClient] Registered provider: ${provider.name}`);
+    process.stderr.write(`[LLMClient] Registered provider: ${provider.name}\n`);
   }
 
   setDefaultProvider(name) {

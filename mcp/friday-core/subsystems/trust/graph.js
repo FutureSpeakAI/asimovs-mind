@@ -9,6 +9,8 @@
  * Uses this.state for persistence, no file I/O.
  */
 
+import crypto from 'node:crypto';
+
 /* -- Constants -- */
 
 const MAX_PERSONS = 200;
@@ -48,7 +50,7 @@ function clamp(value, min, max) {
 }
 
 function generateId() {
-  return Math.random().toString(36).slice(2, 14);
+  return crypto.randomUUID().slice(0, 12);
 }
 
 function createPersonNode(primaryName, aliasType = 'name') {

@@ -429,9 +429,9 @@ export class IntelligenceRouter {
 
     this.#checkBudgetReset();
 
-    console.log(
+    process.stderr.write(
       `[Router] Initialized -- ${this.#models.length} models, ` +
-      `${this.#decisions.length} decisions in history`,
+      `${this.#decisions.length} decisions in history\n`,
     );
   }
 
@@ -705,7 +705,7 @@ export class IntelligenceRouter {
         const d = new Date(last.timestamp);
         if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) {
           this.#config.monthlySpentUsd = 0;
-          console.log('[Router] Monthly budget reset');
+          process.stderr.write('[Router] Monthly budget reset\n');
         }
       }
     }
@@ -720,7 +720,7 @@ export class IntelligenceRouter {
       config: this.#config,
       savedAt: Date.now(),
     }).catch((err) => {
-      console.warn('[Router] State persist failed:', err?.message);
+      process.stderr.write(`[Router] State persist failed: ${err?.message}\n`);
     });
   }
 }

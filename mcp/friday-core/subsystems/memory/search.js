@@ -75,9 +75,9 @@ export class SemanticSearchEngine {
     // Start the embedding pipeline (probes Ollama)
     await this.#pipeline.start();
 
-    console.log(
+    process.stderr.write(
       `[SemanticSearch] Loaded ${this.#entries.size} embeddings ` +
-      `(local embeddings: ${this.#pipeline.isReady() ? 'ready' : 'unavailable, keyword fallback'})`
+      `(local embeddings: ${this.#pipeline.isReady() ? 'ready' : 'unavailable, keyword fallback'})\n`
     );
   }
 
@@ -108,7 +108,7 @@ export class SemanticSearchEngine {
     });
     if (toIndex.length === 0) return;
 
-    console.log(`[SemanticSearch] Bulk indexing ${toIndex.length} entries...`);
+    process.stderr.write(`[SemanticSearch] Bulk indexing ${toIndex.length} entries...\n`);
 
     for (let i = 0; i < toIndex.length; i += MAX_BATCH_SIZE) {
       const batch = toIndex.slice(i, i + MAX_BATCH_SIZE);
@@ -299,7 +299,7 @@ export class SemanticSearchEngine {
       }
 
       await this.#save();
-      console.log(`[SemanticSearch] Indexed ${batch.length} entries`);
+      process.stderr.write(`[SemanticSearch] Indexed ${batch.length} entries\n`);
     } catch (err) {
       console.warn('[SemanticSearch] Batch embedding failed:', err.message);
       this.#pendingBatch.push(...batch);

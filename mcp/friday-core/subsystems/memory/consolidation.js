@@ -78,13 +78,13 @@ export class MemoryConsolidation {
     }
 
     this.#running = true;
-    console.log('[Consolidation] Starting consolidation pass...');
+    process.stderr.write('[Consolidation] Starting consolidation pass...\n');
 
     try {
       const result = await this.#promoteHighScoring();
-      console.log(
+      process.stderr.write(
         `[Consolidation] Complete: promoted=${result.promoted.length}, ` +
-        `pruned=${result.pruned.length}, skipped=${result.skipped}`
+        `pruned=${result.pruned.length}, skipped=${result.skipped}\n`
       );
       return result;
     } finally {
@@ -157,8 +157,8 @@ export class MemoryConsolidation {
           from: { id: candidate.id, content: candidate.content, score },
           to: newEntry.id,
         });
-        console.log(
-          `[Consolidation] Promoted (score=${score}): "${candidate.content.slice(0, 60)}" -> long-term (${category})`
+        process.stderr.write(
+          `[Consolidation] Promoted (score=${score}): "${candidate.content.slice(0, 60)}" -> long-term (${category})\n`
         );
       } else {
         // Was a duplicate in long-term (caught by tiers.store)
