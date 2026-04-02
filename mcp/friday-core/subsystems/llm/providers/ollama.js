@@ -89,12 +89,20 @@ export class OllamaProvider {
     const url = `${this.#endpoint}/api/chat`;
     const body = this.#buildBody(request, model, true);
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: request.signal || undefined,
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: request.signal || AbortSignal.timeout(120_000),
+      });
+    } catch (err) {
+      const label = err?.name === 'AbortError' ? 'timed out' : 'network error';
+      throw new Error(
+        `[OllamaProvider] Stream ${label}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     if (!res.ok) {
       const text = await res.text();

@@ -100,16 +100,24 @@ export class AnthropicProvider {
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     };
 
-    const res = await fetch(`${API_BASE}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.#apiKey,
-        'anthropic-version': API_VERSION,
-      },
-      body: JSON.stringify(body),
-      signal: request.signal || undefined,
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.#apiKey,
+          'anthropic-version': API_VERSION,
+        },
+        body: JSON.stringify(body),
+        signal: request.signal || AbortSignal.timeout(120_000),
+      });
+    } catch (err) {
+      const label = err?.name === 'AbortError' ? 'timed out' : 'network error';
+      throw new Error(
+        `[AnthropicProvider] Stream ${label}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     if (!res.ok) {
       const text = await res.text();

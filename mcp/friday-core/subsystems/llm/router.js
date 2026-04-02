@@ -469,6 +469,18 @@ export class IntelligenceRouter {
   selectModel(task) {
     const decisionId = randomUUID().slice(0, 12);
 
+    // Hard budget block: if a monthly budget is set and fully consumed, reject
+    // immediately rather than silently routing anyway.
+    if (this.#config.monthlyBudgetUsd > 0 &&
+        this.#config.monthlySpentUsd >= this.#config.monthlyBudgetUsd) {
+      const spent = this.#config.monthlySpentUsd.toFixed(4);
+      const limit = this.#config.monthlyBudgetUsd.toFixed(2);
+      throw new Error(
+        `[Router] Monthly budget exhausted ($${spent} of $${limit}). ` +
+        'Reset via updateConfig({ monthlySpentUsd: 0 }) or wait for the monthly reset.',
+      );
+    }
+
     // Pinned model
     if (this.#config.pinnedModelId) {
       const pinned = this.#modelMap.get(this.#config.pinnedModelId);
