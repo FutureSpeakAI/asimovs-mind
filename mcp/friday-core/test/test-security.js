@@ -13,7 +13,17 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-import { initCrypto } from '../core/crypto.js';
+import {
+  initCrypto,
+  generateExchangeKeyPair,
+  generateSigningKeyPair,
+  deriveSharedSecret,
+  deriveSessionKeys,
+  encryptMessage,
+  decryptMessage,
+  SecureBuffer
+} from '../core/crypto.js';
+import { PeerChannel } from '../subsystems/p2p/protocol.js';
 import { SovereignVault } from '../core/vault.js';
 import { execute as commsExecute } from '../subsystems/connectors/comms.js';
 import { execute as terminalExecute } from '../subsystems/connectors/terminal.js';
@@ -261,5 +271,274 @@ describe('Input bounds', () => {
       'Counts below 500 must pass through unchanged');
     assert.equal(Math.min(undefined ?? 20, 500), 20,
       'Missing count defaults to 20');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. HKDF key derivation — direction correctness and safety number
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('HKDF key derivation', () => {
+  // One-time setup: generate two exchange key pairs for all HKDF tests.
+  let alice, bob;
+  let keysFromAlice, keysFromBob;
+
+  before(() => {
+    alice = generateExchangeKeyPair();
+    bob   = generateExchangeKeyPair();
+
+    // Alice's perspective
+    const secretA = deriveSharedSecret(alice.privateKey, bob.publicKey);
+    keysFromAlice = deriveSessionKeys(secretA, alice.publicKey, bob.publicKey);
+
+    // Bob's perspective (shared secret is computed independently)
+    const secretB = deriveSharedSecret(bob.privateKey, alice.publicKey);
+    keysFromBob = deriveSessionKeys(secretB, bob.publicKey, alice.publicKey);
+  });
+
+  after(() => {
+    alice.privateKey.destroy();
+    bob.privateKey.destroy();
+    keysFromAlice.encryptKey.destroy();
+    keysFromAlice.decryptKey.destroy();
+    keysFromBob.encryptKey.destroy();
+    keysFromBob.decryptKey.destroy();
+  });
+
+  it('deriveSessionKeys produces different encrypt and decrypt key material', () => {
+    // The two keys must be distinct — same material would mean no directional separation.
+    let encBuf, decBuf;
+    keysFromAlice.encryptKey.withAccess(b => { encBuf = Buffer.from(b); });
+    keysFromAlice.decryptKey.withAccess(b => { decBuf = Buffer.from(b); });
+    assert.notDeepEqual(encBuf, decBuf,
+      'encryptKey and decryptKey must not be the same key material');
+  });
+
+  it('swapping public keys swaps encrypt/decrypt roles (direction correctness)', () => {
+    // Alice's encryptKey == Bob's decryptKey, and vice-versa.
+    let aEnc, bDec, aDec, bEnc;
+    keysFromAlice.encryptKey.withAccess(b => { aEnc = Buffer.from(b); });
+    keysFromBob.decryptKey.withAccess(b  => { bDec = Buffer.from(b); });
+    keysFromAlice.decryptKey.withAccess(b => { aDec = Buffer.from(b); });
+    keysFromBob.encryptKey.withAccess(b  => { bEnc = Buffer.from(b); });
+
+    assert.deepEqual(aEnc, bDec,
+      'Alice encryptKey must equal Bob decryptKey');
+    assert.deepEqual(aDec, bEnc,
+      'Alice decryptKey must equal Bob encryptKey');
+  });
+
+  it('shared secret is zeroed after deriveSessionKeys returns', () => {
+    // deriveSessionKeys calls sharedSecret.fill(0) internally before returning.
+    // We verify by passing a freshly computed secret and checking it is all-zero after.
+    const a2 = generateExchangeKeyPair();
+    const b2 = generateExchangeKeyPair();
+
+    const secret = deriveSharedSecret(a2.privateKey, b2.publicKey);
+    // secret is a plain Buffer at this point (not a SecureBuffer)
+    const before = Buffer.from(secret); // snapshot a copy
+
+    const keys = deriveSessionKeys(secret, a2.publicKey, b2.publicKey);
+
+    // secret should now be all zeros
+    assert.ok(secret.every(byte => byte === 0),
+      'shared secret buffer must be zeroed after deriveSessionKeys');
+
+    // Sanity: the snapshot was not all zeros
+    assert.ok(!before.every(byte => byte === 0),
+      'the shared secret was non-zero before derivation');
+
+    a2.privateKey.destroy();
+    b2.privateKey.destroy();
+    keys.encryptKey.destroy();
+    keys.decryptKey.destroy();
+  });
+
+  it('safety number is a 6-digit zero-padded decimal string', () => {
+    const { safetyNumber } = keysFromAlice;
+    assert.match(safetyNumber, /^\d{6}$/,
+      `Safety number must be exactly 6 decimal digits, got: "${safetyNumber}"`);
+    // Both sides must agree
+    assert.equal(keysFromAlice.safetyNumber, keysFromBob.safetyNumber,
+      'Safety numbers must match on both sides of the channel');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. P2P message encryption / decryption roundtrip
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('P2P message encrypt/decrypt', () => {
+  let aliceKeys, bobKeys;
+
+  before(() => {
+    const a = generateExchangeKeyPair();
+    const b = generateExchangeKeyPair();
+
+    const sA = deriveSharedSecret(a.privateKey, b.publicKey);
+    aliceKeys = deriveSessionKeys(sA, a.publicKey, b.publicKey);
+
+    const sB = deriveSharedSecret(b.privateKey, a.publicKey);
+    bobKeys = deriveSessionKeys(sB, b.publicKey, a.publicKey);
+
+    a.privateKey.destroy();
+    b.privateKey.destroy();
+  });
+
+  after(() => {
+    aliceKeys.encryptKey.destroy();
+    aliceKeys.decryptKey.destroy();
+    bobKeys.encryptKey.destroy();
+    bobKeys.decryptKey.destroy();
+  });
+
+  it('encryptMessage + decryptMessage roundtrips plaintext correctly', () => {
+    const original = Buffer.from('hello from alice', 'utf-8');
+    const ciphertext = encryptMessage(original, aliceKeys.encryptKey, 0);
+
+    const { plaintext, sequence } = decryptMessage(ciphertext, bobKeys.decryptKey, 0);
+    assert.deepEqual(plaintext, original,
+      'decrypted plaintext must equal the original');
+    assert.equal(sequence, 0, 'sequence number must round-trip');
+  });
+
+  it('decryptMessage throws when the wrong session key is supplied', () => {
+    const msg = Buffer.from('secret', 'utf-8');
+    const ciphertext = encryptMessage(msg, aliceKeys.encryptKey, 1);
+
+    // Build a completely different 32-byte key (all 0xAB) to use as the "wrong" key.
+    const wrongKeyBuf = Buffer.alloc(32, 0xAB);
+    const wrongKey = SecureBuffer.from(wrongKeyBuf);
+
+    // Decrypting with a foreign key must fail GCM authentication.
+    assert.throws(
+      () => decryptMessage(ciphertext, wrongKey, 1),
+      /unsupported state|Unsupported state|bad decrypt|authentication|Unsupported/i,
+      'decryption with a foreign key must throw an authentication error'
+    );
+
+    wrongKey.destroy();
+  });
+
+  it('decryptMessage throws on sequence number mismatch (AAD mismatch)', () => {
+    const msg = Buffer.from('in order', 'utf-8');
+    // Encrypt with sequence 5
+    const ciphertext = encryptMessage(msg, aliceKeys.encryptKey, 5);
+
+    // Attempt to accept it as sequence 3 — must be rejected
+    assert.throws(
+      () => decryptMessage(ciphertext, bobKeys.decryptKey, 3),
+      /Sequence mismatch/,
+      'decryptMessage must reject a message whose sequence number does not match'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. PeerChannel null-key guards
+//
+// #sendEncrypted returns { success: false, error: '...' } when encryptKey is
+// null but state is 'open'.  Reaching this via the public API requires an
+// already-open channel; the natural equivalent observable from outside is the
+// channel throwing 'Channel not open' after close().  We therefore test both:
+//   (a) an open channel with valid keys sends successfully (proving the happy
+//       path), then close() zeroes the keys and subsequent sendText throws the
+//       state error rather than silently failing — i.e. the null-key guard is
+//       behind the state gate.
+//   (b) handleIncomingMessage on a closed channel (keys=null, state='closed')
+//       with a raw encrypted payload returns { error: 'Decryption key not
+//       available' } because the state check only gates 'new'/'handshaking'.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('PeerChannel null-key guards', () => {
+  // Helper: build a fully open pair of channels with no network layer.
+  // Uses real key pairs and the full handshake flow so both channels reach
+  // state='open' with valid session keys derived via ECDH+HKDF.
+  async function openChannelPair() {
+    const aliceExch = generateExchangeKeyPair();
+    const bobExch   = generateExchangeKeyPair();
+    const bobSign   = generateSigningKeyPair();   // Bob needs a signing key for the ack
+
+    const sentByBob = [];
+
+    const aliceCh = new PeerChannel({
+      peerId:   'bob',
+      peerName: 'bob',
+      sendFn:   async () => {}    // Alice's outbound messages are dropped in this test
+    });
+
+    const bobCh = new PeerChannel({
+      peerId:   'alice',
+      peerName: 'alice',
+      sendFn:   async (msg) => sentByBob.push(msg)
+    });
+
+    // Bob handles Alice's handshake — this sets Bob to 'open' and sends a signed ack.
+    await bobCh.handleHandshake(
+      {
+        type:               'handshake',
+        version:            '1.0.0',
+        exchangePublicKey:  aliceExch.publicKey.toString('base64'),
+        timestamp:          Date.now()
+      },
+      bobExch.privateKey,
+      bobExch.publicKey,
+      bobSign.privateKey,   // Bob signs the ack
+      null,                 // no attestation payload
+      null                  // no attestation verifier
+    );
+
+    // The signed ack Bob sent is sentByBob[0].
+    // Alice needs _myExchangePrivateKey/_myExchangePublicKey set before handleHandshakeAck.
+    aliceCh._myExchangePrivateKey = aliceExch.privateKey;
+    aliceCh._myExchangePublicKey  = aliceExch.publicKey;
+
+    // Alice has no peerSigningPubKey configured, so handleHandshakeAck skips the
+    // signature check and just derives session keys from the ack's exchangePublicKey.
+    const ackResult = aliceCh.handleHandshakeAck(sentByBob[0], null);
+    assert.ok(ackResult.success, `handleHandshakeAck failed: ${ackResult.error}`);
+
+    bobSign.privateKey.destroy();
+    return { aliceCh, bobCh, aliceExch, bobExch };
+  }
+
+  it('sendText on a closed channel throws "Channel not open" — keys already nulled', async () => {
+    const { aliceCh, bobCh, aliceExch, bobExch } = await openChannelPair();
+    assert.equal(aliceCh.state, 'open', 'channel must be open before close');
+
+    // Close the channel: this destroys + nulls both keys and sets state='closed'
+    await aliceCh.close();
+    assert.equal(aliceCh.state, 'closed');
+
+    // sendText must now throw about channel state, not silently return
+    await assert.rejects(
+      () => aliceCh.sendText('after close'),
+      /Channel not open/,
+      'sending on a closed (keys=null) channel must throw Channel not open'
+    );
+
+    aliceExch.privateKey.destroy();
+    bobExch.privateKey.destroy();
+    await bobCh.close();
+  });
+
+  it('handleIncomingMessage returns error when decryptKey is null (closed channel)', async () => {
+    // A closed channel has state='closed' and keys=null.
+    // handleIncomingMessage only guards against 'new'/'handshaking'; 'closed'
+    // falls through to the encrypted-message path where !decryptKey is checked.
+    const ch = new PeerChannel({
+      peerId: 'ghost',
+      sendFn: async () => {}
+    });
+    // Trigger close() — sets state='closed' and keys remain null (they were never set)
+    await ch.close();
+
+    const result = await ch.handleIncomingMessage({
+      encrypted: Buffer.from('fake ciphertext').toString('base64')
+    });
+
+    assert.ok(result.error, 'expected an error result');
+    assert.match(result.error, /Decryption key not available/,
+      `expected null-key error, got: "${result.error}"`);
   });
 });
