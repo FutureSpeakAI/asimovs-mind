@@ -133,89 +133,101 @@ def count_agents(config):
 
 
 def main():
-    lines = []
+    # Consume stdin — SessionStart hooks receive a JSON object on stdin.
+    # We don't use it here, but we must drain it to avoid broken-pipe errors.
+    try:
+        sys.stdin.read()
+    except OSError:
+        pass
 
-    # Load personality — output it as context for the session
-    personality = load_personality()
-    if personality:
-        lines.append(personality.strip())
-        lines.append("")
+    try:
+        lines = []
 
-    # Build the status line
-    profile = load_user_profile()
-    sessions = load_recent_sessions()
-    config = load_federation_config()
-
-    if profile:
-        name, mode, prefs = summarize_profile(profile)
-        lines.append(f"Agent Friday active. Mode: {mode}.")
-        lines.append(f"User: {name}. Preferences: {prefs}.")
-    else:
-        lines.append("Welcome to Asimov's Mind — Agent Friday's kernel for Claude Code.")
-        lines.append("")
-        lines.append("First-time setup required:")
-        lines.append("  1. Run /friday unlock to initialize the Sovereign Vault (encrypted storage)")
-        lines.append("  2. Run /onboard to create your user profile")
-        lines.append("  3. You're ready to work!")
-        lines.append("")
-        lines.append("The vault protects your data with AES-256-GCM encryption. Your passphrase is the only key.")
-
-        # Check if the vault port file exists; if not, warn that the server may still be starting
-        vault_port_file = ASIMOVS_DIR / "vault" / "port"
-        if not vault_port_file.exists():
+        # Load personality — output it as context for the session
+        personality = load_personality()
+        if personality:
+            lines.append(personality.strip())
             lines.append("")
-            lines.append("Note: The vault server is starting up. If /friday unlock doesn't work, wait a moment and try again.")
 
-    # Last session context
-    if sessions:
-        last_summary = summarize_last_session(sessions)
-        if last_summary:
-            lines.append(f"Last session: {last_summary}.")
+        # Build the status line
+        profile = load_user_profile()
+        sessions = load_recent_sessions()
+        config = load_federation_config()
 
-    # Federation status
-    if config:
-        agent_count = count_agents(config)
-        integrity = config.get("governance_integrity", "unknown")
-        lines.append(f"Federation: {agent_count} agents discovered, governance integrity {integrity}.")
+        if profile:
+            name, mode, prefs = summarize_profile(profile)
+            lines.append(f"Agent Friday active. Mode: {mode}.")
+            lines.append(f"User: {name}. Preferences: {prefs}.")
+        else:
+            lines.append("Welcome to Asimov's Mind — Agent Friday's kernel for Claude Code.")
+            lines.append("")
+            lines.append("First-time setup required:")
+            lines.append("  1. Run /friday unlock to initialize the Sovereign Vault (encrypted storage)")
+            lines.append("  2. Run /onboard to create your user profile")
+            lines.append("  3. You're ready to work!")
+            lines.append("")
+            lines.append("The vault protects your data with AES-256-GCM encryption. Your passphrase is the only key.")
 
-    # Memory system context — what Friday remembers
-    try:
-        sys.path.insert(0, str(PLUGIN_ROOT / "discovery"))
-        from memory import get_status, get_all_trust
-        status = get_status()
-        if status.get("total_evidence", 0) > 0:
-            trust_data = get_all_trust(min_confidence=0.1)
-            high_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) >= 0.8]
-            low_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) < 0.5]
+            # Check if the vault port file exists; if not, warn that the server may still be starting
+            vault_port_file = ASIMOVS_DIR / "vault" / "port"
+            if not vault_port_file.exists():
+                lines.append("")
+                lines.append("Note: The vault server is starting up. If /friday unlock doesn't work, wait a moment and try again.")
 
-            memory_parts = [f"Memory: {status['total_evidence']} observations"]
-            if high_trust:
-                names = ", ".join(e for e, _ in high_trust[:3])
-                memory_parts.append(f"trusted: {names}")
-            if low_trust:
-                names = ", ".join(e for e, _ in low_trust[:3])
-                memory_parts.append(f"caution: {names}")
-            if status.get("graph_nodes", 0) > 0:
-                memory_parts.append(f"{status['graph_nodes']} entities tracked")
+        # Last session context
+        if sessions:
+            last_summary = summarize_last_session(sessions)
+            if last_summary:
+                lines.append(f"Last session: {last_summary}.")
 
-            lines.append(". ".join(memory_parts) + ".")
-    except (ImportError, Exception):
-        pass  # Memory system not available — skip gracefully
+        # Federation status
+        if config:
+            agent_count = count_agents(config)
+            integrity = config.get("governance_integrity", "unknown")
+            lines.append(f"Federation: {agent_count} agents discovered, governance integrity {integrity}.")
 
-    # Privacy Shield — check if PII was scrubbed in the previous session
-    try:
-        if _VAULT_OK:
-            privacy_data = vault_read("privacy-stats")
-            if privacy_data and isinstance(privacy_data, dict):
-                scrub_total = privacy_data.get("total", 0)
-                if scrub_total > 0:
-                    lines.append(f"Privacy Shield: {scrub_total} items scrubbed last session.")
-    except Exception:
-        pass  # Privacy stats not available — skip gracefully
+        # Memory system context — what Friday remembers
+        try:
+            sys.path.insert(0, str(PLUGIN_ROOT / "discovery"))
+            from memory import get_status, get_all_trust
+            status = get_status()
+            if status.get("total_evidence", 0) > 0:
+                trust_data = get_all_trust(min_confidence=0.1)
+                high_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) >= 0.8]
+                low_trust = [(e, t) for e, t in trust_data.items() if t.get("overall", 0) < 0.5]
 
-    output = "\n".join(lines)
-    if output.strip():
-        print(output)
+                memory_parts = [f"Memory: {status['total_evidence']} observations"]
+                if high_trust:
+                    names = ", ".join(e for e, _ in high_trust[:3])
+                    memory_parts.append(f"trusted: {names}")
+                if low_trust:
+                    names = ", ".join(e for e, _ in low_trust[:3])
+                    memory_parts.append(f"caution: {names}")
+                if status.get("graph_nodes", 0) > 0:
+                    memory_parts.append(f"{status['graph_nodes']} entities tracked")
+
+                lines.append(". ".join(memory_parts) + ".")
+        except (ImportError, Exception):
+            pass  # Memory system not available — skip gracefully
+
+        # Privacy Shield — check if PII was scrubbed in the previous session
+        try:
+            if _VAULT_OK:
+                privacy_data = vault_read("privacy-stats")
+                if privacy_data and isinstance(privacy_data, dict):
+                    scrub_total = privacy_data.get("total", 0)
+                    if scrub_total > 0:
+                        lines.append(f"Privacy Shield: {scrub_total} items scrubbed last session.")
+        except Exception:
+            pass  # Privacy stats not available — skip gracefully
+
+        output = "\n".join(lines)
+        if output.strip():
+            print(output)
+
+    except Exception as exc:
+        # Never block a session start — report to stderr and exit 0
+        print(f"personality-loader: unexpected error ({exc})", file=sys.stderr)
 
     sys.exit(0)
 

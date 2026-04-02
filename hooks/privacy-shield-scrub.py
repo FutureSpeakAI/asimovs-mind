@@ -77,31 +77,39 @@ def main():
     # Read hook input from stdin
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         sys.exit(0)
 
-    tool_name = hook_input.get("tool_name", "")
+    try:
+        tool_name = hook_input.get("tool_name", "")
 
-    # Only scrub outbound web tools
-    if tool_name not in SCRUB_TOOLS:
-        sys.exit(0)
+        # Only scrub outbound web tools
+        if tool_name not in SCRUB_TOOLS:
+            sys.exit(0)
 
-    tool_input = hook_input.get("tool_input", {})
-    if not tool_input:
-        sys.exit(0)
+        tool_input = hook_input.get("tool_input", {})
+        if not tool_input:
+            sys.exit(0)
 
-    # Find the vault
-    port = get_vault_port()
-    if port is None:
-        # Vault not running — pass through unchanged
-        sys.exit(0)
+        # Find the vault
+        port = get_vault_port()
+        if port is None:
+            # Vault not running — pass through unchanged
+            sys.exit(0)
 
-    # Scrub all string values in tool_input
-    scrubbed_input, changed = scrub_value(port, tool_input)
+        # Scrub all string values in tool_input
+        scrubbed_input, changed = scrub_value(port, tool_input)
 
-    if changed:
-        # Output the modified tool_input so Claude Code uses the scrubbed version
-        print(json.dumps(scrubbed_input))
+        if changed:
+            # Output the modified tool_input so Claude Code uses the scrubbed version
+            try:
+                print(json.dumps(scrubbed_input))
+            except (TypeError, ValueError):
+                pass  # Serialization failed — pass through unchanged
+
+    except Exception as exc:
+        # Never block a tool call — log the error and allow
+        print(f"privacy-shield-scrub: unexpected error ({exc})", file=sys.stderr)
 
     # Exit 0 = allow (with or without modification)
     sys.exit(0)

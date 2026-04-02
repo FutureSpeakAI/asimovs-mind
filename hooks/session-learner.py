@@ -103,7 +103,7 @@ def build_summary(files_modified, git_commits, discoveries):
         parts.append(f"{git_commits} commit{'s' if git_commits != 1 else ''}")
 
     if discoveries:
-        parts.append(f"{discoveries} discovery{'ies' if discoveries != 1 else 'y'}")
+        parts.append(f"{discoveries} {'discoveries' if discoveries != 1 else 'discovery'}")
 
     if not parts:
         return "Session with no recorded file changes."
@@ -229,7 +229,7 @@ def feed_memory(session_record):
             }
         }).encode("utf-8")
 
-        url = f"http://localhost:{port}/tool/memory_store"
+        url = f"http://127.0.0.1:{port}/tool/memory_store"
         req = urllib.request.Request(
             url,
             data=payload,

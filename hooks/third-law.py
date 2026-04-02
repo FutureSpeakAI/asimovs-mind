@@ -43,39 +43,44 @@ def append_to_ledger(record):
 def main():
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         sys.exit(0)
 
-    tool_name = hook_input.get("tool_name", "")
-    tool_input = hook_input.get("tool_input", {})
+    try:
+        tool_name = hook_input.get("tool_name", "")
+        tool_input = hook_input.get("tool_input", {})
 
-    # Track file modifications
-    if tool_name in ("Write", "Edit"):
-        file_path = tool_input.get("file_path", "")
-        if not file_path:
-            sys.exit(0)
+        # Track file modifications
+        if tool_name in ("Write", "Edit"):
+            file_path = tool_input.get("file_path", "")
+            if not file_path:
+                sys.exit(0)
 
-        record = {
-            "timestamp": datetime.now().isoformat(),
-            "event": "file_modified",
-            "tool": tool_name,
-            "file": file_path,
-        }
-
-        # Append to session ledger
-        append_to_ledger(record)
-
-    # Track bash commands that might affect the codebase
-    elif tool_name == "Bash":
-        command = tool_input.get("command", "")
-        # Log git operations for the audit trail
-        if any(cmd in command for cmd in ["git commit", "git reset", "git revert", "git push"]):
             record = {
                 "timestamp": datetime.now().isoformat(),
-                "event": "git_operation",
-                "command": command[:200],  # truncate long commands
+                "event": "file_modified",
+                "tool": tool_name,
+                "file": file_path,
             }
+
+            # Append to session ledger
             append_to_ledger(record)
+
+        # Track bash commands that might affect the codebase
+        elif tool_name == "Bash":
+            command = tool_input.get("command", "")
+            # Log git operations for the audit trail
+            if any(cmd in command for cmd in ["git commit", "git reset", "git revert", "git push"]):
+                record = {
+                    "timestamp": datetime.now().isoformat(),
+                    "event": "git_operation",
+                    "command": command[:200],  # truncate long commands
+                }
+                append_to_ledger(record)
+
+    except Exception as exc:
+        # Never block a tool call — log the error and allow
+        print(f"third-law: unexpected error ({exc})", file=sys.stderr)
 
     sys.exit(0)
 

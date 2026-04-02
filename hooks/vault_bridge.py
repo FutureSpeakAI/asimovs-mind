@@ -16,14 +16,15 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 _port_cache = None
+_token_cache = None
 
 
-def _find_port_file():
-    """Locate .asimovs-mind/vault/port, searching cwd and parent dirs."""
+def _find_vault_dir():
+    """Locate .asimovs-mind/vault/, searching cwd and parent dirs."""
     search = Path.cwd()
     for _ in range(10):  # Walk up at most 10 levels
-        candidate = search / ".asimovs-mind" / "vault" / "port"
-        if candidate.exists():
+        candidate = search / ".asimovs-mind" / "vault"
+        if candidate.is_dir():
             return candidate
         parent = search.parent
         if parent == search:
@@ -38,16 +39,35 @@ def _get_port():
     if _port_cache is not None:
         return _port_cache
 
-    port_file = _find_port_file()
-    if port_file is None:
+    vault_dir = _find_vault_dir()
+    if vault_dir is None:
         return None
 
     try:
-        port_str = port_file.read_text(encoding="utf-8").strip()
+        port_str = (vault_dir / "port").read_text(encoding="utf-8").strip()
         port = int(port_str)
         _port_cache = port
         return port
     except (OSError, ValueError):
+        return None
+
+
+def _get_token():
+    """Read and cache the vault HTTP bridge bearer token."""
+    global _token_cache
+    if _token_cache is not None:
+        return _token_cache
+
+    vault_dir = _find_vault_dir()
+    if vault_dir is None:
+        return None
+
+    try:
+        token = (vault_dir / "bridge-token").read_text(encoding="utf-8").strip()
+        if token:
+            _token_cache = token
+        return _token_cache
+    except OSError:
         return None
 
 
@@ -72,17 +92,25 @@ def _get(path):
         return None
 
 
-def _post(path, payload):
-    """Issue a POST request to the vault bridge. Returns parsed JSON or None."""
+def _post(path, payload, auth=False):
+    """Issue a POST request to the vault bridge. Returns parsed JSON or None.
+
+    Pass auth=True for write endpoints that require the bearer token.
+    """
     base = _base_url()
     if base is None:
         return None
     try:
         body = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if auth:
+            token = _get_token()
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
         req = Request(
             f"{base}{path}",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urlopen(req, timeout=5) as resp:
@@ -130,7 +158,7 @@ def vault_read(key):
 def vault_write(key, data):
     """Encrypt and persist data under the given key. Returns True on success."""
     try:
-        result = _post("/write", {"key": key, "data": data})
+        result = _post("/write", {"key": key, "data": data}, auth=True)
         if result is None:
             return False
         return result.get("success", False)
@@ -141,7 +169,7 @@ def vault_write(key, data):
 def vault_append(key, entry):
     """Append an entry to an array stored under the given key. Returns True on success."""
     try:
-        result = _post("/append", {"key": key, "entry": entry})
+        result = _post("/append", {"key": key, "entry": entry}, auth=True)
         if result is None:
             return False
         return result.get("success", False)

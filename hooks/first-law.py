@@ -92,37 +92,45 @@ def main():
     # Read the hook input from stdin
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         # Can't parse input — allow by default (don't break the session)
         sys.exit(0)
 
-    tool_name = hook_input.get("tool_name", "")
-    tool_input = hook_input.get("tool_input", {})
+    try:
+        tool_name = hook_input.get("tool_name", "")
+        tool_input = hook_input.get("tool_input", {})
 
-    # Only check Write and Edit tools
-    if tool_name not in ("Write", "Edit"):
-        sys.exit(0)
+        # Only check Write and Edit tools
+        if tool_name not in ("Write", "Edit"):
+            sys.exit(0)
 
-    file_path = tool_input.get("file_path", "")
-    if not file_path:
-        sys.exit(0)
+        file_path = tool_input.get("file_path", "")
+        if not file_path:
+            sys.exit(0)
 
-    patterns = load_protected_patterns()
-    blocked, reason, severity = check_file_against_zones(file_path, patterns)
+        patterns = load_protected_patterns()
+        blocked, reason, severity = check_file_against_zones(file_path, patterns)
 
-    if blocked:
-        # Output the block reason — this message is shown to the agent
-        result = {
-            "decision": "block",
-            "reason": f"FIRST LAW VIOLATION: Cannot modify protected file.\n"
-                      f"File: {file_path}\n"
-                      f"Zone: {reason}\n"
-                      f"Severity: {severity}\n"
-                      f"The First Law prohibits actions that could harm the codebase. "
-                      f"Protected zones are immutable."
-        }
-        print(json.dumps(result))
-        sys.exit(2)
+        if blocked:
+            # Output the block reason — this message is shown to the agent
+            result = {
+                "decision": "block",
+                "reason": f"FIRST LAW VIOLATION: Cannot modify protected file.\n"
+                          f"File: {file_path}\n"
+                          f"Zone: {reason}\n"
+                          f"Severity: {severity}\n"
+                          f"The First Law prohibits actions that could harm the codebase. "
+                          f"Protected zones are immutable."
+            }
+            print(json.dumps(result))
+            sys.exit(2)
+
+    except Exception as exc:
+        # Unexpected error in First Law enforcement — log and allow rather than
+        # silently blocking all writes. A crash here MUST NOT silently block tool
+        # calls. Legitimate First Law blocks are always the explicit sys.exit(2)
+        # path above.
+        print(f"first-law: unexpected error ({exc})", file=sys.stderr)
 
     # Allow the write
     sys.exit(0)

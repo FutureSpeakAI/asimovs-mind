@@ -25,76 +25,87 @@ SCANNER_PATH = PLUGIN_ROOT / "discovery" / "safety_scanner.py"
 def main():
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         sys.exit(0)
-
-    tool_name = hook_input.get("tool_name", "")
-    if tool_name != "Write":
-        sys.exit(0)
-
-    tool_input = hook_input.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
-    content = tool_input.get("content", "")
-
-    # Only scan Python files
-    if not file_path.endswith(".py"):
-        sys.exit(0)
-
-    # Skip scanning files within the plugin itself (they're trusted),
-    # EXCEPT writes targeting the hooks/ or governance/ directories must
-    # always be scanned regardless of provenance markers (SEC-011).
-    plugin_root_str = str(PLUGIN_ROOT).replace("\\", "/").rstrip("/")
-    file_normalized = file_path.replace("\\", "/")
-
-    target_is_sensitive = (
-        file_normalized.startswith(plugin_root_str + "/hooks/")
-        or file_normalized.startswith(plugin_root_str + "/governance/")
-    )
-
-    if file_normalized.startswith(plugin_root_str + "/") and not target_is_sensitive:
-        sys.exit(0)
-
-    # Skip if content doesn't look like it contains imported/external code
-    # (check for provenance attribution comments), BUT always scan writes
-    # to hooks/ and governance/ regardless of these markers.
-    if not target_is_sensitive and "IMPORTED" not in content and "Source:" not in content:
-        sys.exit(0)
-
-    # Run the safety scanner on the content
-    if not SCANNER_PATH.exists():
-        sys.exit(0)
-
-    import subprocess
-    import tempfile
-
-    # Write content to a temp file for scanning
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
 
     try:
-        result = subprocess.run(
-            [sys.executable, str(SCANNER_PATH), tmp_path],
-            capture_output=True, text=True, timeout=10,
+        tool_name = hook_input.get("tool_name", "")
+        if tool_name != "Write":
+            sys.exit(0)
+
+        tool_input = hook_input.get("tool_input", {})
+        file_path = tool_input.get("file_path", "")
+        content = tool_input.get("content", "")
+
+        # Only scan Python files
+        if not file_path.endswith(".py"):
+            sys.exit(0)
+
+        # Skip scanning files within the plugin itself (they're trusted),
+        # EXCEPT writes targeting the hooks/ or governance/ directories must
+        # always be scanned regardless of provenance markers (SEC-011).
+        plugin_root_str = str(PLUGIN_ROOT).replace("\\", "/").rstrip("/")
+        file_normalized = file_path.replace("\\", "/")
+
+        target_is_sensitive = (
+            file_normalized.startswith(plugin_root_str + "/hooks/")
+            or file_normalized.startswith(plugin_root_str + "/governance/")
         )
 
-        if "HARD_BLOCK" in result.stdout:
-            block_result = {
-                "decision": "block",
-                "reason": f"FIRST LAW: Safety scanner detected dangerous patterns in code being written.\n\n"
-                          f"{result.stdout}\n"
-                          f"The code contains patterns that are blocked by the safety scanner. "
-                          f"Review and remove the flagged patterns before proceeding."
-            }
-            print(json.dumps(block_result))
-            sys.exit(2)
-    except subprocess.TimeoutExpired:
-        pass  # Allow on timeout — don't block the session
-    finally:
+        if file_normalized.startswith(plugin_root_str + "/") and not target_is_sensitive:
+            sys.exit(0)
+
+        # Skip if content doesn't look like it contains imported/external code
+        # (check for provenance attribution comments), BUT always scan writes
+        # to hooks/ and governance/ regardless of these markers.
+        if not target_is_sensitive and "IMPORTED" not in content and "Source:" not in content:
+            sys.exit(0)
+
+        # Run the safety scanner on the content
+        if not SCANNER_PATH.exists():
+            sys.exit(0)
+
+        import subprocess
+        import tempfile
+
+        tmp_path = None
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+            # Write content to a temp file for scanning
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=False, encoding="utf-8"
+            ) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            result = subprocess.run(
+                [sys.executable, str(SCANNER_PATH), tmp_path],
+                capture_output=True, text=True, timeout=10,
+            )
+
+            if "HARD_BLOCK" in result.stdout:
+                block_result = {
+                    "decision": "block",
+                    "reason": (
+                        "FIRST LAW: Safety scanner detected dangerous patterns in code being written.\n\n"
+                        f"{result.stdout}\n"
+                        "The code contains patterns that are blocked by the safety scanner. "
+                        "Review and remove the flagged patterns before proceeding."
+                    ),
+                }
+                print(json.dumps(block_result))
+                sys.exit(2)
+        except subprocess.TimeoutExpired:
+            pass  # Allow on timeout — don't block the session
+        finally:
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+    except Exception as exc:
+        # Unexpected error in safety scanner — log and allow rather than blocking
+        print(f"safety-scanner-hook: unexpected error ({exc})", file=sys.stderr)
 
     sys.exit(0)
 

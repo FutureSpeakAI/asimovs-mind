@@ -52,31 +52,36 @@ def main():
     # Read hook input from stdin
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         sys.exit(0)
 
-    tool_name = hook_input.get("tool_name", "")
+    try:
+        tool_name = hook_input.get("tool_name", "")
 
-    # Only rehydrate responses from web tools
-    if tool_name not in REHYDRATE_TOOLS:
-        sys.exit(0)
+        # Only rehydrate responses from web tools
+        if tool_name not in REHYDRATE_TOOLS:
+            sys.exit(0)
 
-    tool_output = hook_input.get("tool_output", "")
-    if not tool_output:
-        sys.exit(0)
+        tool_output = hook_input.get("tool_output", "")
+        if not tool_output:
+            sys.exit(0)
 
-    # Find the vault
-    port = get_vault_port()
-    if port is None:
-        # Vault not running — pass through unchanged
-        sys.exit(0)
+        # Find the vault
+        port = get_vault_port()
+        if port is None:
+            # Vault not running — pass through unchanged
+            sys.exit(0)
 
-    # Rehydrate the tool output
-    restored = rehydrate_text(port, tool_output)
+        # Rehydrate the tool output
+        restored = rehydrate_text(port, tool_output)
 
-    if restored is not None and restored != tool_output:
-        # Output the restored text so Claude Code sees the real data
-        print(restored)
+        if restored is not None and restored != tool_output:
+            # Output the restored text so Claude Code sees the real data
+            print(restored)
+
+    except Exception as exc:
+        # Never block a tool call — log the error and allow
+        print(f"privacy-shield-rehydrate: unexpected error ({exc})", file=sys.stderr)
 
     # Exit 0 = allow (with or without modification)
     sys.exit(0)

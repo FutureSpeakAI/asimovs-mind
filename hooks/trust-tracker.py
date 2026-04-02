@@ -108,37 +108,41 @@ def main():
     """Hook entry point — track agent-related tool calls."""
     try:
         hook_input = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError):
         sys.exit(0)
 
-    tool_name = hook_input.get("tool_name", "")
-    tool_input = hook_input.get("tool_input", {})
+    try:
+        tool_name = hook_input.get("tool_name", "")
+        tool_input = hook_input.get("tool_input", {})
 
-    # Track Agent tool deployments
-    if tool_name == "Agent":
-        agent_type = tool_input.get("subagent_type", "general-purpose")
-        description = tool_input.get("description", "")
-        # Record deployment (outcome tracked by session-learner on session end)
-        trust = load_trust()
-        if agent_type not in trust:
-            trust[agent_type] = {
-                "deployed": 0, "kept": 0, "reverted": 0, "crashed": 0,
-                "first_seen": datetime.now().isoformat(),
-                "last_seen": datetime.now().isoformat(),
-                "autonomy_level": "supervised",
-            }
-        trust[agent_type]["deployed"] += 1
-        trust[agent_type]["last_seen"] = datetime.now().isoformat()
-        save_trust(trust)
+        # Track Agent tool deployments
+        if tool_name == "Agent":
+            agent_type = tool_input.get("subagent_type", "general-purpose")
+            # Record deployment (outcome tracked by session-learner on session end)
+            trust = load_trust()
+            if agent_type not in trust:
+                trust[agent_type] = {
+                    "deployed": 0, "kept": 0, "reverted": 0, "crashed": 0,
+                    "first_seen": datetime.now().isoformat(),
+                    "last_seen": datetime.now().isoformat(),
+                    "autonomy_level": "supervised",
+                }
+            trust[agent_type]["deployed"] += 1
+            trust[agent_type]["last_seen"] = datetime.now().isoformat()
+            save_trust(trust)
 
-    # Track git commits (kept) and resets (reverted)
-    elif tool_name == "Bash":
-        command = tool_input.get("command", "")
-        if "git commit" in command:
-            # The last deployed agent gets credit for a "kept" outcome
-            pass  # Full tracking requires correlating with the agent deployment
-        elif "git reset --hard" in command or "git revert" in command:
-            pass  # Similarly for reverts
+        # Track git commits (kept) and resets (reverted)
+        elif tool_name == "Bash":
+            command = tool_input.get("command", "")
+            if "git commit" in command:
+                # The last deployed agent gets credit for a "kept" outcome
+                pass  # Full tracking requires correlating with the agent deployment
+            elif "git reset --hard" in command or "git revert" in command:
+                pass  # Similarly for reverts
+
+    except Exception as exc:
+        # Never block a tool call — log the error and allow
+        print(f"trust-tracker: unexpected error ({exc})", file=sys.stderr)
 
     sys.exit(0)
 

@@ -58,50 +58,62 @@ def compute_file_hmac(file_path, key):
 
 
 def main():
-    manifest = None
+    # Consume stdin — SessionStart hooks receive a JSON object on stdin.
+    # We don't use it here, but we must drain it to avoid broken-pipe errors.
+    try:
+        sys.stdin.read()
+    except OSError:
+        pass
 
-    # Try vault first for the HMAC manifest
-    if _VAULT_OK:
-        manifest = vault_read("governance-manifest")
+    try:
+        manifest = None
 
-    # Filesystem fallback
-    if manifest is None:
-        if not MANIFEST_FILE.exists():
-            # Not yet federated — skip silently
+        # Try vault first for the HMAC manifest
+        if _VAULT_OK:
+            manifest = vault_read("governance-manifest")
+
+        # Filesystem fallback
+        if manifest is None:
+            if not MANIFEST_FILE.exists():
+                # Not yet federated — skip silently
+                sys.exit(0)
+            try:
+                manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                # Can't read manifest — skip rather than block
+                sys.exit(0)
+
+        files = manifest.get("files", {})
+        if not files:
             sys.exit(0)
-        try:
-            manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            # Can't read manifest — skip rather than block
-            sys.exit(0)
 
-    files = manifest.get("files", {})
-    if not files:
-        sys.exit(0)
+        key = derive_hmac_key()
+        mismatches = []
 
-    key = derive_hmac_key()
-    mismatches = []
+        for relative_path, expected_hash in files.items():
+            # Governance files are relative to the plugin root
+            file_path = PLUGIN_ROOT / relative_path
+            if not file_path.exists():
+                mismatches.append((relative_path, "file missing"))
+                continue
 
-    for relative_path, expected_hash in files.items():
-        # Governance files are relative to the plugin root
-        file_path = PLUGIN_ROOT / relative_path
-        if not file_path.exists():
-            mismatches.append((relative_path, "file missing"))
-            continue
+            actual_hash = compute_file_hmac(file_path, key)
+            if actual_hash is None:
+                mismatches.append((relative_path, "unreadable"))
+                continue
 
-        actual_hash = compute_file_hmac(file_path, key)
-        if actual_hash is None:
-            mismatches.append((relative_path, "unreadable"))
-            continue
+            if not hmac.compare_digest(actual_hash, expected_hash):
+                mismatches.append((relative_path, "hash mismatch"))
 
-        if not hmac.compare_digest(actual_hash, expected_hash):
-            mismatches.append((relative_path, "hash mismatch"))
+        if mismatches:
+            for name, reason in mismatches:
+                print(f"WARNING: Governance file {name} has been modified externally ({reason}). Safe mode recommended.")
+        else:
+            print("Governance integrity: verified")
 
-    if mismatches:
-        for name, reason in mismatches:
-            print(f"WARNING: Governance file {name} has been modified externally ({reason}). Safe mode recommended.")
-    else:
-        print("Governance integrity: verified")
+    except Exception as exc:
+        # Never block a session start — report to stderr and exit 0
+        print(f"integrity-check: unexpected error ({exc})", file=sys.stderr)
 
     sys.exit(0)
 
