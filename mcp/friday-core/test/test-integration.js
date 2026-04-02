@@ -14,6 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { initCrypto } from '../core/crypto.js';
 import { SovereignVault, OllamaMonitor } from '../core/vault.js';
+import { StateManager } from '../core/state-manager.js';
 import { PeerChannel as _PeerChannel, PeerManager } from '../subsystems/p2p/protocol.js';
 import {
   generateExchangeKeyPair,
@@ -525,6 +526,130 @@ describe('TIER 7: Ollama Monitor Graceful Degradation', () => {
     const status = mon.status;
     assert.equal(status.healthy, false);
     assert.equal(status.baseUrl, 'http://localhost:99999');
+  });
+});
+
+// ============================================================
+// TIER 8: StateManager — Namespace Persistence with Real Vault
+// ============================================================
+//
+// These tests verify the cycle-27 fix: the namespace separator is
+// ":" (not "/") so vault's validateKey accepts namespaced keys.
+//
+// Windows note: NTFS treats "name:key.enc" as an alternate data
+// stream, so listKeys() (which reads the directory) will not see
+// colon-namespaced files. Data round-trips via read/write are
+// unaffected. Tests below verify round-trip behavior and use
+// vault.read() with the full key to confirm the separator format —
+// they do not rely on listKeys() for colon-namespaced keys.
+
+describe('TIER 8: StateManager Namespace Persistence', () => {
+  let vault;
+  let sm;
+
+  before(async () => {
+    vault = new SovereignVault(path.join(testDir, 'state-manager'));
+    await vault.init();
+    await vault.initialize(TEST_PASSPHRASE);
+    sm = new StateManager(vault);
+  });
+
+  after(() => vault.lock());
+
+  it('namespace write/read round-trips data correctly', async () => {
+    const ns = sm.namespace('test-subsystem');
+    const payload = { key: 'value', count: 42 };
+
+    const writeResult = await ns.write('settings', payload);
+    assert.ok(writeResult.success, `write failed: ${writeResult.error}`);
+
+    const readResult = await ns.read('settings');
+    assert.ok(readResult.success, `read failed: ${readResult.error}`);
+    assert.deepEqual(readResult.data, payload);
+  });
+
+  it('vault stores the key with colon separator (not slash)', async () => {
+    const ns = sm.namespace('test-subsystem');
+    await ns.write('prefs', { theme: 'dark' });
+
+    // The key written to the vault must be "test-subsystem:prefs".
+    // A slash-separated key would throw from validateKey; reading the
+    // colon-separated key back directly confirms the format is correct.
+    const directRead = await vault.read('test-subsystem:prefs');
+    assert.ok(directRead.success, 'direct colon-key read failed');
+    assert.deepEqual(directRead.data, { theme: 'dark' });
+  });
+
+  it('data survives lock/unlock cycle', async () => {
+    const ns = sm.namespace('test-subsystem');
+    await ns.write('persistent', { survives: true });
+
+    vault.lock();
+    assert.equal(vault.status, 'locked');
+
+    const unlockResult = await vault.unlock(TEST_PASSPHRASE);
+    assert.ok(unlockResult.success, `unlock failed: ${unlockResult.error}`);
+
+    const readResult = await ns.read('persistent');
+    assert.ok(readResult.success);
+    assert.deepEqual(readResult.data, { survives: true });
+  });
+
+  it('namespace isolation: alpha cannot read beta data', async () => {
+    const alpha = sm.namespace('subsystem-alpha');
+    const beta = sm.namespace('subsystem-beta');
+
+    await alpha.write('secret', { owner: 'alpha' });
+    await beta.write('secret', { owner: 'beta' });
+
+    // Each namespace reads its own data
+    const alphaRead = await alpha.read('secret');
+    const betaRead = await beta.read('secret');
+    assert.deepEqual(alphaRead.data, { owner: 'alpha' });
+    assert.deepEqual(betaRead.data, { owner: 'beta' });
+
+    // They are different — the namespace prefix isolates the keys
+    assert.notDeepEqual(alphaRead.data, betaRead.data);
+  });
+
+  it('namespace isolation: beta cannot access alpha-only key', async () => {
+    const alpha = sm.namespace('subsystem-alpha');
+    const beta = sm.namespace('subsystem-beta');
+
+    await alpha.write('alpha-only', { secret: 'for alpha' });
+
+    // beta reads "alpha-only" which maps to "subsystem-beta:alpha-only" — absent
+    const betaAttempt = await beta.read('alpha-only');
+    assert.ok(betaAttempt.success, 'read call itself should succeed');
+    assert.equal(betaAttempt.data, null, 'beta must not see alpha-only data');
+
+    // alpha can read its own
+    const alphaRead = await alpha.read('alpha-only');
+    assert.deepEqual(alphaRead.data, { secret: 'for alpha' });
+  });
+
+  it('namespace delete removes only that namespace key', async () => {
+    const ns = sm.namespace('test-subsystem');
+
+    await ns.write('to-delete', { temporary: true });
+    await ns.write('to-keep', { permanent: true });
+
+    await ns.delete('to-delete');
+
+    const deleted = await ns.read('to-delete');
+    assert.equal(deleted.data, null, 'deleted key should be gone');
+
+    const kept = await ns.read('to-keep');
+    assert.deepEqual(kept.data, { permanent: true }, 'sibling key should survive');
+  });
+
+  it('write rejects slash in key name (validateKey enforcement)', async () => {
+    // This confirms that using "/" as separator would break — the cycle-27
+    // fix was correct to switch to ":".
+    await assert.rejects(
+      () => vault.read('test-subsystem/settings'),
+      /path separator/
+    );
   });
 });
 
