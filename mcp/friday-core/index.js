@@ -123,7 +123,7 @@ registry.get('vault').setRegistry(registry);
 
 const server = new McpServer({
   name: 'friday-core',
-  version: '2.2.0'
+  version: '2.3.0'
 });
 
 // Register all subsystem tools on the MCP server
