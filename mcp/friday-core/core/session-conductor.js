@@ -20,6 +20,8 @@ export class SessionConductor {
   #greeting = null;
   #cwdContext = null;
   #pendingCommitments = [];
+  /** Prevents duplicate concurrent session starts from overlapping vault:unlocked events. */
+  #startInFlight = false;
 
   constructor({ registry, eventBus, vault, logger }) {
     this.#registry = registry;
@@ -38,6 +40,18 @@ export class SessionConductor {
   }
 
   async #onSessionStart() {
+    // Guard: if a session start is already in flight (duplicate vault:unlocked
+    // event), drop the second invocation rather than running the lifecycle twice.
+    if (this.#startInFlight) return;
+    this.#startInFlight = true;
+    try {
+      await this.#doSessionStart();
+    } finally {
+      this.#startInFlight = false;
+    }
+  }
+
+  async #doSessionStart() {
     this.#sessionStartTime = Date.now();
 
     // 1. Detect working directory context

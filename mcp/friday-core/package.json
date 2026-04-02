@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js test/test-security.js && node --test --test-force-exit test/test-subsystems.js",
+    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js test/test-security.js test/test-concurrency.js && node --test --test-force-exit test/test-subsystems.js",
     "lint": "eslint ."
   },
   "dependencies": {
