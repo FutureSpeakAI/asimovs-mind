@@ -574,7 +574,7 @@ describe('Trust graph: first-name unique resolution', () => {
     graph.resolvePerson('Jordan Lee');
 
     // "Jordan" alone should NOT match either — returns a new node
-    const { person: resolved, isNew } = graph.resolvePerson('Jordan', 'name');
+    const { person: resolved, isNew: _isNew } = graph.resolvePerson('Jordan', 'name');
 
     // Ambiguous first name: the match fails and a new node is created
     // OR if the fuzzy matcher picks one — in any case, no crash
@@ -767,7 +767,7 @@ describe('ConnectorRegistry: executeTool routing', () => {
 
     // One module that hangs forever (will be killed by the 5-second timeout)
     // and one fast module that is available
-    const hangingModule = {
+    const _hangingModule = {
       detect: () => new Promise(() => {}),  // never resolves
       getTools: () => [],
       execute: async () => ({ result: 'ok' }),
@@ -852,7 +852,7 @@ describe('ConnectorRegistry: executeTool routing', () => {
         module: {
           detect: async () => true,
           getTools: () => [{ name: 'live_tool', description: 'ok', inputSchema: {} }],
-          execute: async (toolName, args) => {
+          execute: async (toolName, _args) => {
             if (toolName === 'live_tool') return mockResult;
             return { error: 'unknown tool' };
           },
