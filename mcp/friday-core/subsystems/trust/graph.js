@@ -147,7 +147,12 @@ export class TrustGraph {
   #scheduleSave() {
     this.#dirty = true;
     if (this.#saveTimer) clearTimeout(this.#saveTimer);
-    this.#saveTimer = setTimeout(() => this.save().catch(() => {}), 2000);
+    // --- TUNABLE --- debounce delay (ms)
+    this.#saveTimer = setTimeout(() => this.save().catch((err) => {
+      // Surface vault errors rather than silently dropping them.
+      // In-memory graph is already consistent; this is a persistence warning only.
+      console.warn(`[trust] save failed: ${err.message}`);
+    }), 2000);
   }
 
   /* -- Person Resolution (Hermeneutic) -- */
@@ -267,12 +272,24 @@ export class TrustGraph {
     const person = this.getPersonById(personId);
     if (!person) return;
 
+    // Validate required fields on the internal path (MCP tool path is guarded by Zod).
+    if (!evidence.type || typeof evidence.description !== 'string' || !evidence.description.trim()) {
+      console.warn(`[trust] addEvidence: missing type or description for person ${personId} — skipped`);
+      return;
+    }
+
     const fullEvidence = {
       ...evidence,
       id: generateId(),
       timestamp: Date.now(),
-      impact: clamp(evidence.impact, -1, 1),
+      impact: clamp(evidence.impact ?? 0, -1, 1),
     };
+
+    // Compute the mean impact of existing evidence before adding the new one,
+    // so we can detect a sign reversal (contradictory evidence).
+    const prevMeanImpact = person.evidence.length > 0
+      ? person.evidence.reduce((s, e) => s + e.impact, 0) / person.evidence.length
+      : 0;
 
     person.evidence.push(fullEvidence);
     person.lastSeen = Date.now();
@@ -292,11 +309,18 @@ export class TrustGraph {
       person.evidence = person.evidence.slice(0, MAX_EVIDENCE_PER_PERSON);
     }
 
+    // Hermeneutic trigger: force a full re-evaluation immediately when incoming
+    // evidence contradicts the running trend (sign reversal + meaningful magnitude).
+    // This ensures a pattern-breaking observation is not deferred up to RE_EVAL_THRESHOLD steps.
+    const contradicts = Math.abs(prevMeanImpact) >= 0.1
+      && Math.sign(fullEvidence.impact) !== Math.sign(prevMeanImpact)
+      && Math.abs(fullEvidence.impact) >= 0.3;
+
     // Track for re-evaluation threshold
     const count = (this.#evidenceCountSinceReEval.get(personId) || 0) + 1;
     this.#evidenceCountSinceReEval.set(personId, count);
 
-    if (count >= RE_EVAL_THRESHOLD) {
+    if (count >= RE_EVAL_THRESHOLD || contradicts) {
       this.recomputeTrust(personId);
       this.#evidenceCountSinceReEval.set(personId, 0);
     } else {
@@ -655,7 +679,8 @@ export class TrustGraph {
       const daysSinceSeen = (now - person.lastSeen) / msPerDay;
       if (daysSinceSeen < 1) continue;
 
-      const decayFactor = 1 - 0.001 * daysSinceSeen;
+      // --- TUNABLE --- decay rate (fraction of score lost per day)
+      const decayFactor = clamp(1 - 0.001 * daysSinceSeen, 0, 1);
 
       const decayDimension = (current) => {
         if (current <= TRUST_FLOOR) return current;
