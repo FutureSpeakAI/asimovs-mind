@@ -21,6 +21,8 @@
  * Stripped Electron, fs, FatalIntegrityError. Uses state persistence.
  */
 
+import crypto from 'node:crypto';
+
 /* -- Default dimensions -- */
 
 const DEFAULT_DIMENSIONS = {
@@ -198,7 +200,7 @@ export class CalibrationEngine {
   recordSignal(signal) {
     const fullSignal = {
       ...signal,
-      id: Math.random().toString(36).slice(2, 10),
+      id: crypto.randomUUID().slice(0, 8),
       timestamp: Date.now(),
     };
 
