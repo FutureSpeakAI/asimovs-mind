@@ -40,8 +40,31 @@ export class FridayEventBus extends EventEmitter {
     this.#stats.published++;
     this.#stats.topics.add(topic);
 
-    this.emit(topic, event);
-    this.emit('*', event);
+    // --- TUNABLE ---
+    // Dispatch to each listener individually so a throwing subscriber never
+    // prevents subsequent subscribers from running. EventEmitter.emit() is
+    // synchronous and propagates throws, which would silently drop all
+    // downstream handlers and the wildcard channel. We iterate manually
+    // instead of calling this.emit() directly.
+    this.#safeDispatch(topic, event);
+    this.#safeDispatch('*', event);
+  }
+
+  #safeDispatch(channel, event) {
+    const listeners = this.rawListeners(channel);
+    for (const listener of listeners) {
+      try {
+        // rawListeners() returns the wrapper for .once() handlers; call it
+        // directly so EventEmitter's internal once-removal still fires.
+        listener.call(this, event);
+      } catch (err) {
+        // Emit 'error' only if someone is listening, otherwise swallow to
+        // prevent an uncaught exception from crashing the process.
+        if (this.listenerCount('error') > 0) {
+          this.emit('error', err);
+        }
+      }
+    }
   }
 
   recent(topic, limit = 20) {
