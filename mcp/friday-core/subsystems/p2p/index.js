@@ -8,12 +8,44 @@
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { Subsystem } from '../../core/subsystem.js';
 import { PeerManager } from './protocol.js';
 import { P2PTransport } from './transport.js';
 import { getCanonicalLaws } from '../identity/index.js';
 import { generateExchangeKeyPair } from '../../core/crypto.js';
+
+// SEC-001: Path validation — resolved path must be under home or project root
+function validateFilePath(inputPath) {
+  if (!inputPath) return 'file_path is required.';
+  const resolved = path.resolve(inputPath);
+  const home = os.homedir();
+  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || home;
+  if (!resolved.startsWith(home) && !resolved.startsWith(projectRoot)) {
+    return `Path must be under ${home} or ${projectRoot}`;
+  }
+  return null;
+}
+
+// SEC-002: SSRF blocklist for peer_connect
+const SSRF_BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+
+function isBlockedHost(hostname) {
+  const lower = hostname.toLowerCase();
+  if (SSRF_BLOCKED_HOSTNAMES.has(lower)) return true;
+  if (lower.endsWith('.local')) return true;
+  // Parse numeric IPv4 addresses
+  const parts = lower.split('.');
+  if (parts.length === 4) {
+    const [a, b] = parts.map(Number);
+    if (a === 10) return true;                              // 10.x.x.x
+    if (a === 172 && b >= 16 && b <= 31) return true;      // 172.16-31.x.x
+    if (a === 192 && b === 168) return true;                // 192.168.x.x
+    if (a === 169 && b === 254) return true;                // 169.254.x.x (link-local)
+  }
+  return false;
+}
 
 export class P2PSubsystem extends Subsystem {
   #peerManager;
@@ -102,6 +134,15 @@ export class P2PSubsystem extends Subsystem {
           const idResult = await vault.getIdentity();
           if (!idResult.success || !idResult.data) {
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'No identity. Run identity_generate first.' }) }] };
+          }
+
+          // SEC-002: Block SSRF targets
+          let parsedUrl;
+          try { parsedUrl = new URL(address); } catch {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Invalid address URL.' }) }] };
+          }
+          if (isBlockedHost(parsedUrl.hostname)) {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: `Blocked address: connections to ${parsedUrl.hostname} are not permitted.` }) }] };
           }
 
           const peerId = crypto.randomUUID().slice(0, 8);
@@ -198,6 +239,10 @@ export class P2PSubsystem extends Subsystem {
           return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Channel not open' }) }] };
         }
         try {
+          const pathErr = validateFilePath(filePath);
+          if (pathErr) {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: pathErr }) }] };
+          }
           const data = await fs.readFile(filePath);
           const name = file_name || path.basename(filePath);
           const result = await channel.sendFile(name, data);

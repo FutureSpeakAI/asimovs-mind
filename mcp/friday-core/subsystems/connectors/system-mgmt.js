@@ -157,9 +157,17 @@ async function firewallRules(args) {
   return safeRun(script);
 }
 
+const DIRECTIONS = new Set(['Inbound', 'Outbound']);
+const ACTIONS = new Set(['Allow', 'Block']);
+const PROTOCOLS = new Set(['TCP', 'UDP', 'Any', 'ICMPv4', 'ICMPv6']);
+
 async function firewallAddRule(args) {
   if (!args.name || !args.direction || !args.action) return fail('name, direction, action required.');
-  const parts = [`New-NetFirewallRule -DisplayName '${psEsc(args.name)}'`, `-Direction ${args.direction}`, `-Action ${args.action}`, `-Protocol ${args.protocol || 'TCP'}`];
+  if (!DIRECTIONS.has(args.direction)) return fail(`Invalid direction. Must be one of: ${[...DIRECTIONS].join(', ')}.`);
+  if (!ACTIONS.has(args.action)) return fail(`Invalid action. Must be one of: ${[...ACTIONS].join(', ')}.`);
+  const protocol = args.protocol || 'TCP';
+  if (!PROTOCOLS.has(protocol)) return fail(`Invalid protocol. Must be one of: ${[...PROTOCOLS].join(', ')}.`);
+  const parts = [`New-NetFirewallRule -DisplayName '${psEsc(args.name)}'`, `-Direction ${args.direction}`, `-Action ${args.action}`, `-Protocol ${protocol}`];
   if (args.local_port) parts.push(`-LocalPort ${psEsc(args.local_port)}`);
   if (args.remote_address) parts.push(`-RemoteAddress '${psEsc(args.remote_address)}'`);
   if (args.program) parts.push(`-Program '${psEsc(args.program)}'`);
