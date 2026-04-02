@@ -45,12 +45,21 @@ export class ConnectorRegistry {
     this.#log.info('[ConnectorRegistry] Initializing -- scanning for available software...');
     const startTime = Date.now();
 
-    // Run detection in parallel
+    const DETECT_TIMEOUT_MS = 5000;
+
+    // Run detection in parallel, each probe capped at 5 seconds so a slow
+    // or hung external tool check cannot block the entire startup phase.
     const detections = await Promise.allSettled(
       modules.map(async (mod) => {
         try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Detection timed out after ${DETECT_TIMEOUT_MS}ms`)), DETECT_TIMEOUT_MS)
+          );
           // Pass vault to modules that need API keys
-          const available = await mod.module.detect(this.#vault);
+          const available = await Promise.race([
+            mod.module.detect(this.#vault),
+            timeoutPromise,
+          ]);
           return { ...mod, available };
         } catch (err) {
           this.#log.warn(

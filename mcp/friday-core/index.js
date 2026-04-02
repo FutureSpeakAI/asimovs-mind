@@ -143,6 +143,30 @@ const HTTP_TOOL_WHITELIST = new Set([
   'personality_status',
 ]);
 
+// --- Token-bucket rate limiter (100 req/s per source IP) ---
+
+const RATE_LIMIT_MAX = 100;      // max tokens (= max burst)
+const RATE_LIMIT_REFILL = 100;   // tokens added per second
+const rateBuckets = new Map();   // IP -> { tokens, lastRefill }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  let bucket = rateBuckets.get(ip);
+  if (!bucket) {
+    bucket = { tokens: RATE_LIMIT_MAX, lastRefill: now };
+    rateBuckets.set(ip, bucket);
+  }
+
+  // Refill tokens proportional to elapsed time
+  const elapsed = (now - bucket.lastRefill) / 1000; // seconds
+  bucket.tokens = Math.min(RATE_LIMIT_MAX, bucket.tokens + elapsed * RATE_LIMIT_REFILL);
+  bucket.lastRefill = now;
+
+  if (bucket.tokens < 1) return false; // rate limited
+  bucket.tokens -= 1;
+  return true;
+}
+
 async function startHttpBridge() {
   // Generate a random bearer token for write-endpoint authentication
   bridgeToken = (await import('node:crypto')).default.randomBytes(32).toString('hex');
@@ -162,6 +186,13 @@ async function startHttpBridge() {
       if (remoteAddr !== '127.0.0.1' && remoteAddr !== '::1' && remoteAddr !== '::ffff:127.0.0.1') {
         res.writeHead(403);
         res.end(JSON.stringify({ error: 'Localhost only' }));
+        return;
+      }
+
+      // Rate limit: 100 requests/second per source address
+      if (!checkRateLimit(remoteAddr)) {
+        res.writeHead(429);
+        res.end(JSON.stringify({ error: 'Rate limit exceeded' }));
         return;
       }
 

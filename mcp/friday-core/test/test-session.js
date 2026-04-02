@@ -342,6 +342,14 @@ function createMockState() {
   return {
     read: async (key) => ({ success: true, data: store.get(key) ?? null }),
     write: async (key, data) => { store.set(key, data); return { success: true }; },
+    append: async (key, entry) => {
+      const arr = store.get(key) || [];
+      arr.push(entry);
+      store.set(key, arr);
+      return { success: true };
+    },
+    delete: async (key) => { store.delete(key); return { success: true }; },
+    list: async () => ({ success: true, keys: [...store.keys()] }),
     _store: store,
   };
 }
