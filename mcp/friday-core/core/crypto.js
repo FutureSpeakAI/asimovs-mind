@@ -308,7 +308,7 @@ export function deriveSharedSecret(myExchangePrivateKey, peerExchangePublicKey) 
 }
 
 export function deriveSessionKeys(sharedSecret, myPublicKey, peerPublicKey) {
-  // HKDF-like derivation using BLAKE2b
+  // Standard HKDF (RFC 5869) with SHA-256
   // Salt: SHA-256 of sorted public keys (domain separation per pair)
   ensureReady();
   const sorted = Buffer.compare(myPublicKey, peerPublicKey) < 0
@@ -316,11 +316,16 @@ export function deriveSessionKeys(sharedSecret, myPublicKey, peerPublicKey) {
     : Buffer.concat([peerPublicKey, myPublicKey]);
   const salt = crypto.createHash('sha256').update(sorted).digest();
 
-  // Derive two session keys: one for sending, one for receiving
-  // Use different sub-key IDs to get different keys for each direction
-  const ikm = Buffer.concat([sharedSecret, salt]);
-  const sendKey = crypto.createHmac('sha256', salt).update(Buffer.concat([ikm, Buffer.from([0x01])])).digest();
-  const recvKey = crypto.createHmac('sha256', salt).update(Buffer.concat([ikm, Buffer.from([0x02])])).digest();
+  // HKDF-Extract: PRK = HMAC-SHA256(salt, sharedSecret)
+  const prk = crypto.createHmac('sha256', salt).update(sharedSecret).digest();
+
+  // HKDF-Expand: derive two session keys with different info bytes
+  const sendKey = crypto.createHmac('sha256', prk).update(Buffer.from([0x01])).digest();
+  const recvKey = crypto.createHmac('sha256', prk).update(Buffer.from([0x02])).digest();
+
+  // Zero the PRK and shared secret
+  prk.fill(0);
+  sharedSecret.fill(0);
 
   // Determine direction: the peer with the "lower" public key sends on key 1
   const iAmLower = Buffer.compare(myPublicKey, peerPublicKey) < 0;
