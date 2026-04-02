@@ -27,7 +27,8 @@ export class CloudGate {
     this.#consentTracker = consentTracker;
 
     try {
-      const saved = await state.get('cloud-policies');
+      const savedResult = await state.read('cloud-policies');
+      const saved = savedResult?.success ? savedResult.data : null;
       if (saved && typeof saved === 'object') {
         for (const [category, policy] of Object.entries(saved)) {
           if (policy && policy.scope === 'always') {
@@ -43,10 +44,13 @@ export class CloudGate {
   // -- Gate check -----------------------------------------------------------
 
   checkGate(taskCategory, _context) {
-    // 1. Check if cloud API consent exists
+    // 1. Verify cloud API consent exists WITHOUT consuming it yet.
+    //    Consuming a once-scoped consent happens only if we ultimately allow
+    //    the action — doing it before the policy check would silently spend
+    //    the grant even when the gate returns denied.
     if (this.#consentTracker) {
-      const consent = this.#consentTracker.checkConsent('cloud_api');
-      if (!consent.granted) {
+      const consentState = this.#consentTracker.peekConsent('cloud_api');
+      if (!consentState.granted) {
         this.#stats.escalatedDenied++;
         return { allowed: false, reason: 'no-cloud-consent', detail: 'User has not consented to cloud API access' };
       }
@@ -54,26 +58,33 @@ export class CloudGate {
 
     // 2. Check category-specific policy
     const policy = this.#policies.get(taskCategory);
-    if (policy) {
-      if (policy.scope === 'once') {
-        this.#policies.delete(taskCategory);
-      }
-      if (policy.decision === 'allow') {
-        this.#stats.escalatedAllowed++;
-        return { allowed: true, reason: 'policy-allow', detail: `Policy allows ${taskCategory} (scope: ${policy.scope})` };
-      } else {
-        this.#stats.escalatedDenied++;
-        return { allowed: false, reason: 'policy-deny', detail: `Policy denies ${taskCategory}` };
-      }
+
+    if (!policy) {
+      // No explicit policy -- default: deny (sovereign-first)
+      this.#stats.escalatedDenied++;
+      return {
+        allowed: false,
+        reason: 'no-policy',
+        detail: `No policy for task category "${taskCategory}". Set one with enterprise_cloud_gate action:"set_policy".`,
+      };
     }
 
-    // 3. No explicit policy -- default: deny (sovereign-first)
-    this.#stats.escalatedDenied++;
-    return {
-      allowed: false,
-      reason: 'no-policy',
-      detail: `No policy for task category "${taskCategory}". Set one with enterprise_cloud_gate action:"set_policy".`,
-    };
+    if (policy.decision !== 'allow') {
+      // Policy explicitly denies — no consent consumed, no policy consumed
+      this.#stats.escalatedDenied++;
+      return { allowed: false, reason: 'policy-deny', detail: `Policy denies ${taskCategory}` };
+    }
+
+    // 3. Action is allowed — now consume once-scoped grants
+    if (this.#consentTracker) {
+      this.#consentTracker.checkConsent('cloud_api');
+    }
+    if (policy.scope === 'once') {
+      this.#policies.delete(taskCategory);
+    }
+
+    this.#stats.escalatedAllowed++;
+    return { allowed: true, reason: 'policy-allow', detail: `Policy allows ${taskCategory} (scope: ${policy.scope})` };
   }
 
   // -- Policy management ----------------------------------------------------
@@ -100,7 +111,7 @@ export class CloudGate {
     const count = this.#policies.size;
     this.#policies.clear();
     if (this.#state) {
-      this.#state.set('cloud-policies', {}).catch(() => {});
+      this.#state.write('cloud-policies', {}).catch(() => {});
     }
     return count;
   }
@@ -128,13 +139,14 @@ export class CloudGate {
   async #persistPolicy(category, policy) {
     try {
       if (!this.#state) return;
-      const existing = (await this.#state.get('cloud-policies')) || {};
+      const result = await this.#state.read('cloud-policies');
+      const existing = (result?.success ? result.data : null) || {};
       if (policy) {
         existing[category] = policy;
       } else {
         delete existing[category];
       }
-      await this.#state.set('cloud-policies', existing);
+      await this.#state.write('cloud-policies', existing);
     } catch {
       // Best effort
     }

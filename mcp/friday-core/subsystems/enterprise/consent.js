@@ -29,7 +29,8 @@ export class ConsentTracker {
   async initialize(state) {
     this.#state = state;
     try {
-      const saved = await state.get('consents');
+      const savedResult = await state.read('consents');
+      const saved = savedResult?.success ? savedResult.data : null;
       if (saved && typeof saved === 'object') {
         for (const [category, consent] of Object.entries(saved)) {
           if (consent.scope === 'always') {
@@ -37,7 +38,8 @@ export class ConsentTracker {
           }
         }
       }
-      const log = await state.get('consent-audit');
+      const logResult = await state.read('consent-audit');
+      const log = logResult?.success ? logResult.data : null;
       if (Array.isArray(log)) {
         this.#auditLog = log.slice(-this.#maxAuditEntries);
       }
@@ -67,6 +69,18 @@ export class ConsentTracker {
     }
 
     this.#logAudit(category, 'check', true, `scope: ${consent.scope}`);
+    return { granted: true, scope: consent.scope, grantedAt: consent.grantedAt };
+  }
+
+  /**
+   * Peek at consent state without consuming once-scoped grants.
+   * Use this when you need to check before committing to the action.
+   */
+  peekConsent(category) {
+    const consent = this.#consents.get(category);
+    if (!consent || !consent.granted) {
+      return { granted: false, reason: consent?.reason || 'No consent recorded for this category' };
+    }
     return { granted: true, scope: consent.scope, grantedAt: consent.grantedAt };
   }
 
@@ -150,8 +164,8 @@ export class ConsentTracker {
         for (const [category, consent] of this.#consents) {
           data[category] = consent;
         }
-        await this.#state.set('consents', data);
-        await this.#state.set('consent-audit', this.#auditLog);
+        await this.#state.write('consents', data);
+        await this.#state.write('consent-audit', this.#auditLog);
       } catch {
         // Best effort
       }

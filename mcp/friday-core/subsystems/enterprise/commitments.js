@@ -50,7 +50,8 @@ export class CommitmentTracker {
   async initialize(state) {
     this.#state = state;
     try {
-      const data = await state.get('commitments');
+      const result = await state.read('commitments');
+      const data = result?.success ? result.data : null;
       if (data) {
         this.#commitments = Array.isArray(data.commitments) ? data.commitments : [];
         this.#outboundMessages = Array.isArray(data.outboundMessages) ? data.outboundMessages : [];
@@ -387,7 +388,7 @@ export class CommitmentTracker {
     setTimeout(async () => {
       this.#saveQueued = false;
       try {
-        await this.#state.set('commitments', {
+        await this.#state.write('commitments', {
           commitments: this.#commitments,
           outboundMessages: this.#outboundMessages,
           followUpSuggestions: this.#followUpSuggestions,
