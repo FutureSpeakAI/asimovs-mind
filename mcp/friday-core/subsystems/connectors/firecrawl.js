@@ -87,9 +87,27 @@ async function webSearch(args, apiKey) {
   return `## Search Results for: "${query}"\n\n${results.join('\n\n---\n\n')}`;
 }
 
+function validateFirecrawlUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { throw new Error('Invalid URL'); }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('URL must use HTTP or HTTPS');
+  const hostname = parsed.hostname.toLowerCase();
+  if (['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local')) {
+    throw new Error('URL must not target localhost');
+  }
+  const parts = hostname.split('.');
+  if (parts.length === 4) {
+    const [a, b] = parts.map(Number);
+    if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) {
+      throw new Error('URL must not target private IP ranges');
+    }
+  }
+}
+
 async function webScrape(args, apiKey) {
   const url = typeof args.url === 'string' ? args.url : '';
   if (!url) return 'ERROR: URL is required.';
+  try { validateFirecrawlUrl(url); } catch (e) { return `ERROR: ${e.message}`; }
   const onlyMainContent = args.onlyMainContent !== false;
   const { status, data } = await apiRequest('POST', '/scrape', apiKey, { url, formats: ['markdown'], onlyMainContent });
   if (status === 401) return 'ERROR: API key invalid.';
@@ -105,6 +123,7 @@ async function webScrape(args, apiKey) {
 async function webCrawl(args, apiKey) {
   const url = typeof args.url === 'string' ? args.url : '';
   if (!url) return 'ERROR: URL is required.';
+  try { validateFirecrawlUrl(url); } catch (e) { return `ERROR: ${e.message}`; }
   const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
   const startResult = await apiRequest('POST', '/crawl', apiKey, {
     url, limit, scrapeOptions: { formats: ['markdown'], onlyMainContent: true },
@@ -112,6 +131,7 @@ async function webCrawl(args, apiKey) {
   if (startResult.status !== 200 || !startResult.data.success) return `ERROR: Crawl failed (${startResult.status}): ${startResult.data.error || ''}`;
   const jobId = startResult.data.id;
   if (!jobId) return 'ERROR: No crawl job ID returned.';
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(jobId)) return 'ERROR: Invalid job ID returned by API.';
 
   const startTime = Date.now();
   while (Date.now() - startTime < CRAWL_MAX_WAIT_MS) {

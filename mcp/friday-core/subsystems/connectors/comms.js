@@ -41,6 +41,8 @@ function validateWebhookUrl(raw, allowHttp = false) {
   }
 }
 
+// Sanitize SMTP header fields — strip CR/LF to prevent header injection
+function smtpSafe(s) { return String(s).replace(/[\r\n]/g, ''); }
 function psEscape(s) { return s.replace(/'/g, "''"); }
 function xmlEsc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -89,7 +91,7 @@ function smtpSendEmail(params) {
     const send = (line) => socket.write(line + CRLF);
     const buildMessage = () => {
       const ct = html ? 'Content-Type: text/html; charset=UTF-8' : 'Content-Type: text/plain; charset=UTF-8';
-      return [`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0', ct, '', mailBody].join(CRLF);
+      return [`From: ${smtpSafe(from)}`, `To: ${smtpSafe(to)}`, `Subject: ${smtpSafe(subject)}`, 'MIME-Version: 1.0', ct, '', mailBody].join(CRLF);
     };
     const advance = (code, text) => {
       try {
@@ -102,8 +104,8 @@ function smtpSendEmail(params) {
             { const tlsSocket = tls.connect({ socket, host, servername: host }, () => { upgraded = true; socket = tlsSocket; buffer = ''; socket.on('data', onData); step = 1; send('EHLO agent-friday'); }); tlsSocket.on('error', reject); } break;
           case 3: if (code !== 334) throw new Error(`AUTH LOGIN failed: ${code}`); step = 4; send(Buffer.from(user).toString('base64')); break;
           case 4: if (code !== 334) throw new Error(`AUTH user failed: ${code}`); step = 5; send(Buffer.from(pass).toString('base64')); break;
-          case 5: if (code !== 235) throw new Error(`AUTH password failed: ${code}`); step = 6; send(`MAIL FROM:<${from}>`); break;
-          case 6: if (code !== 250) throw new Error(`MAIL FROM failed: ${code}`); step = 7; send(`RCPT TO:<${to}>`); break;
+          case 5: if (code !== 235) throw new Error(`AUTH password failed: ${code}`); step = 6; send(`MAIL FROM:<${smtpSafe(from)}>`); break;
+          case 6: if (code !== 250) throw new Error(`MAIL FROM failed: ${code}`); step = 7; send(`RCPT TO:<${smtpSafe(to)}>`); break;
           case 7: if (code !== 250) throw new Error(`RCPT TO failed: ${code}`); step = 8; send('DATA'); break;
           case 8: if (code !== 354) throw new Error(`DATA failed: ${code}`); step = 9;
             { const msg = buildMessage().replace(/\r\n\./g, '\r\n..'); socket.write(msg + CRLF + '.' + CRLF); } break;

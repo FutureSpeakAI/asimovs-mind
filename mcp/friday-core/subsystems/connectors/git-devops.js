@@ -92,8 +92,8 @@ function gitLog(args) {
     const gitArgs = ['log', `--max-count=${count}`];
     if (oneline) gitArgs.push('--oneline', '--decorate');
     else gitArgs.push('--format=medium');
-    if (args.author) gitArgs.push(`--author=${args.author}`);
-    if (args.since) gitArgs.push(`--since=${args.since}`);
+    if (args.author) gitArgs.push('--author', args.author);
+    if (args.since) gitArgs.push('--since', args.since);
     const output = runArgs('git', gitArgs, { cwd: repoPath });
     return ok(output || 'No commits found matching the criteria.');
   } catch (err) { return fail(`git log failed: ${err.message}`); }
@@ -239,7 +239,17 @@ function dockerRun(args) {
     if (detach) da.push('-d');
     if (args.name) da.push('--name', args.name);
     if (args.ports) for (const p of args.ports) da.push('-p', p);
-    if (args.volumes) for (const v of args.volumes) da.push('-v', v);
+    if (args.volumes) {
+      const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
+      for (const v of args.volumes) {
+        const hostPath = v.split(':')[0];
+        const resolved = path.resolve(hostPath);
+        if (!resolved.startsWith(path.resolve(projectRoot))) {
+          return fail(`SAFETY BLOCK: Volume mount host path must be within project root: ${hostPath}`);
+        }
+        da.push('-v', v);
+      }
+    }
     if (args.env) for (const [k, v] of Object.entries(args.env)) da.push('-e', `${k}=${v}`);
     da.push(args.image);
     if (args.command) da.push(args.command);
@@ -280,7 +290,7 @@ function dockerExec(args) {
     return fail(`Command exceeds maximum length of ${DOCKER_EXEC_MAX_CMD_LENGTH} characters.`);
   }
   try {
-    const da = ['exec', '-i', args.container, ...args.command.split(/\s+/).filter(Boolean)];
+    const da = ['exec', '-i', args.container, '--', ...args.command.split(/\s+/).filter(Boolean)];
     return ok(runArgs('docker', da) || 'Command executed.');
   } catch (err) { return fail(`docker exec failed: ${err.message}`); }
 }
