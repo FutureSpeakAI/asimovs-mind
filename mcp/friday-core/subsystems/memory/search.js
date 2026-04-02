@@ -16,6 +16,18 @@ import { EmbeddingPipeline } from './embedding.js';
 
 const MAX_BATCH_SIZE = 100;
 
+// --- TUNABLE ---
+// Module-level constant: avoids rebuilding a 60-entry Set on every tokenize() call.
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for',
+  'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+  'before', 'after', 'and', 'but', 'or', 'not', 'no', 'so', 'if',
+  'than', 'that', 'this', 'it', 'its', 'they', 'them', 'their',
+  'he', 'she', 'his', 'her', 'we', 'us', 'our', 'you', 'your', 'i', 'my', 'me',
+]);
+
 /**
  * @typedef {Object} IndexEntry
  * @property {string} id
@@ -229,18 +241,8 @@ export class SemanticSearchEngine {
    * Tokenize text for keyword matching. Removes stopwords, lowercases.
    */
   #tokenize(text) {
-    const stopWords = new Set([
-      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for',
-      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
-      'before', 'after', 'and', 'but', 'or', 'not', 'no', 'so', 'if',
-      'than', 'that', 'this', 'it', 'its', 'they', 'them', 'their',
-      'he', 'she', 'his', 'her', 'we', 'us', 'our', 'you', 'your', 'i', 'my', 'me',
-    ]);
-
     const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
-    return new Set(words.filter(w => !stopWords.has(w) && w.length > 2));
+    return new Set(words.filter(w => !STOP_WORDS.has(w) && w.length > 2));
   }
 
   getCount() {

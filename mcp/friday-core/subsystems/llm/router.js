@@ -380,7 +380,12 @@ function zeroScore(modelId) {
 
 export class IntelligenceRouter {
   #models = [];
+  /** @type {Map<string, object>} modelId -> model — O(1) hot-path lookups */
+  // --- TUNABLE ---
+  #modelMap = new Map();
   #decisions = [];
+  /** @type {Map<string, object>} decisionId -> decision — O(1) outcome recording */
+  #decisionMap = new Map();
   #config = {
     enabled: true,
     monthlyBudgetUsd: 0,
@@ -421,9 +426,16 @@ export class IntelligenceRouter {
     }
 
     // Merge defaults (preserve existing customized entries)
+    // Build map first for O(1) existence check during merge
+    this.#rebuildModelMap();
+    // Rebuild decision map for O(1) outcome recording
+    this.#decisionMap.clear();
+    for (const d of this.#decisions) this.#decisionMap.set(d.id, d);
     for (const def of DEFAULT_MODELS) {
-      if (!this.#models.find((m) => m.modelId === def.modelId)) {
-        this.#models.push({ ...def });
+      if (!this.#modelMap.has(def.modelId)) {
+        const m = { ...def };
+        this.#models.push(m);
+        this.#modelMap.set(m.modelId, m);
       }
     }
 
@@ -459,7 +471,7 @@ export class IntelligenceRouter {
 
     // Pinned model
     if (this.#config.pinnedModelId) {
-      const pinned = this.#models.find((m) => m.modelId === this.#config.pinnedModelId);
+      const pinned = this.#modelMap.get(this.#config.pinnedModelId);
       if (pinned?.available) {
         const d = this.#createDecision(decisionId, task, pinned.modelId, 'User-pinned model', [], false, false);
         this.#recordDecision(d);
@@ -506,7 +518,7 @@ export class IntelligenceRouter {
    * Record outcome after request completes (success/failure/cost tracking).
    */
   recordOutcome(decisionId, outcome) {
-    const d = this.#decisions.find((x) => x.id === decisionId);
+    const d = this.#decisionMap.get(decisionId);
     if (!d) return;
 
     d.success = outcome.success;
@@ -514,7 +526,7 @@ export class IntelligenceRouter {
     d.actualInputTokens = outcome.inputTokens ?? null;
     d.actualOutputTokens = outcome.outputTokens ?? null;
 
-    const model = this.#models.find((m) => m.modelId === d.selectedModelId);
+    const model = this.#modelMap.get(d.selectedModelId);
     if (model && outcome.inputTokens && outcome.outputTokens) {
       d.actualCost = estimateRequestCost(model, outcome.inputTokens, outcome.outputTokens);
       this.#config.monthlySpentUsd += d.actualCost;
@@ -540,18 +552,24 @@ export class IntelligenceRouter {
   }
 
   getModel(modelId) {
-    return this.#models.find((m) => m.modelId === modelId) || null;
+    return this.#modelMap.get(modelId) || null;
   }
 
   registerModel(model) {
-    const idx = this.#models.findIndex((m) => m.modelId === model.modelId);
-    if (idx >= 0) this.#models[idx] = model;
-    else this.#models.push(model);
+    const existing = this.#modelMap.get(model.modelId);
+    if (existing) {
+      const idx = this.#models.indexOf(existing);
+      if (idx >= 0) this.#models[idx] = model;
+      this.#modelMap.set(model.modelId, model);
+    } else {
+      this.#models.push(model);
+      this.#modelMap.set(model.modelId, model);
+    }
     this.#persistState();
   }
 
   setModelAvailability(modelId, available) {
-    const m = this.#models.find((x) => x.modelId === modelId);
+    const m = this.#modelMap.get(modelId);
     if (m) {
       m.available = available;
       m.lastChecked = Date.now();
@@ -569,13 +587,13 @@ export class IntelligenceRouter {
   registerOllamaModels(ollamaModels) {
     for (const om of ollamaModels) {
       const modelId = `ollama/${om.id}`;
-      const existing = this.#models.find((m) => m.modelId === modelId);
+      const existing = this.#modelMap.get(modelId);
       if (existing) {
         existing.available = true;
         existing.lastChecked = Date.now();
         existing.consecutiveFailures = 0;
       } else {
-        this.#models.push({
+        const newModel = {
           modelId,
           name: `${om.name} (Ollama)`,
           provider: 'ollama',
@@ -595,7 +613,9 @@ export class IntelligenceRouter {
           lastChecked: Date.now(),
           rateLimit: 0,
           consecutiveFailures: 0,
-        });
+        };
+        this.#models.push(newModel);
+        this.#modelMap.set(modelId, newModel);
       }
     }
     this.#persistState();
@@ -683,15 +703,17 @@ export class IntelligenceRouter {
 
   #recordDecision(decision) {
     this.#decisions.push(decision);
+    this.#decisionMap.set(decision.id, decision);
     if (this.#decisions.length > this.#config.maxDecisionHistory) {
-      this.#decisions = this.#decisions.slice(-this.#config.maxDecisionHistory);
+      const evicted = this.#decisions.splice(0, this.#decisions.length - this.#config.maxDecisionHistory);
+      for (const e of evicted) this.#decisionMap.delete(e.id);
     }
     this.#persistState();
   }
 
   #isBudgetConstrained(task, modelId) {
     if (this.#config.monthlyBudgetUsd <= 0) return false;
-    const model = this.#models.find((m) => m.modelId === modelId);
+    const model = this.#modelMap.get(modelId);
     if (!model) return true;
     const cost = estimateRequestCost(model, task.estimatedInputTokens, task.estimatedInputTokens * 0.5);
     return cost > this.#config.monthlyBudgetUsd - (this.#config.monthlySpentUsd || 0);
@@ -708,6 +730,14 @@ export class IntelligenceRouter {
           process.stderr.write('[Router] Monthly budget reset\n');
         }
       }
+    }
+  }
+
+  /** Rebuild the modelId -> model Map from the current #models array. */
+  #rebuildModelMap() {
+    this.#modelMap.clear();
+    for (const m of this.#models) {
+      this.#modelMap.set(m.modelId, m);
     }
   }
 

@@ -21,20 +21,17 @@ export class EmbeddingPipeline {
 
   // -- Lifecycle -------------------------------------------------------
 
+  // --- TUNABLE ---
   async start() {
     this.#ready = false;
     this.#model = null;
 
     try {
-      const available = await this.#checkOllamaAvailable();
-      if (!available) {
-        process.stderr.write('[friday:embedding] Ollama not available — embeddings disabled\n');
-        return;
-      }
-
+      // Single /api/tags fetch: both availability check and model discovery
+      // in one round-trip instead of two sequential HTTP calls.
       const model = await this.#findEmbeddingModel();
       if (!model) {
-        process.stderr.write('[friday:embedding] No embedding model found — embeddings disabled\n');
+        process.stderr.write('[friday:embedding] No embedding model found (or Ollama unavailable) — embeddings disabled\n');
         return;
       }
 
@@ -135,18 +132,6 @@ export class EmbeddingPipeline {
   }
 
   // -- Private: Ollama probing -----------------------------------------
-
-  async #checkOllamaAvailable() {
-    try {
-      const res = await fetch(`${OLLAMA_ENDPOINT}/api/tags`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
 
   async #findEmbeddingModel() {
     try {

@@ -93,28 +93,28 @@ const deps = { vault, eventBus, stateManager, logger, ollamaMonitor };
 
 const registry = new SubsystemRegistry();
 
-// Tier 0 — no dependencies
-registry.register(new VaultSubsystem(deps));
-registry.register(new IdentitySubsystem(deps));
-registry.register(new PrivacySubsystem(deps));
-registry.register(new OllamaSubsystem(deps));
-// Tier 1
-registry.register(new P2PSubsystem(deps));           // needs identity
-// Tier 2
-registry.register(new LLMSubsystem(deps));            // needs vault, ollama
-registry.register(new MemorySubsystem(deps));          // needs llm
-registry.register(new ContextSubsystem(deps));         // needs event bus
-registry.register(new TrustSubsystem(deps));           // needs vault
-registry.register(new PersonalitySubsystem(deps));     // needs vault, memory
-// Tier 3
-registry.register(new AgentSubsystem(deps));           // needs llm, memory, trust
-registry.register(new ToolsSubsystem(deps));           // needs event bus
-registry.register(new ConnectorSubsystem(deps));       // needs tools, vault
-registry.register(new GatewaySubsystem(deps));         // needs trust, vault
-registry.register(new BriefingSubsystem(deps));        // needs memory, trust, context
-registry.register(new VoiceSubsystem(deps));           // needs event bus
-registry.register(new EnterpriseSubsystem(deps));      // needs vault, event bus
-registry.register(new SessionSubsystem(deps));          // needs session conductor (injected after startAll)
+// Tier 0 — no dependencies (run in parallel)
+registry.register(new VaultSubsystem(deps),     { tier: 0 });
+registry.register(new IdentitySubsystem(deps),  { tier: 0 });
+registry.register(new PrivacySubsystem(deps),   { tier: 0 });
+registry.register(new OllamaSubsystem(deps),    { tier: 0 });
+// Tier 1 — needs identity (run in parallel within tier)
+registry.register(new P2PSubsystem(deps),       { tier: 1 });
+// Tier 2 — needs vault / ollama / event bus (run in parallel within tier)
+registry.register(new LLMSubsystem(deps),       { tier: 2 }); // needs vault, ollama
+registry.register(new MemorySubsystem(deps),    { tier: 2 }); // needs llm
+registry.register(new ContextSubsystem(deps),   { tier: 2 }); // needs event bus
+registry.register(new TrustSubsystem(deps),     { tier: 2 }); // needs vault
+registry.register(new PersonalitySubsystem(deps), { tier: 2 }); // needs vault, memory
+// Tier 3 — needs llm, memory, trust (run in parallel within tier)
+registry.register(new AgentSubsystem(deps),     { tier: 3 }); // needs llm, memory, trust
+registry.register(new ToolsSubsystem(deps),     { tier: 3 }); // needs event bus
+registry.register(new ConnectorSubsystem(deps), { tier: 3 }); // needs tools, vault
+registry.register(new GatewaySubsystem(deps),   { tier: 3 }); // needs trust, vault
+registry.register(new BriefingSubsystem(deps),  { tier: 3 }); // needs memory, trust, context
+registry.register(new VoiceSubsystem(deps),     { tier: 3 }); // needs event bus
+registry.register(new EnterpriseSubsystem(deps), { tier: 3 }); // needs vault, event bus
+registry.register(new SessionSubsystem(deps),   { tier: 3 }); // needs session conductor (injected after startAll)
 
 // Inject registry reference into vault subsystem for status reporting
 registry.get('vault').setRegistry(registry);
