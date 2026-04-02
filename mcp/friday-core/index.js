@@ -35,6 +35,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import http from 'node:http';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 
 // Core modules
@@ -150,6 +151,21 @@ const RATE_LIMIT_MAX = 100;      // max tokens (= max burst)
 const RATE_LIMIT_REFILL = 100;   // tokens added per second
 const rateBuckets = new Map();   // IP -> { tokens, lastRefill }
 
+// Tighter rate limit for passphrase-sensitive endpoints (5 attempts per minute)
+const UNLOCK_RATE_MAX = 5;
+const UNLOCK_RATE_REFILL = 5 / 60; // 5 per 60 seconds
+const unlockBucket = { tokens: UNLOCK_RATE_MAX, lastRefill: Date.now() };
+
+function checkUnlockRateLimit() {
+  const now = Date.now();
+  const elapsed = (now - unlockBucket.lastRefill) / 1000;
+  unlockBucket.tokens = Math.min(UNLOCK_RATE_MAX, unlockBucket.tokens + elapsed * UNLOCK_RATE_REFILL);
+  unlockBucket.lastRefill = now;
+  if (unlockBucket.tokens < 1) return false;
+  unlockBucket.tokens -= 1;
+  return true;
+}
+
 function checkRateLimit(ip) {
   const now = Date.now();
   let bucket = rateBuckets.get(ip);
@@ -170,7 +186,7 @@ function checkRateLimit(ip) {
 
 async function startHttpBridge() {
   // Generate a random bearer token for write-endpoint authentication
-  bridgeToken = (await import('node:crypto')).default.randomBytes(32).toString('hex');
+  bridgeToken = crypto.randomBytes(32).toString('hex');
   try {
     await fs.mkdir(VAULT_DIR, { recursive: true });
     await fs.writeFile(path.join(VAULT_DIR, 'bridge-token'), bridgeToken, { encoding: 'utf-8', mode: 0o600 });
@@ -209,7 +225,9 @@ async function startHttpBridge() {
       if (requiresAuth) {
         const authHeader = req.headers['authorization'] || '';
         const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-        if (!bridgeToken || provided !== bridgeToken) {
+        const tokenBuf = Buffer.from(bridgeToken || '');
+        const providedBuf = Buffer.from(provided);
+        if (!bridgeToken || tokenBuf.length !== providedBuf.length || !crypto.timingSafeEqual(tokenBuf, providedBuf)) {
           res.writeHead(401);
           res.end(JSON.stringify({ error: 'Unauthorized' }));
           return;
@@ -262,6 +280,11 @@ async function startHttpBridge() {
           res.end(UNLOCK_HTML);
 
         } else if (route === '/unlock' && req.method === 'POST') {
+          if (!checkUnlockRateLimit()) {
+            res.writeHead(429);
+            res.end(JSON.stringify({ error: 'Too many unlock attempts. Try again later.' }));
+            return;
+          }
           const body = await readBody(req);
           const { passphrase } = JSON.parse(body);
           const result = await vault.unlock(passphrase);
