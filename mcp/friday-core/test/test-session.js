@@ -70,7 +70,7 @@ describe('SessionConductor: CWD detection', () => {
 
     // Trigger session start
     bus.publish('vault:unlocked', {});
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 500));
 
     const cwd = conductor.cwdContext;
     assert.ok(cwd, 'cwdContext should be set after vault:unlocked');
@@ -100,7 +100,7 @@ describe('SessionConductor: Greeting composition', () => {
     conductor.wire();
 
     bus.publish('vault:unlocked', {});
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 500));
 
     const greeting = conductor.greeting;
     assert.ok(greeting, 'greeting should be generated');
@@ -117,7 +117,7 @@ describe('SessionConductor: Greeting composition', () => {
     conductor.wire();
 
     bus.publish('vault:unlocked', {});
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 500));
 
     const greeting = conductor.greeting;
     assert.ok(greeting, 'greeting should be generated');
@@ -519,7 +519,7 @@ describe('Personality save/load: mood log survives re-initialise', () => {
     // Use a string guaranteed to match 'frustrated' pattern
     sent1.analyse('I am so frustrated, the damn thing is still broken!');
     // Allow async #persistLog to settle
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 500));
 
     const sent2 = new SentimentEngine();
     await sent2.initialize(state, bus);

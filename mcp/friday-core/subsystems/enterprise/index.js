@@ -51,15 +51,17 @@ export class EnterpriseSubsystem extends Subsystem {
 
   registerEvents() {
     // Listen for commitment mentions from memory extraction
-    this.eventBus.on('memory:commitment_mentions', (mentions) => {
+    this.eventBus.on('memory:commitment_mentions', (event) => {
+      const mentions = event?.data || event;
+      if (!Array.isArray(mentions)) return;
       for (const mention of mentions) {
         this.#commitments.addCommitment(mention);
       }
     });
 
     // Listen for outbound messages to track for follow-up
-    this.eventBus.on('gateway:outbound_message', (msg) => {
-      this.#commitments.trackOutboundMessage(msg);
+    this.eventBus.on('gateway:outbound_message', (event) => {
+      this.#commitments.trackOutboundMessage(event?.data || event);
     });
   }
 

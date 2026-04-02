@@ -29,7 +29,7 @@ function validateWebhookUrl(raw, allowHttp = false) {
     if (parsed.protocol !== 'https:') throw new Error('Webhook URL must use HTTPS.');
   }
   const hostname = parsed.hostname.toLowerCase();
-  if (['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local')) {
+  if (['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1', '0:0:0:0:0:0:0:1', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local')) {
     throw new Error('URL must not target localhost.');
   }
   const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
