@@ -151,7 +151,7 @@ export class TrustGraph {
     this.#saveTimer = setTimeout(() => this.save().catch((err) => {
       // Surface vault errors rather than silently dropping them.
       // In-memory graph is already consistent; this is a persistence warning only.
-      console.warn(`[trust] save failed: ${err.message}`);
+      process.stderr.write(`[friday:trust] save failed: ${err.message}\n`);
     }), 2000);
   }
 
@@ -274,7 +274,7 @@ export class TrustGraph {
 
     // Validate required fields on the internal path (MCP tool path is guarded by Zod).
     if (!evidence.type || typeof evidence.description !== 'string' || !evidence.description.trim()) {
-      console.warn(`[trust] addEvidence: missing type or description for person ${personId} — skipped`);
+      process.stderr.write(`[friday:trust] addEvidence: missing type or description for person ${personId} — skipped\n`);
       return;
     }
 
