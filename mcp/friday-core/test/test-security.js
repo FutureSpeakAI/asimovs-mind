@@ -26,7 +26,7 @@ import {
 import { PeerChannel } from '../subsystems/p2p/protocol.js';
 import { SovereignVault } from '../core/vault.js';
 import { execute as commsExecute } from '../subsystems/connectors/comms.js';
-import { execute as terminalExecute } from '../subsystems/connectors/terminal.js';
+import { execute as _terminalExecute } from '../subsystems/connectors/terminal.js';
 import { execute as gitExecute } from '../subsystems/connectors/git-devops.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

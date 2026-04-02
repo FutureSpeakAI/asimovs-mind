@@ -62,12 +62,13 @@ function isRegistryReadBlocked(regPath) {
 function runPowerShell(command, timeoutMs = DEFAULT_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const child = spawn('powershell.exe', [...PS_BASE_ARGS, command], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    let stdout = '', stderr = '', killed = false;
-    const timer = setTimeout(() => { killed = true; child.kill('SIGKILL'); reject(new Error(`PowerShell timed out after ${timeoutMs / 1000}s`)); }, timeoutMs);
+    let stdout = '', stderr = '', killed = false, settled = false;
+    function settle(fn, val) { if (settled) return; settled = true; fn(val); }
+    const timer = setTimeout(() => { killed = true; child.kill('SIGKILL'); settle(reject, new Error(`PowerShell timed out after ${timeoutMs / 1000}s`)); }, timeoutMs);
     child.stdout.on('data', (chunk) => { stdout += chunk.toString(); if (stdout.length > MAX_OUTPUT_LENGTH) stdout = stdout.slice(0, MAX_OUTPUT_LENGTH); });
     child.stderr.on('data', (chunk) => { stderr += chunk.toString(); if (stderr.length > MAX_OUTPUT_LENGTH) stderr = stderr.slice(0, MAX_OUTPUT_LENGTH); });
-    child.on('error', (err) => { clearTimeout(timer); reject(err); });
-    child.on('close', (code) => { clearTimeout(timer); if (killed) return; if (code !== 0 && stderr.trim()) reject(new Error(stderr.trim())); else resolve(stdout.trim()); });
+    child.on('error', (err) => { clearTimeout(timer); settle(reject, err); });
+    child.on('close', (code) => { clearTimeout(timer); if (killed) return; if (code !== 0 && stderr.trim()) settle(reject, new Error(stderr.trim())); else settle(resolve, stdout.trim()); });
   });
 }
 

@@ -122,7 +122,10 @@ async function terminalCreate(args) {
     return { error: `Failed to spawn ${shell}: ${err.message}` };
   }
 
-  if (!proc.pid) return { error: `Failed to start ${shell} -- no PID assigned.` };
+  if (!proc.pid) {
+    try { proc.kill(); } catch {}
+    return { error: `Failed to start ${shell} -- no PID assigned.` };
+  }
 
   const session = {
     id, name, shell, process: proc,
