@@ -62,8 +62,9 @@ if (existsSync(portPath)) {
     const port = parseInt(readFileSync(portPath, 'utf-8').trim(), 10);
     if (!isNaN(port)) {
       try {
-        const _resp = await fetch(`http://127.0.0.1:${port}/status`, {
-          signal: AbortSignal.timeout(1000),
+        // --- TUNABLE: 200 ms is sufficient for a localhost round-trip ---
+      const _resp = await fetch(`http://127.0.0.1:${port}/status`, {
+          signal: AbortSignal.timeout(200),
         });
         // If we get here, another instance is already running — do not start a
         // second one. The MCP host will get two servers responding on stdio,

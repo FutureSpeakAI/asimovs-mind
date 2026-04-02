@@ -94,15 +94,17 @@ export class FridayEventBus extends EventEmitter {
     this.removeAllListeners();
   }
 
+  // --- TUNABLE ---
   #prune() {
     const now = Date.now();
-    if (this.#buffer.length > this.#maxBufferSize) {
-      this.#buffer.splice(0, this.#buffer.length - this.#maxBufferSize);
+    const cutoff = now - this.#maxBufferAgeMs;
+    // Walk from the front until we find the first entry that is both within
+    // the age window AND within the size cap. One pass, one splice.
+    const overSize = Math.max(0, this.#buffer.length - this.#maxBufferSize);
+    let dropTo = overSize;
+    while (dropTo < this.#buffer.length && this.#buffer[dropTo].timestamp < cutoff) {
+      dropTo++;
     }
-    if (this.#buffer.length > 0 && (now - this.#buffer[0].timestamp) > this.#maxBufferAgeMs) {
-      let i = 0;
-      while (i < this.#buffer.length && (now - this.#buffer[i].timestamp) > this.#maxBufferAgeMs) i++;
-      if (i > 0) this.#buffer.splice(0, i);
-    }
+    if (dropTo > 0) this.#buffer.splice(0, dropTo);
   }
 }

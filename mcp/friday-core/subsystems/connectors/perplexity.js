@@ -38,7 +38,8 @@ function fail(msg) { return { error: msg }; }
 async function getApiKey(vault) {
   if (!vault) return null;
   try {
-    const keys = await vault.read('api-keys');
+    const result = await vault.read('api-keys');
+    const keys = result?.success ? result.data : null;
     return keys?.perplexity || null;
   } catch { return null; }
 }

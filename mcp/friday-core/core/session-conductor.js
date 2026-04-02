@@ -8,8 +8,12 @@
  */
 
 import path from 'node:path';
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+// --- TUNABLE: exec and readFile are async to avoid blocking the event loop
+// during vault:unlocked processing. execSync blocked for 50-200 ms on large repos.
+import { exec } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
+const execAsync = promisify(exec);
 
 export class SessionConductor {
   #registry;
@@ -54,8 +58,8 @@ export class SessionConductor {
   async #doSessionStart() {
     this.#sessionStartTime = Date.now();
 
-    // 1. Detect working directory context
-    this.#cwdContext = this.#detectCwd();
+    // 1. Detect working directory context (async — avoids blocking event loop)
+    this.#cwdContext = await this.#detectCwd();
 
     // 2. Check for overdue commitments
     this.#pendingCommitments = this.#checkCommitments();
@@ -97,21 +101,18 @@ export class SessionConductor {
     this.#pendingCommitments = [];
   }
 
-  #detectCwd() {
+  async #detectCwd() {
     const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
-    let gitBranch = null;
-    try {
-      gitBranch = execSync('git rev-parse --abbrev-ref HEAD', {
-        cwd: projectRoot,
-        stdio: 'pipe',
-      }).toString().trim();
-    } catch { /* not a git repo */ }
 
-    let packageName = null;
-    try {
-      const raw = readFileSync(path.join(projectRoot, 'package.json'), 'utf-8');
-      packageName = JSON.parse(raw).name;
-    } catch { /* no package.json */ }
+    // Run git branch detection and package.json read in parallel
+    const [gitBranch, packageName] = await Promise.all([
+      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot })
+        .then(({ stdout }) => stdout.trim())
+        .catch(() => null),
+      readFile(path.join(projectRoot, 'package.json'), 'utf-8')
+        .then(raw => JSON.parse(raw).name)
+        .catch(() => null),
+    ]);
 
     return {
       projectRoot,

@@ -69,7 +69,9 @@ export class GatewaySubsystem extends Subsystem {
   }
 
   refresh() {
-    this.#trust.initialize(this.state);
+    this.#trust.initialize(this.state).catch(err => {
+      process.stderr.write(`[friday:gateway] refresh failed: ${err.message}\n`);
+    });
   }
 
   /** Expose internals for other subsystems */

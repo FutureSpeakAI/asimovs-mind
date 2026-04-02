@@ -17,6 +17,25 @@ import { OllamaProvider } from './providers/ollama.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenRouterProvider } from './providers/openrouter.js';
 
+// SSRF blocklist for ollamaEndpoint vault override — blocks cloud metadata
+// and private network endpoints. Localhost is intentionally ALLOWED because
+// Ollama typically runs on 127.0.0.1:11434.
+const BLOCKED_OLLAMA_HOSTS = new Set(['169.254.169.254', 'metadata.google.internal']);
+function isBlockedOllamaHost(hostname) {
+  const lower = hostname.toLowerCase();
+  if (BLOCKED_OLLAMA_HOSTS.has(lower)) return true;
+  if (lower.endsWith('.internal') && lower !== 'metadata.google.internal') return true;
+  const parts = lower.split('.');
+  if (parts.length === 4) {
+    const [a, b] = parts.map(Number);
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+  }
+  return false;
+}
+
 export class LLMSubsystem extends Subsystem {
   constructor(deps) {
     super('llm', deps);
@@ -253,21 +272,25 @@ export class LLMSubsystem extends Subsystem {
     this.client.registerProvider(this.anthropic);
     this.client.registerProvider(this.openrouter);
 
-    // Check Ollama health and discover models
-    try {
-      const healthy = await this.ollama.checkHealth();
-      if (healthy) {
-        const models = await this.ollama.listModels();
-        if (models.length > 0) {
-          this.router.registerOllamaModels(models);
-          this.log.info?.(`Ollama online: ${models.length} models available`);
+    // --- TUNABLE: Ollama discovery is fire-and-forget so the 5 s health-check
+    // timeout never blocks Tier 2 startup. Models are registered asynchronously;
+    // any llm_complete call before discovery finishes uses cloud providers.
+    (async () => {
+      try {
+        const healthy = await this.ollama.checkHealth();
+        if (healthy) {
+          const models = await this.ollama.listModels();
+          if (models.length > 0) {
+            this.router.registerOllamaModels(models);
+            this.log.info?.(`Ollama online: ${models.length} models available`);
+          }
+        } else {
+          this.log.info?.('Ollama not reachable -- local models disabled');
         }
-      } else {
-        this.log.info?.('Ollama not reachable -- local models disabled');
+      } catch (err) {
+        this.log.warn?.('Ollama discovery failed:', err?.message);
       }
-    } catch (err) {
-      this.log.warn?.('Ollama discovery failed:', err?.message);
-    }
+    })();
 
     // Set default provider based on what's available
     if (this.anthropic.isAvailable()) {
@@ -278,27 +301,28 @@ export class LLMSubsystem extends Subsystem {
       this.client.setDefaultProvider('ollama');
     }
 
-    this._started = true;
+    await super.start();
     this.log.info?.(`LLM subsystem started. Default provider: ${this.client.getDefaultProvider()}`);
   }
 
   async stop() {
     this.router.stop();
-    this._started = false;
+    await super.stop();
   }
 
   // ── Private ───────────────────────────────────────────────────────
 
   async #loadApiKeys() {
-    let keys;
+    let result;
     if (this.vault) {
       try {
-        keys = await this.vault.read('api-keys');
+        result = await this.vault.read('api-keys');
       } catch {
         // No keys yet -- that's fine
       }
     }
 
+    const keys = result?.success ? result.data : null;
     if (!keys) return;
 
     if (keys.anthropic) this.anthropic.setApiKey(keys.anthropic);
@@ -313,6 +337,8 @@ export class LLMSubsystem extends Subsystem {
         const parsed = new URL(keys.ollamaEndpoint);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
           process.stderr.write(`[friday:llm] Rejected ollamaEndpoint: invalid protocol ${parsed.protocol}\n`);
+        } else if (isBlockedOllamaHost(parsed.hostname)) {
+          process.stderr.write(`[friday:llm] Rejected ollamaEndpoint: blocked hostname ${parsed.hostname}\n`);
         } else {
           this.ollama = new OllamaProvider({ endpoint: keys.ollamaEndpoint });
           this.client.registerProvider(this.ollama);

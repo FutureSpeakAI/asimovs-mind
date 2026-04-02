@@ -265,6 +265,9 @@ async function startHttpBridge() {
           const body = await readBody(req);
           const { passphrase } = JSON.parse(body);
           const result = await vault.unlock(passphrase);
+          if (result.success) {
+            eventBus.publish('vault:unlocked', { timestamp: Date.now() });
+          }
           res.end(JSON.stringify(result));
 
         } else if (route === '/initialize' && req.method === 'POST') {

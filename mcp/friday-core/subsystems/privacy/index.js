@@ -41,8 +41,22 @@ const PII_PATTERNS = {
   IP: [
     /\b(?!127\.0\.0\.1|192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.)(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g
   ],
-  PATH: [] // Populated dynamically with username
+  PATH: [] // Populated at module load time (see below)
 };
+
+// --- TUNABLE: PATH patterns are compiled once at module load, not per-call.
+// USERNAME never changes during a process lifetime, so there is no reason to
+// rebuild these RegExp objects on every scrubPii() invocation.
+{
+  const username = process.env.USERNAME || process.env.USER || '';
+  if (username) {
+    const escaped = escapeRegex(username);
+    PII_PATTERNS.PATH = [
+      new RegExp(`[A-Za-z]:\\\\(?:Users|users)\\\\${escaped}\\\\[^\\s"']+`, 'g'),
+      new RegExp(`/(?:home|Users)/${escaped}/[^\\s"']+`, 'g')
+    ];
+  }
+}
 
 // --- FNV-1a hash for deterministic session-scoped placeholders ---
 
@@ -64,15 +78,6 @@ function escapeRegex(str) {
 export function scrubPii(text, nonce, shield) {
   let result = text;
   const nonceSeed = parseInt(nonce.slice(0, 8), 16);
-
-  // Add username-based path patterns
-  const username = process.env.USERNAME || process.env.USER || '';
-  if (username) {
-    PII_PATTERNS.PATH = [
-      new RegExp(`[A-Za-z]:\\\\(?:Users|users)\\\\${escapeRegex(username)}\\\\[^\\s"']+`, 'g'),
-      new RegExp(`/(?:home|Users)/${escapeRegex(username)}/[^\\s"']+`, 'g')
-    ];
-  }
 
   // Process in order: specific to broad (secrets first, names last)
   const categoryOrder = ['SECRET', 'CREDIT_CARD', 'SSN', 'EMAIL', 'PHONE', 'IP', 'PATH'];

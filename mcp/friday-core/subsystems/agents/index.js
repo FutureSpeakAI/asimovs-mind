@@ -40,6 +40,7 @@ export class AgentSubsystem extends Subsystem {
   #delegation;
   #mesh;
   #teams;
+  #cleanupInterval = null;
 
   constructor(deps) {
     super('agents', deps);
@@ -57,9 +58,9 @@ export class AgentSubsystem extends Subsystem {
 
   async stop() {
     // Cancel the periodic cleanup interval registered in registerEvents()
-    if (this._cleanupInterval) {
-      clearInterval(this._cleanupInterval);
-      this._cleanupInterval = null;
+    if (this.#cleanupInterval) {
+      clearInterval(this.#cleanupInterval);
+      this.#cleanupInterval = null;
     }
     // Halt all active trees on shutdown
     await this.#delegation.haltAll();
@@ -80,13 +81,11 @@ export class AgentSubsystem extends Subsystem {
     });
 
     // Periodic cleanup
-    const cleanupInterval = setInterval(() => {
+    this.#cleanupInterval = setInterval(() => {
       this.#delegation.cleanup();
       this.#teams.cleanup();
     }, 5 * 60 * 1000);
-
-    // Store so we can clear on stop
-    this._cleanupInterval = cleanupInterval;
+    this.#cleanupInterval.unref();
   }
 
   /** Expose components for other subsystems */

@@ -6,7 +6,20 @@
  * The PeerChannel handles encryption/decryption; this layer just moves bytes.
  */
 
-import { WebSocketServer, WebSocket } from 'ws';
+// --- TUNABLE: ws is lazy-loaded on first use (start/connect) to avoid
+// paying its parse cost at startup when P2P is never used.
+// WebSocketServer and WebSocket are resolved the first time start() or
+// connect() is called, then cached in module-level variables.
+let WebSocketServer = null;
+let WebSocket = null;
+async function loadWs() {
+  if (!WebSocketServer) {
+    const ws = await import('ws');
+    WebSocketServer = ws.WebSocketServer;
+    WebSocket = ws.WebSocket;
+  }
+}
+
 import crypto from 'node:crypto';
 
 const WS_PROTOCOL = 'asimov-p2p-v1';
@@ -30,6 +43,7 @@ export class P2PTransport {
   onIncomingMessage(fn) { this.#onIncomingMessage = fn; }
 
   async start(preferredPort = 0) {
+    await loadWs();
     return new Promise((resolve, reject) => {
       this.#wss = new WebSocketServer({
         port: preferredPort,
@@ -55,6 +69,7 @@ export class P2PTransport {
   }
 
   async connect(address, peerId) {
+    await loadWs();
     // address: "ws://hostname:port" or "wss://hostname:port"
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
