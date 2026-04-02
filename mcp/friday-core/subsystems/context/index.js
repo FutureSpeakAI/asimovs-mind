@@ -69,14 +69,17 @@ export class ContextSubsystem extends Subsystem {
   registerEvents() {
     if (!this.eventBus) return;
 
-    // Listen to all events and feed them into the graph for entity extraction
-    this.eventBus.on('*', (event) => {
-      try {
-        this.#graph.processEvent(event);
-      } catch {
-        // Don't let graph errors break the event pipeline
-      }
-    });
+    // Feed entity-rich events into the graph. Wiring.js routes memory:stored
+    // explicitly, so we only subscribe to events that carry entity content.
+    // The prior wildcard '*' handler was removed because it processed every
+    // event (including noise like eis:updated, trust:score-updated) at cost
+    // of CPU with no entity extraction benefit.
+    const feedGraph = (event) => {
+      try { this.#graph.processEvent(event); } catch { /* graph errors are non-fatal */ }
+    };
+    this.eventBus.on('message:user', feedGraph);
+    this.eventBus.on('message:assistant', feedGraph);
+    this.eventBus.on('trust:evidence-added', feedGraph);
 
     // On vault:unlocked, reload graph from vault
     this.eventBus.on('vault:unlocked', async () => {
@@ -117,19 +120,18 @@ export class ContextSubsystem extends Subsystem {
       }
     });
 
-    // memory:stored is already caught by the wildcard '*' handler above
+    // memory:stored is routed explicitly through wiring.js
 
-    // On session:end or vault:locking, save graph to vault
-    const saveGraph = async () => {
+    // On session:end, save graph to vault. vault:locking triggers session:end
+    // via the conductor, so subscribing to both would cause a double save.
+    this.eventBus.on('session:end', async () => {
       try {
         await this.#graph.persist();
         this.log.info('context graph saved to vault');
       } catch (err) {
         this.log.warn(`context graph save failed: ${err.message}`);
       }
-    };
-    this.eventBus.on('session:end', saveGraph);
-    this.eventBus.on('vault:locking', saveGraph);
+    });
   }
 
   // -- MCP tools ---------------------------------------------------------------

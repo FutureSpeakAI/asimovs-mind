@@ -73,9 +73,9 @@ export class PersonalitySubsystem extends Subsystem {
    */
   async #applyMotherSignal() {
     try {
-      // Read from vault root (not namespaced)
-      const vault = this.state?.constructor?.name === 'Object' ? null : this.vault;
-      if (!vault) return;
+      // Read from vault root (not namespaced) — user-profile is a cross-cutting key
+      const vault = this.vault;
+      if (!vault || typeof vault.read !== 'function') return;
 
       const result = await vault.read('user-profile');
       const userProfile = result?.success ? result.data : result;
