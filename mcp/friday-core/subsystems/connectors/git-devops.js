@@ -9,10 +9,22 @@
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 const MAX_OUTPUT_CHARS = 8000;
 const EXEC_TIMEOUT_MS = 30_000;
+
+function validateRepoPath(repoPath) {
+  if (!repoPath) return null; // will use cwd
+  const resolved = path.resolve(repoPath);
+  const home = os.homedir();
+  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || home;
+  if (!resolved.startsWith(home) && !resolved.startsWith(projectRoot)) {
+    return `repo_path must be under ${home} or ${projectRoot}`;
+  }
+  return null;
+}
 const DIFF_CHAR_LIMIT = 5000;
 
 const DANGEROUS_CLOUD_PATTERNS = [
@@ -60,9 +72,16 @@ function detectPackageManager(cwd) {
 function ok(text, limit) { return { result: truncate(text.trim(), limit) }; }
 function fail(msg) { return { error: msg }; }
 
+function checkRepoPath(args) {
+  const err = validateRepoPath(args.repo_path);
+  return err ? fail(err) : null;
+}
+
 // -- Git Tools --
 
 function gitStatus(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   try {
     const porcelain = runArgs('git', ['status', '--porcelain'], { cwd: repoPath });
@@ -85,6 +104,8 @@ function gitStatus(args) {
 }
 
 function gitLog(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   const count = Math.min(args.count ?? 20, 500);
   const oneline = args.oneline ?? true;
@@ -100,6 +121,8 @@ function gitLog(args) {
 }
 
 function gitDiff(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   try {
     const gitArgs = ['diff'];
@@ -112,6 +135,8 @@ function gitDiff(args) {
 }
 
 function gitCommit(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   try {
     if (args.files?.length > 0) {
@@ -125,6 +150,8 @@ function gitCommit(args) {
 }
 
 function gitBranch(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   const action = args.action;
   const branchName = args.branch_name;
@@ -146,6 +173,8 @@ function gitBranch(args) {
 }
 
 function gitStash(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   try {
     switch (args.action) {
@@ -163,6 +192,8 @@ function gitStash(args) {
 }
 
 function gitPull(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   try {
     const ga = args.rebase ? ['pull', '--rebase'] : ['pull'];
     return ok(runArgs('git', ga, { cwd: args.repo_path }) || 'Already up to date.');
@@ -170,6 +201,8 @@ function gitPull(args) {
 }
 
 function gitPush(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   const repoPath = args.repo_path;
   try {
     if (args.force) {
@@ -197,6 +230,8 @@ function gitClone(args) {
 }
 
 function gitBlame(args) {
+  const blocked = checkRepoPath(args);
+  if (blocked) return blocked;
   try {
     const ga = ['blame'];
     if (args.lines) {

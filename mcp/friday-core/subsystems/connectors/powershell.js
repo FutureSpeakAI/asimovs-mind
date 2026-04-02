@@ -146,11 +146,23 @@ async function registryWrite(args) {
 
 const WMI_NAMESPACE_PATTERN = /^[a-zA-Z0-9_/\\]+$/;
 
+// WMI classes that expose sensitive credential or security data
+const BLOCKED_WMI_CLASSES = new Set([
+  'win32_networkloginprofile', 'win32_useraccount', 'win32_logonsession',
+  'win32_loggedonuser', 'win32_ntlogevent', 'win32_shadowcopy',
+  'msft_mpsignaturedynamics', 'win32_scheduledjob',
+]);
+
 async function wmiQuery(args) {
   const query = String(args.query ?? '');
   if (!query) return { error: 'WMI query required.' };
   const namespace = String(args.namespace ?? 'root/cimv2');
   if (!WMI_NAMESPACE_PATTERN.test(namespace)) return { error: 'Invalid WMI namespace: only alphanumeric, underscore, forward slash, and backslash are allowed.' };
+  // Check for blocked WMI classes in the query
+  const classMatch = query.match(/\bFROM\s+(\w+)/i);
+  if (classMatch && BLOCKED_WMI_CLASSES.has(classMatch[1].toLowerCase())) {
+    return { error: `SAFETY BLOCK: WMI class "${classMatch[1]}" is restricted due to credential/security sensitivity.` };
+  }
   return safeRun(`Get-CimInstance -Query '${psEsc(query)}' -Namespace '${psEsc(namespace)}' | Format-List | Out-String -Width 300`);
 }
 
