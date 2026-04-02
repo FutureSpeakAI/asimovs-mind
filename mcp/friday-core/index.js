@@ -423,9 +423,12 @@ async function main() {
   logger.info('MCP server connected');
 
   // Cleanup on exit
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
-  process.on('exit', cleanup);
+  // SIGINT / SIGTERM: run async cleanup then exit explicitly.
+  // process.on('exit') is intentionally omitted — exit handlers must be
+  // synchronous and cleanup() is async; registering it on 'exit' caused all
+  // awaited work (stopAll, unlink) to be silently dropped.
+  process.on('SIGINT',  () => { cleanup().finally(() => process.exit(0)); });
+  process.on('SIGTERM', () => { cleanup().finally(() => process.exit(0)); });
 }
 
 async function cleanup() {
@@ -437,6 +440,14 @@ async function cleanup() {
   try { await fs.unlink(path.join(VAULT_DIR, 'port')).catch(() => {}); } catch {}
   logger.info('Vault locked, subsystems stopped, keys destroyed');
 }
+
+// Surface unhandled rejections from subsystem background timers / event handlers
+// so they don't silently disappear. Log and exit to avoid running in a
+// degraded state where critical subsystems have failed undetected.
+process.on('unhandledRejection', (reason) => {
+  process.stderr.write(`[friday-core] Unhandled rejection: ${reason}\n`);
+  cleanup().finally(() => process.exit(1));
+});
 
 main().catch((err) => {
   process.stderr.write(`[friday-core] Fatal: ${err.message}\n`);

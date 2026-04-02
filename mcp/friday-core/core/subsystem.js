@@ -85,24 +85,33 @@ export class SubsystemRegistry {
       }
     }
 
-    if (tiered.size === 0) {
-      // No tiers declared — original sequential behaviour
+    // On any startup failure, stop the subsystems that already started so we
+    // don't leave a partially-initialised system running. Re-throw the original
+    // error so main() (and its caller in bootstrap.js) can surface it cleanly.
+    try {
+      if (tiered.size === 0) {
+        // No tiers declared — original sequential behaviour
+        for (const name of sequential) {
+          await this.#subsystems.get(name).start();
+        }
+        return;
+      }
+
+      // Start sequential (un-tiered) subsystems first, then run tiers in order
       for (const name of sequential) {
         await this.#subsystems.get(name).start();
       }
-      return;
-    }
 
-    // Start sequential (un-tiered) subsystems first, then run tiers in order
-    for (const name of sequential) {
-      await this.#subsystems.get(name).start();
-    }
-
-    const sortedTiers = [...tiered.keys()].sort((a, b) => a - b);
-    for (const t of sortedTiers) {
-      await Promise.all(
-        tiered.get(t).map((name) => this.#subsystems.get(name).start())
-      );
+      const sortedTiers = [...tiered.keys()].sort((a, b) => a - b);
+      for (const t of sortedTiers) {
+        await Promise.all(
+          tiered.get(t).map((name) => this.#subsystems.get(name).start())
+        );
+      }
+    } catch (startErr) {
+      // Best-effort cleanup of already-started subsystems (reverse order)
+      await this.stopAll().catch(() => {});
+      throw startErr;
     }
   }
 

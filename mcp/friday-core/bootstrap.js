@@ -65,8 +65,11 @@ if (existsSync(portPath)) {
         const _resp = await fetch(`http://127.0.0.1:${port}/status`, {
           signal: AbortSignal.timeout(1000),
         });
-        // If we get here, another instance is already running
-        process.stderr.write(`[friday] Another instance detected on port ${port}\n`);
+        // If we get here, another instance is already running — do not start a
+        // second one. The MCP host will get two servers responding on stdio,
+        // which corrupts the protocol stream.
+        process.stderr.write(`[friday] Another instance already running on port ${port}. Exiting.\n`);
+        process.exit(0);
       } catch {
         // Stale port file — remove it
         unlinkSync(portPath);
