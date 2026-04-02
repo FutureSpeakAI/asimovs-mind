@@ -77,7 +77,7 @@ export class EpisodicMemory {
    */
   startEpisode(title) {
     if (this.#active) {
-      console.warn('[EpisodicMemory] Episode already in progress, ending it first');
+      process.stderr.write('[friday:episodic] Episode already in progress, ending it first\n');
       // Auto-end the previous without summary
       this.#finalizeEpisode('Auto-ended: new episode started');
     }
@@ -117,7 +117,7 @@ export class EpisodicMemory {
    */
   async endEpisode(summary, meta = {}) {
     if (!this.#active) {
-      console.warn('[EpisodicMemory] No active episode to end');
+      process.stderr.write('[friday:episodic] No active episode to end\n');
       return null;
     }
 
@@ -236,7 +236,7 @@ export class EpisodicMemory {
     }
 
     // Save async
-    this.#save().catch(err => console.warn('[EpisodicMemory] Save failed:', err.message));
+    this.#save().catch(err => process.stderr.write('[friday:episodic] Save failed: ' + err.message + '\n'));
 
     // Clear active
     this.#active = null;

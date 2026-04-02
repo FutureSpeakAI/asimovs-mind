@@ -286,7 +286,7 @@ export class TrustEngine {
         await this.#state.set('identities', this.#identities);
       }
     } catch (err) {
-      console.warn('[TrustEngine] Failed to save identities:', err instanceof Error ? err.message : 'Unknown error');
+      process.stderr.write('[friday:trust] Failed to save identities: ' + (err instanceof Error ? err.message : 'Unknown error') + '\n');
     }
   }
 }

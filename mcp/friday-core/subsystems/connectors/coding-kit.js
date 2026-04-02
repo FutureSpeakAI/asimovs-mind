@@ -14,9 +14,22 @@
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 const MAX_OUTPUT_CHARS = 12_000;
+const MAX_DEPTH_HARD_LIMIT = 10;
+
+function validatePath(inputPath) {
+  if (!inputPath) return 'path is required.';
+  const resolved = path.resolve(inputPath);
+  const home = os.homedir();
+  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || home;
+  if (!resolved.startsWith(home) && !resolved.startsWith(projectRoot)) {
+    return `Path must be under ${home} or ${projectRoot}`;
+  }
+  return null;
+}
 
 function truncate(text, limit = MAX_OUTPUT_CHARS) {
   if (text.length <= limit) return text;
@@ -49,7 +62,9 @@ function extractSymbolName(match) {
 
 function codeAnalyzeProject(args) {
   const projectPath = args.path;
-  if (!projectPath || !fs.existsSync(projectPath)) {
+  const pathErr = validatePath(projectPath);
+  if (pathErr) return fail(pathErr);
+  if (!fs.existsSync(projectPath)) {
     return fail('Valid project path is required.');
   }
 
@@ -105,7 +120,9 @@ function codeAnalyzeProject(args) {
 function codeFindSymbols(args) {
   const projectPath = args.path;
   const query = args.query;
-  if (!projectPath || !query) return fail('path and query are required.');
+  if (!query) return fail('path and query are required.');
+  const pathErr = validatePath(projectPath);
+  if (pathErr) return fail(pathErr);
 
   const kindFilter = args.kind || 'all';
   const maxResults = args.max_results || 30;
@@ -157,9 +174,11 @@ function codeFindSymbols(args) {
 
 function codeGetTree(args) {
   const projectPath = args.path;
-  if (!projectPath || !fs.existsSync(projectPath)) return fail('Valid path is required.');
+  const pathErr = validatePath(projectPath);
+  if (pathErr) return fail(pathErr);
+  if (!fs.existsSync(projectPath)) return fail('Valid path is required.');
 
-  const maxDepth = args.max_depth || 4;
+  const maxDepth = Math.min(args.max_depth || 4, MAX_DEPTH_HARD_LIMIT);
   const filesOnly = args.files_only === true;
   const entries = [];
 
@@ -191,7 +210,8 @@ function codeGetTree(args) {
 
 function codeAnalyzeDeps(args) {
   const projectPath = args.path;
-  if (!projectPath) return fail('path is required.');
+  const pathErr = validatePath(projectPath);
+  if (pathErr) return fail(pathErr);
 
   try {
     const pkgJsonPath = path.join(projectPath, 'package.json');

@@ -28,13 +28,13 @@ export class EmbeddingPipeline {
     try {
       const available = await this.#checkOllamaAvailable();
       if (!available) {
-        console.warn('[EmbeddingPipeline] Ollama not available — embeddings disabled');
+        process.stderr.write('[friday:embedding] Ollama not available — embeddings disabled\n');
         return;
       }
 
       const model = await this.#findEmbeddingModel();
       if (!model) {
-        console.warn('[EmbeddingPipeline] No embedding model found — embeddings disabled');
+        process.stderr.write('[friday:embedding] No embedding model found — embeddings disabled\n');
         return;
       }
 
@@ -42,7 +42,7 @@ export class EmbeddingPipeline {
       this.#ready = true;
       process.stderr.write(`[EmbeddingPipeline] Ready with model: ${model}\n`);
     } catch (err) {
-      console.warn('[EmbeddingPipeline] Start failed:', err.message);
+      process.stderr.write('[friday:embedding] Start failed: ' + err.message + '\n');
       this.#ready = false;
       this.#model = null;
     }
@@ -75,7 +75,7 @@ export class EmbeddingPipeline {
       });
 
       if (!response.ok) {
-        console.warn(`[EmbeddingPipeline] Embed failed (${response.status})`);
+        process.stderr.write('[friday:embedding] Embed failed (' + response.status + ')\n');
         return null;
       }
 
@@ -83,7 +83,7 @@ export class EmbeddingPipeline {
       if (!data.embeddings || data.embeddings.length === 0) return null;
       return data.embeddings[0];
     } catch (err) {
-      console.warn('[EmbeddingPipeline] Embed error:', err.message);
+      process.stderr.write('[friday:embedding] Embed error: ' + err.message + '\n');
       return null;
     }
   }
@@ -103,14 +103,14 @@ export class EmbeddingPipeline {
       });
 
       if (!response.ok) {
-        console.warn(`[EmbeddingPipeline] EmbedBatch failed (${response.status})`);
+        process.stderr.write('[friday:embedding] EmbedBatch failed (' + response.status + ')\n');
         return null;
       }
 
       const data = await response.json();
       return data.embeddings || null;
     } catch (err) {
-      console.warn('[EmbeddingPipeline] EmbedBatch error:', err.message);
+      process.stderr.write('[friday:embedding] EmbedBatch error: ' + err.message + '\n');
       return null;
     }
   }

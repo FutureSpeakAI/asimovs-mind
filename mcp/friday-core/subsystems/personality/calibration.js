@@ -443,9 +443,9 @@ export class CalibrationEngine {
 
       if (violations >= 2) {
         // Log a hard warning instead of crashing (no FatalIntegrityError in MCP)
-        console.error(
-          `[Calibration] SYCOPHANCY DRIFT: ${violations + 1} violations. ` +
-          `Streak: ${agreementStreak}, bias: ${positivityBias.toFixed(2)}. Reset applied.`
+        process.stderr.write(
+          '[friday:calibration] SYCOPHANCY DRIFT: ' + (violations + 1) + ' violations. ' +
+          'Streak: ' + agreementStreak + ', bias: ' + positivityBias.toFixed(2) + '. Reset applied.\n'
         );
       }
     }

@@ -68,13 +68,13 @@ export class LLMClient {
     } catch (err) {
       // If explicit provider was requested, only fall back if it wasn't explicitly set
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.warn(`[LLMClient] Provider '${provider.name}' failed: ${errMsg} -- trying fallbacks`);
+      process.stderr.write('[friday:llm] Provider \'' + provider.name + '\' failed: ' + errMsg + ' -- trying fallbacks\n');
 
       for (const [, fallback] of this.#providers) {
         if (fallback.name === provider.name) continue;
         if (!fallback.isAvailable()) continue;
         try {
-          console.warn(`[LLMClient] Retrying with fallback '${fallback.name}'`);
+          process.stderr.write('[friday:llm] Retrying with fallback \'' + fallback.name + '\'\n');
           return await fallback.complete(request);
         } catch {
           continue;
@@ -102,7 +102,7 @@ export class LLMClient {
       if (providerName) throw err;
 
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.warn(`[LLMClient] Streaming from '${provider.name}' failed: ${errMsg} -- trying fallbacks`);
+      process.stderr.write('[friday:llm] Streaming from \'' + provider.name + '\' failed: ' + errMsg + ' -- trying fallbacks\n');
     }
 
     // Try fallbacks
@@ -110,7 +110,7 @@ export class LLMClient {
       if (fallback.name === provider.name) continue;
       if (!fallback.isAvailable()) continue;
       try {
-        console.warn(`[LLMClient] Retrying stream with fallback '${fallback.name}'`);
+        process.stderr.write('[friday:llm] Retrying stream with fallback \'' + fallback.name + '\'\n');
         for await (const chunk of fallback.stream(request)) {
           yield chunk;
         }
@@ -151,7 +151,7 @@ export class LLMClient {
     if (!provider) {
       for (const [, p] of this.#providers) {
         if (p.isAvailable()) {
-          console.warn(`[LLMClient] Provider '${name}' not found, falling back to '${p.name}'`);
+          process.stderr.write('[friday:llm] Provider \'' + name + '\' not found, falling back to \'' + p.name + '\'\n');
           return p;
         }
       }
@@ -164,7 +164,7 @@ export class LLMClient {
     if (!provider.isAvailable()) {
       for (const [, p] of this.#providers) {
         if (p.isAvailable() && p.name !== name) {
-          console.warn(`[LLMClient] Provider '${name}' unavailable, falling back to '${p.name}'`);
+          process.stderr.write('[friday:llm] Provider \'' + name + '\' unavailable, falling back to \'' + p.name + '\'\n');
           return p;
         }
       }

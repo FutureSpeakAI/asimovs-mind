@@ -57,7 +57,7 @@ export class AuditLog {
 
       this.#queueSave();
     } catch (err) {
-      console.warn('[AuditLog] Write failed:', err instanceof Error ? err.message : 'Unknown error');
+      process.stderr.write('[friday:audit] Write failed: ' + (err instanceof Error ? err.message : 'Unknown error') + '\n');
     }
   }
 

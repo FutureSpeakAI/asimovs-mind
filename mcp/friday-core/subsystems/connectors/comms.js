@@ -20,19 +20,23 @@ const PS_TIMEOUT_MS = 15_000;
 
 // -- Safety helpers --
 
-function validateWebhookUrl(raw) {
+function validateWebhookUrl(raw, allowHttp = false) {
   let parsed;
   try { parsed = new URL(raw); } catch { throw new Error(`Invalid URL: ${raw}`); }
-  if (parsed.protocol !== 'https:') throw new Error('Webhook URL must use HTTPS.');
+  if (allowHttp) {
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('URL must use HTTP or HTTPS.');
+  } else {
+    if (parsed.protocol !== 'https:') throw new Error('Webhook URL must use HTTPS.');
+  }
   const hostname = parsed.hostname.toLowerCase();
   if (['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local')) {
-    throw new Error('Webhook URL must not target localhost.');
+    throw new Error('URL must not target localhost.');
   }
   const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4Match) {
     const [a, b] = ipv4Match.slice(1).map(Number);
     if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) {
-      throw new Error('Webhook URL must not target private IP ranges.');
+      throw new Error('URL must not target private IP ranges.');
     }
   }
 }
@@ -171,6 +175,7 @@ async function smtpSendEmailTool(args) {
 
 async function httpRequestTool(args) {
   if (!args.url) throw new Error('url is required.');
+  validateWebhookUrl(args.url, true);
   const method = String(args.method ?? 'POST').toUpperCase();
   const allowed = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
   if (!allowed.includes(method)) throw new Error(`Unsupported method: ${method}`);

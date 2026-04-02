@@ -230,9 +230,7 @@ export class OllamaProvider {
       } catch (err) {
         if (attempt === MAX_RETRIES || !this.#isRetryable(err)) throw err;
         const delay = BASE_DELAY_MS * 2 ** attempt + Math.random() * 500;
-        console.warn(
-          `[OllamaProvider] ${label} attempt ${attempt + 1} failed, retrying in ${Math.round(delay)}ms`,
-        );
+        process.stderr.write('[friday:ollama] ' + label + ' attempt ' + (attempt + 1) + ' failed, retrying in ' + Math.round(delay) + 'ms\n');
         await new Promise((r) => setTimeout(r, delay));
       }
     }

@@ -89,7 +89,7 @@ export class VoiceStateMachine {
     if (from === to) return false;
 
     if (!TRANSITIONS.has(`${from}->${to}`)) {
-      console.warn(`[VoiceStateMachine] Illegal transition: ${from} -> ${to} (${reason})`);
+      process.stderr.write('[friday:voice] Illegal transition: ' + from + ' -> ' + to + ' (' + reason + ')\n');
       return false;
     }
 

@@ -98,7 +98,14 @@ async function terminalCreate(args) {
   }
 
   const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim().slice(0, 64) : `${shell}-session`;
-  const cwd = typeof args.cwd === 'string' && args.cwd.trim() ? path.resolve(args.cwd.trim()) : os.homedir();
+  const rawCwd = typeof args.cwd === 'string' && args.cwd.trim() ? args.cwd.trim() : null;
+  const home = os.homedir();
+  const projectRoot = process.env.CLAUDE_PROJECT_ROOT || home;
+  const resolvedCwd = rawCwd ? path.resolve(rawCwd) : home;
+  if (rawCwd && !resolvedCwd.startsWith(home) && !resolvedCwd.startsWith(projectRoot)) {
+    return { error: `Working directory must be under ${home} or ${projectRoot}` };
+  }
+  const cwd = resolvedCwd;
 
   const { command, args: shellArgs } = resolveShellCommand(shell);
   const id = randomUUID();
@@ -235,11 +242,15 @@ async function terminalWaitFor(args) {
 
   let regex;
   try {
-    if (/(\+|\*|\?|\{)\s*\)(\+|\*|\?|\{)/.test(args.pattern) || /(\(.*\|.*\))(\+|\*|\{)/.test(args.pattern)) {
-      regex = new RegExp(args.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'm');
-    } else {
-      regex = new RegExp(args.pattern, 'm');
+    const pat = args.pattern;
+    if (pat.length > 200) {
+      return { error: 'Pattern rejected: exceeds maximum length of 200 characters' };
     }
+    // Reject nested quantifier patterns that cause catastrophic backtracking
+    if (/([+*?]|\{\d).*[)]\s*[+*?{]/.test(pat) || /[(].*[+*?].*[+*?]/.test(pat)) {
+      return { error: 'Pattern rejected: potential catastrophic backtracking' };
+    }
+    regex = new RegExp(pat, 'm');
   } catch (err) { return { error: `Invalid regex: ${err.message}` }; }
 
   const startTime = Date.now();

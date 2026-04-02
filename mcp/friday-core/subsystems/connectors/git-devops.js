@@ -328,7 +328,12 @@ function npmSearch(args) {
 
 // -- Cloud CLI --
 
+const ALLOWED_PROVIDERS = new Set(['aws', 'az', 'gcloud', 'kubectl', 'terraform', 'helm']);
+
 function cloudCli(args) {
+  if (!ALLOWED_PROVIDERS.has(args.provider)) {
+    return fail(`Unsupported provider: ${args.provider}. Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}`);
+  }
   for (const pattern of DANGEROUS_CLOUD_PATTERNS) {
     if (pattern.test(args.command)) {
       return fail(`SAFETY BLOCK: Command contains destructive keyword ("${pattern.source}").`);
