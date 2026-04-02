@@ -177,11 +177,14 @@ export class MemorySubsystem extends Subsystem {
       'memory_recall',
       'Recall relevant memories using semantic search (if embeddings available) or keyword matching.',
       {
-        query: z.string().describe('What to search for'),
+        query: z.string().min(1).describe('What to search for'),
         limit: z.number().int().min(1).max(50).default(5)
           .describe('Maximum results to return'),
       },
       async ({ query, limit }) => {
+        if (!query.trim()) {
+          return { content: [{ type: 'text', text: JSON.stringify({ count: 0, results: [], reason: 'Empty query — provide a search term' }) }] };
+        }
         const results = await tiers.recall(query, limit);
         return { content: [{ type: 'text', text: JSON.stringify({ count: results.length, results }, null, 2) }] };
       }

@@ -116,12 +116,15 @@ export class GatewaySubsystem extends Subsystem {
       'gateway_session_create',
       'Create or restore a gateway session for a sender. Adds a message to session history. Returns the conversation context for this sender.',
       {
-        channel: z.string().describe('Channel name'),
-        sender_id: z.string().describe('Sender identifier'),
+        channel: z.string().min(1).describe('Channel name'),
+        sender_id: z.string().min(1).describe('Sender identifier'),
         message: z.string().describe('The user message to add'),
         role: z.enum(['user', 'assistant']).default('user').describe('Message role'),
       },
       async ({ channel, sender_id, message, role }) => {
+        if (!channel.trim() || !sender_id.trim()) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: 'channel and sender_id must be non-empty' }) }] };
+        }
         if (role === 'user') {
           sessions.addUserMessage(channel, sender_id, message);
         } else {
