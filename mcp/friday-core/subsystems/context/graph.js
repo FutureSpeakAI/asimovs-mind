@@ -403,11 +403,13 @@ export class ContextGraph {
   }
 
   #extractFromText(text, now) {
-    // File paths
-    const fileMatches = text.match(FILE_PATTERN);
-    if (fileMatches) {
+    // File paths — use matchAll to get capture group 1, which excludes the
+    // leading delimiter character (space, quote, paren) from the full match.
+    const fileMatches = [...text.matchAll(FILE_PATTERN)].map(m => m[1]);
+    if (fileMatches.length > 0) {
       for (const m of fileMatches.slice(0, 5)) {
         const clean = m.trim();
+        if (!clean) continue;
         this.#touchNode(`file:${clean}`, 'file', this.#basename(clean), now, { path: clean });
       }
     }

@@ -42,16 +42,6 @@ export class ContextSubsystem extends Subsystem {
   async start() {
     await this.#graph.load();
 
-    // Attempt to load graph from vault immediately (in case vault is already unlocked)
-    try {
-      const saved = await this.state.read('graph');
-      if (saved?.success && saved.data) {
-        this.log.info('context graph loaded from vault on start');
-      }
-    } catch {
-      // Vault may not be unlocked yet, that is fine
-    }
-
     // Auto-persist every 5 minutes
     this.#persistTimer = setInterval(() => {
       this.#graph.persist().catch(err =>
