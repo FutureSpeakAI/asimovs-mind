@@ -13,8 +13,8 @@ Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the sho
 ## Quick Start
 
 ```bash
-# Install
-claude plugin add asimovs-mind
+# Install from GitHub
+claude plugin add https://github.com/FutureSpeakAI/asimovs-mind
 
 # First session
 /friday unlock              # initialize encrypted vault

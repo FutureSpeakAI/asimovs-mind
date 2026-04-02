@@ -1,18 +1,14 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "asimovs-mind-marketplace",
-  "description": "Agent Friday and Asimov's Mind plugins for Claude Code",
   "owner": {
     "name": "FutureSpeak.AI",
-    "email": "stephen@futurespeak.ai"
+    "url": "https://github.com/FutureSpeakAI"
   },
   "plugins": [
     {
       "name": "asimovs-mind",
-      "description": "Agent Friday — the complete AI runtime for Claude Code. 17 subsystems, 92 MCP tools, encrypted vault, holographic dashboard. Governed by Asimov's cLaws. MIT licensed.",
-      "category": "development",
       "source": "./",
-      "homepage": "https://github.com/FutureSpeakAI/asimovs-mind"
+      "description": "Agent Friday -- the complete AI runtime for Claude Code. 17 subsystems, 92 MCP tools, encrypted vault, governed agent swarm. v2.2.0."
     }
   ]
 }

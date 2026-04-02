@@ -10,10 +10,10 @@
 ## Installation
 
 ```bash
-# From the Claude Code marketplace
-claude plugin add asimovs-mind
+# Install directly from GitHub
+claude plugin add https://github.com/FutureSpeakAI/asimovs-mind
 
-# OR from source
+# OR clone and install from source
 git clone https://github.com/FutureSpeakAI/asimovs-mind.git
 claude plugin install ./asimovs-mind
 ```
