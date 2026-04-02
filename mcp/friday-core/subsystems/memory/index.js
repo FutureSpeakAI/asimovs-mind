@@ -25,8 +25,7 @@ import { MemoryTiers } from './tiers.js';
 import { EpisodicMemory } from './episodic.js';
 import { MemoryConsolidation } from './consolidation.js';
 
-// Capacity caps per tier
-const TIER_CAPS = { short: 100, medium: 500, long: 1000 };
+// Capacity caps are enforced inside MemoryTiers.store() — see tiers.js TIER_CAPS.
 
 export class MemorySubsystem extends Subsystem {
   #pipeline;
@@ -133,34 +132,10 @@ export class MemorySubsystem extends Subsystem {
   }
 
   /**
-   * Store with capacity management. If a tier is over its cap, evict the
-   * oldest entry with the lowest access count before inserting.
+   * Store via tiers. Capacity management and dedup are enforced inside
+   * MemoryTiers.store() for all call paths.
    */
   async #storeWithCapacity(content, category, tier, confidence) {
-    const tierMap = { short: 'shortTerm', medium: 'mediumTerm', long: 'longTerm' };
-    const tierKey = tierMap[tier];
-    const cap = TIER_CAPS[tier];
-
-    if (tierKey && cap) {
-      const getter = {
-        shortTerm: () => this.#tiers.getShortTerm(),
-        mediumTerm: () => this.#tiers.getMediumTerm(),
-        longTerm: () => this.#tiers.getLongTerm(),
-      };
-      const entries = getter[tierKey]();
-      if (entries.length >= cap) {
-        // Evict oldest entry with lowest access count
-        const sorted = [...entries].sort((a, b) => {
-          const accessDiff = a.accessCount - b.accessCount;
-          if (accessDiff !== 0) return accessDiff;
-          return a.created - b.created;
-        });
-        if (sorted.length > 0) {
-          await this.#tiers.forget(sorted[0].id);
-        }
-      }
-    }
-
     return this.#tiers.store(content, category, tier, confidence);
   }
 

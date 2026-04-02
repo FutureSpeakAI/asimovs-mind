@@ -15,7 +15,8 @@
 
 import crypto from 'node:crypto';
 
-const MAX_SHORT_TERM = 50;
+// --- TUNABLE ---
+const TIER_CAPS = { short: 100, medium: 500, long: 1000 };
 const MEDIUM_TERM_MAX_AGE_DAYS = 30;
 
 // Stopwords for duplicate detection (Jaccard similarity)
@@ -32,6 +33,9 @@ const STOP_WORDS = new Set([
 export class MemoryTiers {
   /** @type {{ shortTerm: Array, mediumTerm: Array, longTerm: Array }} */
   #store = { shortTerm: [], mediumTerm: [], longTerm: [] };
+
+  /** @type {Set<string>} SHA-256 content hashes for short-term dedup (O(1) lookup) */
+  #shortTermHashes = new Set();
 
   /** @type {object|null} Namespaced state accessor */
   #state = null;
@@ -96,16 +100,24 @@ export class MemoryTiers {
     };
 
     switch (tier) {
-      case 'short':
-        this.#store.shortTerm.push(entry);
-        if (this.#store.shortTerm.length > MAX_SHORT_TERM) {
-          this.#store.shortTerm = this.#store.shortTerm.slice(-MAX_SHORT_TERM);
+      case 'short': {
+        // Content-hash dedup: skip exact duplicates (catches duplicate event firings)
+        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        if (this.#shortTermHashes.has(hash)) return null;
+
+        // Enforce cap via LFU+age eviction before inserting
+        if (this.#store.shortTerm.length >= TIER_CAPS.short) {
+          this.#evictOne(this.#store.shortTerm);
         }
+
+        this.#shortTermHashes.add(hash);
+        this.#store.shortTerm.push(entry);
         // Short-term is in-memory only, no vault write
         break;
+      }
 
       case 'medium': {
-        // Duplicate check
+        // Duplicate check via Jaccard similarity
         const isDup = this.#isDuplicate(content, this.#store.mediumTerm.map(e => e.content));
         if (isDup) {
           // Reinforce existing
@@ -118,6 +130,13 @@ export class MemoryTiers {
             return existing;
           }
         }
+
+        // Enforce cap via LFU+age eviction before inserting
+        if (this.#store.mediumTerm.length >= TIER_CAPS.medium) {
+          const evicted = this.#evictOne(this.#store.mediumTerm);
+          if (evicted && this.#search) this.#search.remove(evicted.id);
+        }
+
         this.#store.mediumTerm.push(entry);
         await this.#save('medium-term');
         if (this.#search) {
@@ -129,6 +148,13 @@ export class MemoryTiers {
       case 'long': {
         const isDup = this.#isDuplicate(content, this.#store.longTerm.map(e => e.content));
         if (isDup) return null; // Already known
+
+        // Enforce cap via LFU+age eviction before inserting
+        if (this.#store.longTerm.length >= TIER_CAPS.long) {
+          const evicted = this.#evictOne(this.#store.longTerm);
+          if (evicted && this.#search) this.#search.remove(evicted.id);
+        }
+
         entry.confidence = Math.max(0.7, confidence); // Long-term starts at higher confidence
         this.#store.longTerm.push(entry);
         await this.#save('long-term');
@@ -180,7 +206,10 @@ export class MemoryTiers {
 
     const shortIdx = this.#store.shortTerm.findIndex(e => e.id === id);
     if (shortIdx >= 0) {
-      this.#store.shortTerm.splice(shortIdx, 1);
+      const [removed] = this.#store.shortTerm.splice(shortIdx, 1);
+      // Remove hash so the same content can be re-stored after an explicit forget
+      const hash = crypto.createHash('sha256').update(removed.content).digest('hex');
+      this.#shortTermHashes.delete(hash);
       found = true;
     }
 
@@ -230,6 +259,7 @@ export class MemoryTiers {
 
   clearShortTerm() {
     this.#store.shortTerm = [];
+    this.#shortTermHashes.clear();
   }
 
   // -- Internal --------------------------------------------------------
@@ -334,6 +364,19 @@ export class MemoryTiers {
     return new Set(words.filter(w => !STOP_WORDS.has(w) && w.length > 2));
   }
 
+  /**
+   * Evict the oldest entry with the lowest access count from an array in-place.
+   * Returns the evicted entry, or null if the array is empty.
+   */
+  #evictOne(arr) {
+    if (arr.length === 0) return null;
+    arr.sort((a, b) => {
+      const diff = a.accessCount - b.accessCount;
+      return diff !== 0 ? diff : a.created - b.created;
+    });
+    return arr.shift();
+  }
+
   #pruneExpired() {
     const cutoff = Date.now() - MEDIUM_TERM_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
     const before = this.#store.mediumTerm.length;
@@ -343,10 +386,6 @@ export class MemoryTiers {
     const pruned = before - this.#store.mediumTerm.length;
     if (pruned > 0) {
       process.stderr.write(`[MemoryTiers] Pruned ${pruned} expired medium-term entries\n`);
-    }
-
-    if (this.#store.shortTerm.length > MAX_SHORT_TERM) {
-      this.#store.shortTerm = this.#store.shortTerm.slice(-MAX_SHORT_TERM);
     }
   }
 
