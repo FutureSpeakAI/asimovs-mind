@@ -33,9 +33,9 @@ export class MeetingIntelligence {
   async initialize(state) {
     this.#state = state;
     try {
-      const data = await state.get('meetings');
-      if (Array.isArray(data)) {
-        this.#meetings = data;
+      const result = await state.read('meetings');
+      if (result?.success && Array.isArray(result.data)) {
+        this.#meetings = result.data;
       }
     } catch {
       this.#meetings = [];
@@ -277,7 +277,7 @@ export class MeetingIntelligence {
     setTimeout(async () => {
       this.#saveQueued = false;
       try {
-        await this.#state.set('meetings', this.#meetings);
+        await this.#state.write('meetings', this.#meetings);
       } catch {
         // Best effort
       }

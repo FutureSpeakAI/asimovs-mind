@@ -40,9 +40,9 @@ export class DailyBriefingEngine {
   async initialize(state) {
     this.#state = state;
     try {
-      const data = await state.get('briefings');
-      if (Array.isArray(data)) {
-        this.#briefings = data;
+      const result = await state.read('briefings');
+      if (result?.success && Array.isArray(result.data)) {
+        this.#briefings = result.data;
       }
     } catch {
       this.#briefings = [];
@@ -259,7 +259,7 @@ export class DailyBriefingEngine {
     setTimeout(async () => {
       this.#saveQueued = false;
       try {
-        await this.#state.set('briefings', this.#briefings);
+        await this.#state.write('briefings', this.#briefings);
       } catch {
         // Best effort
       }
