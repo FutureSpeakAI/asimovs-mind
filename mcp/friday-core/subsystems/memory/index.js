@@ -60,6 +60,7 @@ export class MemorySubsystem extends Subsystem {
         this.log.warn(`session buffer flush failed: ${err.message}`)
       );
     }, 5 * 60 * 1000);
+    this.#sessionBufferTimer.unref();
 
     await super.start();
     this.log.info('Memory subsystem started');

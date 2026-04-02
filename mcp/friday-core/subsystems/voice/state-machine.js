@@ -104,7 +104,7 @@ export class VoiceStateMachine {
     }
 
     if (this.#eventBus) {
-      this.#eventBus.emit('voice:state-change', { from, to, reason });
+      this.#eventBus.publish('voice:state-change', { from, to, reason });
     }
 
     return true;

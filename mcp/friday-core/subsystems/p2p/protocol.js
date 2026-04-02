@@ -277,7 +277,7 @@ export class PeerChannel {
     if (this.#state === 'handshaking' || this.#state === 'new') {
       // These are unencrypted protocol messages
       if (raw.type === 'handshake_ack') {
-        return { protocol: true, ...this.handleHandshakeAck(raw, null) };
+        return { protocol: true, ...this.handleHandshakeAck(raw, this._attestationVerifyFn || null) };
       }
       return { protocol: true, error: 'Unexpected message in handshake state' };
     }
@@ -337,8 +337,13 @@ export class PeerChannel {
     try { await this.#rawSend({ type: 'close', timestamp: Date.now() }); } catch {}
     if (this.#encryptKey) this.#encryptKey.destroy();
     if (this.#decryptKey) this.#decryptKey.destroy();
+    if (this._mySigningPrivateKey && typeof this._mySigningPrivateKey.destroy === 'function') {
+      this._mySigningPrivateKey.destroy();
+    }
     this.#encryptKey = null;
     this.#decryptKey = null;
+    this._mySigningPrivateKey = null;
+    this._attestationVerifyFn = null;
     this.#state = 'closed';
     this.#fileTransfers.clear();
     if (this.#onClose) this.#onClose();
@@ -373,6 +378,11 @@ export class PeerChannel {
   // Store signing key for message authentication
   setSigningKey(privateKey) {
     this._mySigningPrivateKey = privateKey;
+  }
+
+  // Store attestation verifier for incoming handshake acks
+  setAttestationVerifier(fn) {
+    this._attestationVerifyFn = fn;
   }
 }
 

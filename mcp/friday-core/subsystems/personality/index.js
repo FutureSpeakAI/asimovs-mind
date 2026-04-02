@@ -138,6 +138,7 @@ export class PersonalitySubsystem extends Subsystem {
   async stop() {
     // Snapshot current personality version before shutdown
     await this.#snapshotVersion();
+    await this.#calibration.stop();
     await super.stop();
   }
 

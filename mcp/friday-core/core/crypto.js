@@ -323,6 +323,9 @@ export function deriveSessionKeys(sharedSecret, myPublicKey, peerPublicKey) {
   const sendKey = crypto.createHmac('sha256', prk).update(Buffer.from([0x01])).digest();
   const recvKey = crypto.createHmac('sha256', prk).update(Buffer.from([0x02])).digest();
 
+  // Compute safety number before zeroing the shared secret
+  const safetyNumber = computeSafetyNumber(sharedSecret);
+
   // Zero the PRK and shared secret
   prk.fill(0);
   sharedSecret.fill(0);
@@ -332,7 +335,7 @@ export function deriveSessionKeys(sharedSecret, myPublicKey, peerPublicKey) {
   return {
     encryptKey: SecureBuffer.from(iAmLower ? sendKey : recvKey),
     decryptKey: SecureBuffer.from(iAmLower ? recvKey : sendKey),
-    safetyNumber: computeSafetyNumber(sharedSecret)
+    safetyNumber
   };
 }
 

@@ -48,6 +48,7 @@ export class ContextSubsystem extends Subsystem {
         this.log.warn(`context graph persist failed: ${err.message}`)
       );
     }, 5 * 60 * 1000);
+    this.#persistTimer.unref();
 
     this.log.info('context subsystem started');
     await super.start();
@@ -116,16 +117,7 @@ export class ContextSubsystem extends Subsystem {
       }
     });
 
-    // On memory:stored, feed content into graph for entity extraction
-    this.eventBus.on('memory:stored', (event) => {
-      try {
-        if (event.data?.content) {
-          this.#graph.processEvent(event);
-        }
-      } catch {
-        // Don't let graph errors break the event pipeline
-      }
-    });
+    // memory:stored is already caught by the wildcard '*' handler above
 
     // On session:end or vault:locking, save graph to vault
     const saveGraph = async () => {

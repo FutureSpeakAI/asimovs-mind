@@ -29,7 +29,7 @@ function validateFilePath(inputPath) {
 }
 
 // SEC-002: SSRF blocklist for peer_connect
-const SSRF_BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+const SSRF_BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1', '0:0:0:0:0:0:0:1', '0.0.0.0']);
 
 function isBlockedHost(hostname) {
   const lower = hostname.toLowerCase();
@@ -96,9 +96,9 @@ export class P2PSubsystem extends Subsystem {
                   exchangeKP.publicKey,
                   signingKeyResult.privateKey,
                   attestResult.success ? attestResult.attestation : null,
-                  null // attestation verify fn — optional for incoming
+                  (att) => vault.verifyAttestation(att, lawsText)
                 );
-                signingKeyResult.privateKey.destroy();
+                channel.setSigningKey(signingKeyResult.privateKey);
                 exchangeKP.privateKey.destroy();
               } catch (err) {
                 process.stderr.write(`[friday:p2p] Handshake completion error: ${err.message}\n`);
@@ -172,7 +172,8 @@ export class P2PSubsystem extends Subsystem {
             signingKeyResult.privateKey,
             attestResult.success ? attestResult.attestation : null
           );
-          signingKeyResult.privateKey.destroy();
+          channel.setSigningKey(signingKeyResult.privateKey);
+          channel.setAttestationVerifier((att) => vault.verifyAttestation(att, lawsText));
           // Note: exchangeKP.privateKey is retained on the channel (_myExchangePrivateKey)
           // and will be destroyed after handleHandshakeAck derives session keys.
 

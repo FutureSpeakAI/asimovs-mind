@@ -27,6 +27,7 @@ export class GatewaySubsystem extends Subsystem {
   #trust;
   #sessions;
   #audit;
+  #pruneTimer = null;
 
   constructor(deps) {
     super('gateway', deps);
@@ -41,24 +42,34 @@ export class GatewaySubsystem extends Subsystem {
     await this.#audit.initialize(this.state);
     await super.start();
 
-    const identities = this.#trust.getPairedIdentities();
-    this.log.info(`Gateway started: ${identities.length} paired identities`);
-  }
-
-  async stop() {
-    await this.#trust.destroy();
-    await super.stop();
-  }
-
-  registerEvents() {
-    // Periodically prune expired sessions
-    this.eventBus.on('system:tick', () => {
+    this.#pruneTimer = setInterval(() => {
       try {
         this.#sessions.pruneExpired();
       } catch (err) {
         process.stderr.write(`[friday:gateway] pruneExpired failed: ${err.message}\n`);
       }
-    });
+    }, 60_000);
+    this.#pruneTimer.unref();
+
+    const identities = this.#trust.getPairedIdentities();
+    this.log.info(`Gateway started: ${identities.length} paired identities`);
+  }
+
+  async stop() {
+    if (this.#pruneTimer) {
+      clearInterval(this.#pruneTimer);
+      this.#pruneTimer = null;
+    }
+    await this.#trust.destroy();
+    await super.stop();
+  }
+
+  registerEvents() {
+    // Session pruning handled by internal timer in start()/stop()
+  }
+
+  refresh() {
+    this.#trust.initialize(this.state);
   }
 
   /** Expose internals for other subsystems */

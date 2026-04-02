@@ -96,9 +96,13 @@ export class FridayEventBus extends EventEmitter {
 
   #prune() {
     const now = Date.now();
-    while (this.#buffer.length > this.#maxBufferSize) this.#buffer.shift();
-    while (this.#buffer.length > 0 && (now - this.#buffer[0].timestamp) > this.#maxBufferAgeMs) {
-      this.#buffer.shift();
+    if (this.#buffer.length > this.#maxBufferSize) {
+      this.#buffer.splice(0, this.#buffer.length - this.#maxBufferSize);
+    }
+    if (this.#buffer.length > 0 && (now - this.#buffer[0].timestamp) > this.#maxBufferAgeMs) {
+      let i = 0;
+      while (i < this.#buffer.length && (now - this.#buffer[i].timestamp) > this.#maxBufferAgeMs) i++;
+      if (i > 0) this.#buffer.splice(0, i);
     }
   }
 }

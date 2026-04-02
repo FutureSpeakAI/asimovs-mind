@@ -16,6 +16,7 @@
  * office-manager, integrity-manager.
  */
 
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { Subsystem } from '../../core/subsystem.js';
 import { DelegationEngine } from './delegation.js';
@@ -134,7 +135,7 @@ export class AgentSubsystem extends Subsystem {
         });
 
         // Emit spawn event for external runner to pick up
-        eventBus.emit('agent:spawn_requested', {
+        eventBus.publish('agent:spawn_requested', {
           taskId: result.taskId,
           agentType,
           description,
@@ -170,7 +171,7 @@ export class AgentSubsystem extends Subsystem {
         trustTier: z.enum(TRUST_TIERS).default('local').describe('Trust tier for this agent'),
       },
       async ({ agentType, description, input, trustTier }) => {
-        const taskId = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        const taskId = crypto.randomUUID();
 
         // Register as delegation root
         delegation.registerRoot(taskId, agentType, description, trustTier);
@@ -183,7 +184,7 @@ export class AgentSubsystem extends Subsystem {
         });
 
         // Emit spawn event
-        eventBus.emit('agent:spawn_requested', {
+        eventBus.publish('agent:spawn_requested', {
           taskId,
           agentType,
           description,
@@ -222,7 +223,7 @@ export class AgentSubsystem extends Subsystem {
 
         // Emit halt events for external runner
         for (const id of result.haltedTaskIds) {
-          eventBus.emit('agent:halt_requested', { taskId: id });
+          eventBus.publish('agent:halt_requested', { taskId: id });
         }
 
         return {

@@ -29,8 +29,10 @@ const DEFAULT_CONFIG = {
   haltTimeoutMs: 500,
 };
 
+import { randomUUID } from 'node:crypto';
+
 function generateId() {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  return randomUUID();
 }
 
 export class DelegationEngine {
@@ -86,7 +88,7 @@ export class DelegationEngine {
       try { cb(update); } catch { /* swallow */ }
     }
     if (this.#eventBus) {
-      this.#eventBus.emit('delegation:update', update);
+      this.#eventBus.publish('delegation:update', update);
     }
   }
 

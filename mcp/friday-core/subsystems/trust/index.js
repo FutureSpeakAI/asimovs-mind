@@ -39,7 +39,7 @@ export class TrustSubsystem extends Subsystem {
   }
 
   async stop() {
-    await this.#graph.save();
+    await this.#graph.stop();
     await super.stop();
   }
 

@@ -209,7 +209,6 @@ export class SovereignVault {
   async write(key, data) {
     if (this.#locked) return { success: false, error: 'Vault is locked' };
     validateKey(key);
-    await fs.mkdir(this.#stateDir, { recursive: true });
     const plaintext = Buffer.from(JSON.stringify(data), 'utf-8');
     const ciphertext = encrypt(plaintext, this.#vaultKey);
     const filePath = path.join(this.#stateDir, `${key}.enc`);

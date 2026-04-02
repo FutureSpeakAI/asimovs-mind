@@ -13,8 +13,10 @@
  * Pure in-memory team management.
  */
 
+import { randomUUID } from 'node:crypto';
+
 function generateId() {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  return randomUUID();
 }
 
 export class AgentTeamManager {

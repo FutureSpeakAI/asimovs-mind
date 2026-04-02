@@ -24,6 +24,13 @@ const DANGEROUS_COMMAND_PATTERNS = [
   /\bMimikatz\b/i, /\bInvoke-Mimikatz\b/i,
   /\bSet-MpPreference\b.*\bDisableRealtimeMonitoring\b/i,
   /\bbcdedit\b.*\/delete/i,
+  /\bInvoke-Expression\b/i, /\biex\s/i,
+  /\[scriptblock\]::create/i,
+  /\bNew-PSSession\b/i, /\bEnter-PSSession\b/i,
+  /\bAdd-MpPreference\b.*\bExclusionPath\b/i, /\bAdd-MpExclusion\b/i,
+  /\bcertutil\b/i,
+  /\bStart-Process\b/i,
+  /\bSet-ExecutionPolicy\b/i,
 ];
 
 const BLOCKED_REGISTRY_WRITE_PREFIXES = [

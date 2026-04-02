@@ -135,12 +135,13 @@ let httpServer = null;
 let httpPort = 0;
 let bridgeToken = null;
 
-// Tools callable via HTTP (read-only status tools only)
+// Tools callable via HTTP (status tools + memory_store for session-learner hook)
 const HTTP_TOOL_WHITELIST = new Set([
   'vault_status',
   'ollama_status',
   'session_status',
   'personality_status',
+  'memory_store',
 ]);
 
 // --- Token-bucket rate limiter (100 req/s per source IP) ---
@@ -309,8 +310,9 @@ async function startHttpBridge() {
           res.end(JSON.stringify({ error: 'Not found' }));
         }
       } catch (err) {
+        process.stderr.write(`Bridge error: ${err.message}\n`);
         res.writeHead(500);
-        res.end(JSON.stringify({ error: err.message }));
+        res.end(JSON.stringify({ error: 'Internal server error' }));
       }
     });
 

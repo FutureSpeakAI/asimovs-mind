@@ -506,6 +506,14 @@ export class CalibrationEngine {
     this.#saveTimer = setTimeout(() => this.#save(), 2000);
   }
 
+  async stop() {
+    if (this.#saveTimer) {
+      clearTimeout(this.#saveTimer);
+      this.#saveTimer = null;
+    }
+    await this.#save();
+  }
+
   async #save() {
     if (!this.#stateManager) return;
     try {

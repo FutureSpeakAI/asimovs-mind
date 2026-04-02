@@ -35,10 +35,10 @@ function truncate(text, maxLen) {
 function ok(text) { return { result: text.trim() || '(no output)' }; }
 function fail(msg) { return { error: msg }; }
 
-function getApiKey(vault) {
+async function getApiKey(vault) {
   if (!vault) return null;
   try {
-    const keys = vault.read('api-keys');
+    const keys = await vault.read('api-keys');
     return keys?.perplexity || null;
   } catch { return null; }
 }
@@ -138,7 +138,7 @@ export function getTools() {
 }
 
 export async function execute(toolName, args, vault) {
-  const apiKey = getApiKey(vault);
+  const apiKey = await getApiKey(vault);
   try {
     switch (toolName) {
       case 'perplexity_search':        return ok(await perplexitySearch(args, apiKey));
@@ -151,7 +151,7 @@ export async function execute(toolName, args, vault) {
 }
 
 export async function detect(vault) {
-  const key = getApiKey(vault);
+  const key = await getApiKey(vault);
   return !!key && key.length > 0;
 }
 

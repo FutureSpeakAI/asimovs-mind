@@ -145,6 +145,15 @@ export class TrustGraph {
     this.#dirty = false;
   }
 
+  /** Cancel pending save timer and do a final save */
+  async stop() {
+    if (this.#saveTimer) {
+      clearTimeout(this.#saveTimer);
+      this.#saveTimer = null;
+    }
+    await this.save();
+  }
+
   #scheduleSave() {
     this.#dirty = true;
     if (this.#saveTimer) clearTimeout(this.#saveTimer);

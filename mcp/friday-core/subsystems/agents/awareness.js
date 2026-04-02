@@ -398,7 +398,7 @@ export class AwarenessMesh {
       try { cb(event); } catch { /* swallow */ }
     }
     if (this.#eventBus) {
-      this.#eventBus.emit('mesh:event', event);
+      this.#eventBus.publish('mesh:event', event);
     }
   }
 

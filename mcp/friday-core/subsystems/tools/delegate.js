@@ -148,7 +148,7 @@ export class ExecutionDelegate {
 
       // Emit execution event
       if (this.#eventBus) {
-        this.#eventBus.emit('tool:executed', {
+        this.#eventBus.publish('tool:executed', {
           tool: toolName,
           elapsed,
           success: true,
@@ -163,7 +163,7 @@ export class ExecutionDelegate {
       this.#audit(toolName, args, 'error', message, elapsed);
 
       if (this.#eventBus) {
-        this.#eventBus.emit('tool:executed', {
+        this.#eventBus.publish('tool:executed', {
           tool: toolName,
           elapsed,
           success: false,

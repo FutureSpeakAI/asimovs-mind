@@ -181,7 +181,12 @@ async function httpRequestTool(args) {
   const allowed = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
   if (!allowed.includes(method)) throw new Error(`Unsupported method: ${method}`);
   const headers = {};
-  if (args.headers && typeof args.headers === 'object') { for (const [k, v] of Object.entries(args.headers)) headers[k] = String(v); }
+  if (args.headers && typeof args.headers === 'object') {
+    for (const [k, v] of Object.entries(args.headers)) {
+      if (!/^[a-zA-Z0-9!#$%&'*+\-.^_`|~]+$/.test(k)) throw new Error(`Invalid header name: ${k}`);
+      headers[k] = String(v);
+    }
+  }
   const res = await httpRequest(args.url, { method, headers, body: args.body != null ? String(args.body) : undefined });
   return `HTTP ${method} ${args.url} -> ${res.statusCode}\n\n${res.body}`;
 }
@@ -191,7 +196,12 @@ async function webhookSend(args) {
   validateWebhookUrl(args.url);
   const method = String(args.method ?? 'POST').toUpperCase();
   const headers = {};
-  if (args.headers && typeof args.headers === 'object') { for (const [k, v] of Object.entries(args.headers)) headers[k] = String(v); }
+  if (args.headers && typeof args.headers === 'object') {
+    for (const [k, v] of Object.entries(args.headers)) {
+      if (!/^[a-zA-Z0-9!#$%&'*+\-.^_`|~]+$/.test(k)) throw new Error(`Invalid header name: ${k}`);
+      headers[k] = String(v);
+    }
+  }
   if (!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/json';
   const res = await httpRequest(args.url, { method, headers, body: args.body != null ? String(args.body) : undefined });
   if (res.statusCode < 200 || res.statusCode >= 300) throw new Error(`Webhook returned HTTP ${res.statusCode}`);

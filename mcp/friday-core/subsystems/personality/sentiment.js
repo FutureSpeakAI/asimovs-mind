@@ -196,7 +196,7 @@ export class SentimentEngine {
     // Emit mood change event
     if (bestMood !== previousMood || Math.abs(this.#currentState.energyLevel - previousEnergy) > 0.05) {
       if (this.#eventBus) {
-        this.#eventBus.emit('sentiment:mood_change', this.getState());
+        this.#eventBus.publish('sentiment:mood_change', this.getState());
       }
     }
 

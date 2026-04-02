@@ -100,7 +100,7 @@ export class VoiceFallbackManager {
     this.#pathErrors = [];
     this.#switching = false;
     if (this.#eventBus) {
-      this.#eventBus.emit('voice:path-started', { path });
+      this.#eventBus.publish('voice:path-started', { path });
     }
     return true;
   }
@@ -110,7 +110,7 @@ export class VoiceFallbackManager {
     this.#pathErrors.push({ path, error, at: Date.now() });
 
     if (this.#eventBus) {
-      this.#eventBus.emit('voice:path-failed', { path, error });
+      this.#eventBus.publish('voice:path-failed', { path, error });
     }
 
     // Find next available path
@@ -128,7 +128,7 @@ export class VoiceFallbackManager {
     // All exhausted
     this.#currentPath = 'text';
     if (this.#eventBus) {
-      this.#eventBus.emit('voice:all-paths-exhausted', { errors: this.#pathErrors });
+      this.#eventBus.publish('voice:all-paths-exhausted', { errors: this.#pathErrors });
     }
     return { nextPath: 'text', exhausted: true };
   }
@@ -164,13 +164,13 @@ export class VoiceFallbackManager {
       const wasUnhealthy = entry.consecutiveFailures > 0;
       entry.consecutiveFailures = 0;
       if (wasUnhealthy && this.#eventBus) {
-        this.#eventBus.emit('voice:health-recovered', { checkName });
+        this.#eventBus.publish('voice:health-recovered', { checkName });
       }
     } else {
       entry.consecutiveFailures++;
       const level = getEscalationLevel(entry.consecutiveFailures);
       if (this.#eventBus) {
-        this.#eventBus.emit('voice:health-check-failed', {
+        this.#eventBus.publish('voice:health-check-failed', {
           checkName,
           consecutiveFailures: entry.consecutiveFailures,
           escalationLevel: level,
