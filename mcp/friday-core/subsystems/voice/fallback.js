@@ -199,6 +199,7 @@ export class VoiceFallbackManager {
     this.#attemptedPaths.clear();
     this.#pathErrors = [];
     this.#switching = false;
+    this.#pathAvailability.clear();
     this.#healthChecks.clear();
   }
 

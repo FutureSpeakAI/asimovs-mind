@@ -84,55 +84,60 @@ export class VoiceSubsystem extends Subsystem {
         reason: z.string().optional().describe('Reason for transition'),
       },
       async ({ action, target_state, reason }) => {
-        switch (action) {
-          case 'get': {
-            const snapshot = sm.getSnapshot();
-            return {
-              content: [{ type: 'text', text: JSON.stringify(snapshot, null, 2) }],
-            };
-          }
-
-          case 'transition': {
-            if (!target_state) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'target_state required' }) }] };
+        try {
+          switch (action) {
+            case 'get': {
+              const snapshot = sm.getSnapshot();
+              return {
+                content: [{ type: 'text', text: JSON.stringify(snapshot, null, 2) }],
+              };
             }
-            const canTransition = sm.canTransition(target_state);
-            if (!canTransition) {
+
+            case 'transition': {
+              if (!target_state) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'target_state required' }) }] };
+              }
+              const canTransition = sm.canTransition(target_state);
+              if (!canTransition) {
+                return {
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                      transitioned: false,
+                      currentState: sm.getState(),
+                      targetState: target_state,
+                      reason: `Illegal transition from ${sm.getState()} to ${target_state}`,
+                    }, null, 2),
+                  }],
+                };
+              }
+
+              const success = sm.transition(target_state, reason || 'MCP tool request');
               return {
                 content: [{
                   type: 'text',
                   text: JSON.stringify({
-                    transitioned: false,
+                    transitioned: success,
                     currentState: sm.getState(),
-                    targetState: target_state,
-                    reason: `Illegal transition from ${sm.getState()} to ${target_state}`,
+                    uptimeMs: sm.getUptime(),
                   }, null, 2),
                 }],
               };
             }
 
-            const success = sm.transition(target_state, reason || 'MCP tool request');
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  transitioned: success,
-                  currentState: sm.getState(),
-                  uptimeMs: sm.getUptime(),
-                }, null, 2),
-              }],
-            };
-          }
+            case 'reset': {
+              sm.reset();
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ reset: true, state: sm.getState() }) }],
+              };
+            }
 
-          case 'reset': {
-            sm.reset();
-            return {
-              content: [{ type: 'text', text: JSON.stringify({ reset: true, state: sm.getState() }) }],
-            };
+            default:
+              return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
           }
-
-          default:
-            return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
+        } catch (err) {
+          process.stderr.write(`[friday:voice] voice_state tool error: ${err.message}\n`);
+          return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
         }
       },
     );
@@ -148,44 +153,49 @@ export class VoiceSubsystem extends Subsystem {
         healthy: z.boolean().optional().describe('Whether the check passed (for report)'),
       },
       async ({ action, check_name, healthy }) => {
-        switch (action) {
-          case 'report': {
-            if (!check_name || healthy === undefined) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'check_name and healthy required' }) }] };
+        try {
+          switch (action) {
+            case 'report': {
+              if (!check_name || healthy === undefined) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'check_name and healthy required' }) }] };
+              }
+              fb.recordHealthCheck(check_name, healthy);
+              sm.reportHealth(healthy);
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    recorded: true,
+                    checkName: check_name,
+                    healthy,
+                    stateHealth: sm.getHealth(),
+                  }, null, 2),
+                }],
+              };
             }
-            fb.recordHealthCheck(check_name, healthy);
-            sm.reportHealth(healthy);
 
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  recorded: true,
-                  checkName: check_name,
-                  healthy,
-                  stateHealth: sm.getHealth(),
-                }, null, 2),
-              }],
-            };
+            case 'status': {
+              const healthReport = fb.getHealthReport();
+              const stateHealth = sm.getHealth();
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    voiceState: stateHealth,
+                    checks: healthReport,
+                  }, null, 2),
+                }],
+              };
+            }
+
+            default:
+              return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
           }
-
-          case 'status': {
-            const healthReport = fb.getHealthReport();
-            const stateHealth = sm.getHealth();
-
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  voiceState: stateHealth,
-                  checks: healthReport,
-                }, null, 2),
-              }],
-            };
-          }
-
-          default:
-            return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
+        } catch (err) {
+          process.stderr.write(`[friday:voice] voice_health tool error: ${err.message}\n`);
+          return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
         }
       },
     );
@@ -203,73 +213,78 @@ export class VoiceSubsystem extends Subsystem {
         priority: z.number().int().min(0).max(99).optional().describe('Priority (for set_priority; lower = tried first)'),
       },
       async ({ action, path, available, reason, priority }) => {
-        switch (action) {
-          case 'status': {
-            const snapshot = fb.getSnapshot();
-            return {
-              content: [{ type: 'text', text: JSON.stringify(snapshot, null, 2) }],
-            };
-          }
-
-          case 'set_availability': {
-            if (!path || available === undefined) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'path and available required' }) }] };
+        try {
+          switch (action) {
+            case 'status': {
+              const snapshot = fb.getSnapshot();
+              return {
+                content: [{ type: 'text', text: JSON.stringify(snapshot, null, 2) }],
+              };
             }
-            fb.setPathAvailability(path, available, reason);
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({ set: true, path, available, reason }, null, 2),
-              }],
-            };
-          }
 
-          case 'set_priority': {
-            if (!path || priority === undefined) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'path and priority required' }) }] };
+            case 'set_availability': {
+              if (!path || available === undefined) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'path and available required' }) }] };
+              }
+              fb.setPathAvailability(path, available, reason);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({ set: true, path, available, reason }, null, 2),
+                }],
+              };
             }
-            fb.setPathPriority(path, priority);
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({ set: true, path, priority, priorities: fb.getPriorities() }, null, 2),
-              }],
-            };
-          }
 
-          case 'record_failure': {
-            if (!path) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'path required' }) }] };
+            case 'set_priority': {
+              if (!path || priority === undefined) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'path and priority required' }) }] };
+              }
+              fb.setPathPriority(path, priority);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({ set: true, path, priority, priorities: fb.getPriorities() }, null, 2),
+                }],
+              };
             }
-            const result = fb.recordPathFailure(path, reason || 'Unknown failure');
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  failedPath: path,
-                  nextPath: result.nextPath,
-                  exhausted: result.exhausted,
-                  allErrors: fb.getPathErrors(),
-                }, null, 2),
-              }],
-            };
-          }
 
-          case 'start_path': {
-            if (!path) {
-              return { content: [{ type: 'text', text: JSON.stringify({ error: 'path required' }) }] };
+            case 'record_failure': {
+              if (!path) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'path required' }) }] };
+              }
+              const result = fb.recordPathFailure(path, reason || 'Unknown failure');
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    failedPath: path,
+                    nextPath: result.nextPath,
+                    exhausted: result.exhausted,
+                    allErrors: fb.getPathErrors(),
+                  }, null, 2),
+                }],
+              };
             }
-            fb.startPath(path);
-            return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({ started: true, currentPath: fb.getCurrentPath() }, null, 2),
-              }],
-            };
-          }
 
-          default:
-            return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
+            case 'start_path': {
+              if (!path) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: 'path required' }) }] };
+              }
+              fb.startPath(path);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({ started: true, currentPath: fb.getCurrentPath() }, null, 2),
+                }],
+              };
+            }
+
+            default:
+              return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown action: ${action}` }) }] };
+          }
+        } catch (err) {
+          process.stderr.write(`[friday:voice] voice_fallback_status tool error: ${err.message}\n`);
+          return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
         }
       },
     );
