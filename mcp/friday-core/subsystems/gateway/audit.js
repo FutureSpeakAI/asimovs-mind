@@ -24,7 +24,8 @@ export class AuditLog {
     this.#currentMonth = this.#getMonth();
 
     try {
-      const saved = await state.get(`audit-${this.#currentMonth}`);
+      const result = await state.read(`audit-${this.#currentMonth}`);
+      const saved = result?.success ? result.data : null;
       if (Array.isArray(saved)) {
         this.#entries = saved;
       }
@@ -35,12 +36,12 @@ export class AuditLog {
 
   // -- Logging methods ------------------------------------------------------
 
-  log(entry) {
+  async log(entry) {
     try {
       const month = this.#getMonth();
       if (month !== this.#currentMonth) {
-        // Month rotated; save old and start fresh
-        this.#save();
+        // Month rotated; flush old month before clearing entries
+        await this.#save();
         this.#currentMonth = month;
         this.#entries = [];
       }
@@ -61,8 +62,8 @@ export class AuditLog {
     }
   }
 
-  logInbound(channel, senderId, trust, text, msgId) {
-    this.log({
+  async logInbound(channel, senderId, trust, text, msgId) {
+    await this.log({
       ts: Date.now(),
       dir: 'in',
       channel,
@@ -73,8 +74,8 @@ export class AuditLog {
     });
   }
 
-  logOutbound(channel, recipientId, text, toolCalls, durationMs) {
-    this.log({
+  async logOutbound(channel, recipientId, text, toolCalls, durationMs) {
+    await this.log({
       ts: Date.now(),
       dir: 'out',
       channel,
@@ -125,7 +126,7 @@ export class AuditLog {
   async #save() {
     try {
       if (this.#state) {
-        await this.#state.set(`audit-${this.#currentMonth}`, this.#entries);
+        await this.#state.write(`audit-${this.#currentMonth}`, this.#entries);
       }
     } catch {
       // Best effort

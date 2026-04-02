@@ -99,7 +99,8 @@ export class TrustEngine {
 
     // Load identities from vault-backed state
     try {
-      const data = await state.get('identities');
+      const result = await state.read('identities');
+      const data = result?.success ? result.data : null;
       if (Array.isArray(data)) {
         this.#identities = data;
       }
@@ -283,7 +284,7 @@ export class TrustEngine {
   async #saveIdentities() {
     try {
       if (this.#state) {
-        await this.#state.set('identities', this.#identities);
+        await this.#state.write('identities', this.#identities);
       }
     } catch (err) {
       process.stderr.write('[friday:trust] Failed to save identities: ' + (err instanceof Error ? err.message : 'Unknown error') + '\n');

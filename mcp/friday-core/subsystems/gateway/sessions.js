@@ -22,7 +22,8 @@ export class SessionStore {
   async initialize(state) {
     this.#state = state;
     try {
-      const saved = await state.get('sessions');
+      const result = await state.read('sessions');
+      const saved = result?.success ? result.data : null;
       if (saved && typeof saved === 'object') {
         for (const [key, session] of Object.entries(saved)) {
           this.#sessions.set(key, session);
@@ -135,7 +136,7 @@ export class SessionStore {
         for (const [key, session] of this.#sessions) {
           data[key] = session;
         }
-        await this.#state.set('sessions', data);
+        await this.#state.write('sessions', data);
       } catch {
         // Best effort
       }
