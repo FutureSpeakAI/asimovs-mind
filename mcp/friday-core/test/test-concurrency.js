@@ -224,7 +224,7 @@ describe('Memory concurrent stores', () => {
       return `unique observation number ${i - N / 2}`;
     });
 
-    await Promise.all(contents.map((c, i) => tiers.store(c, 'fact', 'short', 0.5)));
+    await Promise.all(contents.map((c) => tiers.store(c, 'fact', 'short', 0.5)));
 
     const shortTerm = tiers.getShortTerm();
     // At most N/2 unique entries (duplicates discarded)
@@ -269,7 +269,7 @@ describe('Memory concurrent stores', () => {
     await tiers.store('Stephen works on AI projects and machine learning research', 'fact', 'medium', 0.8);
 
     // Now fire 5 concurrent near-duplicate stores (>80% word overlap with seed)
-    const nearDups = Array.from({ length: 5 }, (_, i) =>
+    const nearDups = Array.from({ length: 5 }, () =>
       tiers.store('Stephen works on AI projects and machine learning research', 'fact', 'medium', 0.8)
     );
     await Promise.all(nearDups);
