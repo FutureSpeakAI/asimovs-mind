@@ -101,6 +101,9 @@ export class ConnectorRegistry {
 
       if (conn.available && tools.length > 0) {
         for (const tool of tools) {
+          if (this.#toolToConnector.has(tool.name)) {
+            this.#log.warn(`[ConnectorRegistry] Tool name collision: "${tool.name}" from ${conn.id} shadows existing from ${this.#toolToConnector.get(tool.name)}`);
+          }
           this.#toolToConnector.set(tool.name, conn.id);
         }
         this.#log.info(`[ConnectorRegistry] + ${conn.label} -- ${tools.length} tools`);

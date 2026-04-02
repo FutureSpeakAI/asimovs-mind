@@ -39,6 +39,10 @@ function validateWebhookUrl(raw, allowHttp = false) {
       throw new Error('URL must not target private IP ranges.');
     }
   }
+  // Block IPv6 private/link-local ranges (fc00::/7, fe80::/10)
+  if (hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80')) {
+    throw new Error('URL must not target IPv6 private/link-local ranges.');
+  }
 }
 
 // Sanitize SMTP header fields — strip CR/LF to prevent header injection

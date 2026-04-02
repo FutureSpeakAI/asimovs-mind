@@ -83,7 +83,9 @@ async function perplexitySearch(args, apiKey) {
   const query = typeof args.query === 'string' ? args.query : '';
   if (!query) return 'ERROR: search query is required.';
   const body = { model: MODELS.search, messages: [{ role: 'system', content: 'Be precise and concise.' }, { role: 'user', content: query }], return_citations: true, return_related_questions: true };
-  if (args.domains && Array.isArray(args.domains)) body.search_domain_filter = args.domains;
+  if (args.domains && Array.isArray(args.domains)) {
+    body.search_domain_filter = args.domains.filter(d => typeof d === 'string' && /^[a-zA-Z0-9.-]+$/.test(d));
+  }
   if (typeof args.recency === 'string' && ['month', 'week', 'day', 'hour'].includes(args.recency)) body.search_recency_filter = args.recency;
   const { status, data } = await apiRequest(body, apiKey);
   if (status === 401) return 'ERROR: Perplexity API key is invalid.';
@@ -97,7 +99,9 @@ async function perplexityResearch(args, apiKey) {
   const query = typeof args.query === 'string' ? args.query : '';
   if (!query) return 'ERROR: research query is required.';
   const body = { model: MODELS.research, messages: [{ role: 'system', content: 'Provide thorough, well-structured analysis with multiple perspectives. Cite all sources.' }, { role: 'user', content: query }], return_citations: true, search_context_size: 'high' };
-  if (args.domains && Array.isArray(args.domains)) body.search_domain_filter = args.domains;
+  if (args.domains && Array.isArray(args.domains)) {
+    body.search_domain_filter = args.domains.filter(d => typeof d === 'string' && /^[a-zA-Z0-9.-]+$/.test(d));
+  }
   if (typeof args.recency === 'string') body.search_recency_filter = args.recency;
   const { status, data } = await apiRequest(body, apiKey);
   if (status === 401) return 'ERROR: API key invalid.';
