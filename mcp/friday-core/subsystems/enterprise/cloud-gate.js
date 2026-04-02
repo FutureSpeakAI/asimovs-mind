@@ -42,7 +42,7 @@ export class CloudGate {
 
   // -- Gate check -----------------------------------------------------------
 
-  checkGate(taskCategory, context) {
+  checkGate(taskCategory, _context) {
     // 1. Check if cloud API consent exists
     if (this.#consentTracker) {
       const consent = this.#consentTracker.checkConsent('cloud_api');

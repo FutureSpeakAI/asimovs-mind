@@ -47,7 +47,7 @@ export class P2PTransport {
 
       this.#wss.on('error', reject);
 
-      this.#wss.on('connection', (ws, req) => {
+      this.#wss.on('connection', (ws, _req) => {
         const connId = crypto.randomUUID();
         this.#setupConnection(ws, connId, 'inbound');
       });
@@ -150,7 +150,7 @@ export class P2PTransport {
             this.#onIncomingMessage(connId, msg);
           }
         }
-      } catch (err) {
+      } catch {
         // Malformed message, ignore
       }
     });

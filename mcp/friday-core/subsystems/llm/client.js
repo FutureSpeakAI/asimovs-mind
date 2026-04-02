@@ -11,8 +11,6 @@
  *           confidence assessor, local-first routing wrapper.
  */
 
-const CLOUD_PROVIDERS = new Set(['anthropic', 'openrouter']);
-
 export class LLMClient {
   #providers = new Map();
   #defaultProvider = 'anthropic';

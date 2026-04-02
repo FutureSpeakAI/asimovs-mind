@@ -11,8 +11,6 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import * as os from 'node:os';
-
 const execFileAsync = promisify(execFile);
 const MAX_OUTPUT_CHARS = 12_000;
 const DEFAULT_TIMEOUT_MS = 30_000;

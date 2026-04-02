@@ -26,25 +26,13 @@ import {
   encryptMessage,
   decryptMessage,
   sign,
-  verify,
-  SecureBuffer
+  verify
 } from '../../core/crypto.js';
 
 // Protocol constants
 const PROTOCOL_VERSION = '1.0.0';
 const MAX_MESSAGE_SIZE = 16 * 1024 * 1024; // 16 MB
 const MAX_CHUNK_SIZE = 64 * 1024;           // 64 KB for file chunks
-const HANDSHAKE_TIMEOUT_MS = 30000;
-const KEEPALIVE_INTERVAL_MS = 30000;
-const MESSAGE_TYPES = new Set([
-  'handshake', 'handshake_ack',
-  'text', 'file_start', 'file_chunk', 'file_end',
-  'transaction', 'transaction_ack',
-  'attestation', 'trust',
-  'ping', 'pong',
-  'error', 'close'
-]);
-
 /**
  * Represents a secure channel between two Asimov Agents.
  */
@@ -308,7 +296,7 @@ export class PeerChannel {
         if (!valid) return { error: 'Signature verification failed' };
       }
 
-      const { plaintext, sequence } = decryptMessage(ciphertext, this.#decryptKey, Number(this.#recvSequence));
+      const { plaintext, sequence: _sequence } = decryptMessage(ciphertext, this.#decryptKey, Number(this.#recvSequence));
       this.#recvSequence++;
 
       const msg = JSON.parse(plaintext.toString('utf-8'));

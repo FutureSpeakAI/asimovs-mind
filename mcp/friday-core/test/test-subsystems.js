@@ -8,7 +8,7 @@
  * (--test-force-exit needed because some subsystems use internal timers)
  */
 
-import { describe, it, beforeEach, afterEach, after } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
@@ -17,7 +17,7 @@ import { EventEmitter } from 'node:events';
 // ═══════════════════════════════════════════════════════════════════════
 
 /** Mock vault: in-memory key-value store */
-function createMockVault() {
+function _createMockVault() {
   const store = new Map();
   return {
     status: 'unlocked',
@@ -272,7 +272,7 @@ describe('Memory / MemoryTiers', () => {
 
   it('duplicate detection rejects similar content', async () => {
     await tiers.store('The project uses TypeScript for the backend', 'fact', 'medium');
-    const dup = await tiers.store('The project uses TypeScript for the backend', 'fact', 'medium');
+    const _dup = await tiers.store('The project uses TypeScript for the backend', 'fact', 'medium');
 
     // The duplicate should be reinforced (same entry returned with bumped count)
     const mediumTerm = tiers.getMediumTerm();
@@ -399,7 +399,7 @@ describe('Memory / MemoryConsolidation', () => {
     await tiers.initialize(createMockState(), search);
 
     // Store a medium-term entry with high access
-    const entry = await tiers.store('Important recurring observation', 'fact', 'medium', 0.9);
+    const _entry = await tiers.store('Important recurring observation', 'fact', 'medium', 0.9);
 
     // Simulate high access by storing the same text multiple times
     // (the duplicate detector will reinforce it)
@@ -1091,7 +1091,7 @@ describe('Agents / TeamCoordinator', () => {
 // 7. TOOLS (Registry, Delegate)
 // ═══════════════════════════════════════════════════════════════════════
 
-import { ToolRegistry, SAFETY_LEVELS, CATEGORIES } from '../subsystems/tools/registry.js';
+import { ToolRegistry, SAFETY_LEVELS } from '../subsystems/tools/registry.js';
 import { ExecutionDelegate } from '../subsystems/tools/delegate.js';
 
 describe('Tools / ToolRegistry', () => {
@@ -1171,7 +1171,7 @@ describe('Tools / ToolRegistry', () => {
     registry.registerFromConnector('git', [
       { name: 'status', description: 'Git status' },
       { name: 'log', description: 'Git log' },
-    ], async (toolName, args) => ({ result: `${toolName} executed` }));
+    ], async (toolName, _args) => ({ result: `${toolName} executed` }));
 
     assert.ok(registry.has('git_status'));
     assert.ok(registry.has('git_log'));
@@ -1305,7 +1305,7 @@ describe('Connectors / ConnectorRegistry', () => {
             { name: 'test_action', description: 'Do a thing' },
             { name: 'test_query', description: 'Query something' },
           ],
-          execute: async (toolName, args) => ({ result: `${toolName} done` }),
+          execute: async (toolName, _args) => ({ result: `${toolName} done` }),
         },
       },
     ]);

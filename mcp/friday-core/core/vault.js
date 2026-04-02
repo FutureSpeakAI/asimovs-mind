@@ -32,8 +32,7 @@ import {
   encryptPrivateKey,
   decryptPrivateKey,
   sign,
-  verify,
-  SecureBuffer
+  verify
 } from './crypto.js';
 
 const VAULT_VERSION = '1.0.0';

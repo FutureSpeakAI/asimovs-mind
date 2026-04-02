@@ -283,7 +283,8 @@ function dockerLogs(args) {
 function npmRun(args) {
   const pm = args.package_manager ?? detectPackageManager(args.cwd);
   try {
-    let bin, pmArgs = [];
+    let bin;
+    const pmArgs = [];
     switch (pm) {
       case 'yarn': bin = 'yarn'; pmArgs.push(args.script); break;
       case 'pnpm': bin = 'pnpm'; pmArgs.push('run', args.script); break;
@@ -296,7 +297,8 @@ function npmRun(args) {
 function npmInstall(args) {
   const pm = args.package_manager ?? detectPackageManager(args.cwd);
   try {
-    let bin, pmArgs = [];
+    let bin;
+    const pmArgs = [];
     if (args.packages?.length > 0) {
       switch (pm) {
         case 'yarn': bin = 'yarn'; pmArgs.push('add'); if (args.dev) pmArgs.push('--dev'); pmArgs.push(...args.packages); break;

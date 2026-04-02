@@ -7,7 +7,7 @@
  * Run: node --test test/test-session.js
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { SessionConductor } from '../core/session-conductor.js';

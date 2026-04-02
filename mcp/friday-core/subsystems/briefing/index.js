@@ -304,7 +304,7 @@ export class BriefingSubsystem extends Subsystem {
         meeting_id: z.string().describe('Meeting ID to analyze'),
         include_transcript: z.boolean().default(true).optional().describe('Include transcript in context'),
       },
-      async ({ meeting_id, include_transcript }) => {
+      async ({ meeting_id, include_transcript: _include_transcript }) => {
         const meeting = meetings.getMeeting(meeting_id);
         if (!meeting) {
           return { content: [{ type: 'text', text: JSON.stringify({ error: 'Meeting not found' }) }] };

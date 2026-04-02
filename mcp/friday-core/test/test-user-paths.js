@@ -10,7 +10,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { execSync } from 'node:child_process';
 import { initCrypto } from '../core/crypto.js';
 import { SovereignVault } from '../core/vault.js';
 

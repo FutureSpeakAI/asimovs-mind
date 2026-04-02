@@ -14,7 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { initCrypto } from '../core/crypto.js';
 import { SovereignVault, OllamaMonitor } from '../core/vault.js';
-import { PeerChannel, PeerManager } from '../subsystems/p2p/protocol.js';
+import { PeerChannel as _PeerChannel, PeerManager } from '../subsystems/p2p/protocol.js';
 import {
   generateExchangeKeyPair,
   generateSigningKeyPair,
@@ -187,7 +187,7 @@ describe('TIER 2: Identity + Attestation Round-Trip', () => {
 describe('TIER 3: P2P Encrypted Channel Between Two Agents', () => {
   let aliceVault, bobVault;
   let aliceChannel, bobChannel;
-  const messagesReceived = { alice: [], bob: [] };
+  const _messagesReceived = { alice: [], bob: [] };
 
   before(async () => {
     aliceVault = new SovereignVault(path.join(testDir, 'alice'));

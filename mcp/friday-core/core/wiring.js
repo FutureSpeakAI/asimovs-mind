@@ -48,7 +48,7 @@ export function wireSubsystems(registry, eventBus) {
   //                   trust decays, connectors detect
   // Sequence matters: personality first (shapes greeting), then memory, then rest.
   // -----------------------------------------------------------------------
-  eventBus.on('vault:unlocked', async (event) => {
+  eventBus.on('vault:unlocked', async (_event) => {
     try { await registry.get('personality')?.start?.(); } catch (e) { warn('personality load on unlock', e); }
     try { await registry.get('memory')?.start?.(); } catch (e) { warn('memory load on unlock', e); }
     try { await registry.get('context')?.start?.(); } catch (e) { warn('context load on unlock', e); }
@@ -59,7 +59,7 @@ export function wireSubsystems(registry, eventBus) {
   // -----------------------------------------------------------------------
   // vault:locking -> memory consolidates, context saves, everything flushes
   // -----------------------------------------------------------------------
-  eventBus.on('vault:locking', async (event) => {
+  eventBus.on('vault:locking', async (_event) => {
     try { await registry.get('memory')?.stop?.(); } catch (e) { warn('memory flush on lock', e); }
     try { await registry.get('context')?.stop?.(); } catch (e) { warn('context flush on lock', e); }
     try { await registry.get('trust')?.stop?.(); } catch (e) { warn('trust flush on lock', e); }
@@ -93,7 +93,7 @@ export function wireSubsystems(registry, eventBus) {
   // NOTE (ARCH-001): memory storage is handled directly by MemorySubsystem.registerEvents()
   // to avoid double-writing. Do NOT publish memory:store-request here.
   // -----------------------------------------------------------------------
-  eventBus.on('trust:evidence-added', (event) => {
+  eventBus.on('trust:evidence-added', (_event) => {
     try {
       registry.get('gateway')?.refresh?.();
     } catch (e) { warn('gateway on trust:evidence-added', e); }
@@ -173,7 +173,7 @@ export function wireSubsystems(registry, eventBus) {
   // -----------------------------------------------------------------------
   // session:end -> memory consolidates, context saves, everything flushes
   // -----------------------------------------------------------------------
-  eventBus.on('session:end', async (event) => {
+  eventBus.on('session:end', async (_event) => {
     try { await registry.get('memory')?.stop?.(); } catch (e) { warn('memory on session:end', e); }
     try { await registry.get('context')?.stop?.(); } catch (e) { warn('context on session:end', e); }
     try { await registry.get('trust')?.stop?.(); } catch (e) { warn('trust on session:end', e); }

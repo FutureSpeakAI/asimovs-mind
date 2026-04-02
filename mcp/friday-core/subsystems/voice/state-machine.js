@@ -17,7 +17,7 @@
 
 // -- State definitions --------------------------------------------------------
 
-const STATES = ['IDLE', 'CONNECTING', 'ACTIVE', 'PAUSED', 'ERROR', 'RECOVERING'];
+const _STATES = ['IDLE', 'CONNECTING', 'ACTIVE', 'PAUSED', 'ERROR', 'RECOVERING'];
 
 // All legal transitions. If not in this table, the transition is rejected.
 const TRANSITIONS = new Set([

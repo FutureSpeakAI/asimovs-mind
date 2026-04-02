@@ -14,7 +14,7 @@
 
 import { z } from 'zod';
 import { Subsystem } from '../../core/subsystem.js';
-import { ToolRegistry, SAFETY_LEVELS, CATEGORIES } from './registry.js';
+import { ToolRegistry, SAFETY_LEVELS } from './registry.js';
 import { ExecutionDelegate } from './delegate.js';
 
 export { ToolRegistry, SAFETY_LEVELS, CATEGORIES } from './registry.js';

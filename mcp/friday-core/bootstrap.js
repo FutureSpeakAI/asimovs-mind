@@ -62,7 +62,7 @@ if (existsSync(portPath)) {
     const port = parseInt(readFileSync(portPath, 'utf-8').trim(), 10);
     if (!isNaN(port)) {
       try {
-        const resp = await fetch(`http://127.0.0.1:${port}/status`, {
+        const _resp = await fetch(`http://127.0.0.1:${port}/status`, {
           signal: AbortSignal.timeout(1000),
         });
         // If we get here, another instance is already running

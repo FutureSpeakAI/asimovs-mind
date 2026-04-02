@@ -157,7 +157,7 @@ describe('TIER C: Governance JSON Files', () => {
   it('safety-floors.json has encryption_at_rest floor', async () => {
     const raw = await fs.readFile(pluginPath('governance', 'safety-floors.json'), 'utf-8');
     const floors = JSON.parse(raw);
-    const floorNames = Array.isArray(floors) ? floors.map(f => f.name || f.id) : Object.keys(floors);
+    const _floorNames = Array.isArray(floors) ? floors.map(f => f.name || f.id) : Object.keys(floors);
     const allText = JSON.stringify(floors);
     assert.ok(allText.includes('encryption_at_rest'), 'Missing encryption_at_rest safety floor');
   });

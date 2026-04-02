@@ -250,7 +250,7 @@ describe('Event Wiring: Error isolation', () => {
 
   it('subscriber errors do not crash the bus', async () => {
     bus = createMockEventBus();
-    const calledAfterError = [];
+    const _calledAfterError = [];
 
     // Create a subsystem whose start() throws
     const badPersonality = createMockSubsystem('personality', {

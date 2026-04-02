@@ -40,7 +40,7 @@ export class P2PSubsystem extends Subsystem {
           const port = await transport.start(0);
           // Wire up incoming handshakes
           transport.onIncomingHandshake(async (peerId, msg, respond) => {
-            const channel = peerManager.createChannel({
+            const _channel = peerManager.createChannel({
               peerId,
               peerName: msg.peerName || 'unknown',
               sendFn: (data) => respond(data)
@@ -48,7 +48,7 @@ export class P2PSubsystem extends Subsystem {
             // Auto-handle handshake if we have identity
             const idResult = await vault.getIdentity();
             if (idResult.success && idResult.data) {
-              const attest = await vault.generateAttestation(await getCanonicalLaws());
+              const _attest = await vault.generateAttestation(await getCanonicalLaws());
               // TODO: derive exchange private key from vault for handshake
               // For now, store the channel for manual completion
             }
@@ -81,7 +81,7 @@ export class P2PSubsystem extends Subsystem {
           }
 
           const peerId = crypto.randomUUID().slice(0, 8);
-          const ws = await transport.connect(address, peerId);
+          const _ws = await transport.connect(address, peerId);
 
           const channel = peerManager.createChannel({
             peerId,
@@ -94,7 +94,7 @@ export class P2PSubsystem extends Subsystem {
           const attestResult = await vault.generateAttestation(lawsText);
 
           // Initiate handshake (exchange public key + attestation)
-          const exchangePub = Buffer.from(idResult.data.exchange.publicKey, 'base64');
+          const _exchangePub = Buffer.from(idResult.data.exchange.publicKey, 'base64');
 
           return { content: [{ type: 'text', text: JSON.stringify({
             success: true, peerId, peerName: peer_name || address,
@@ -184,7 +184,7 @@ export class P2PSubsystem extends Subsystem {
       {},
       async () => {
         const code = peerManager.generatePairingCode();
-        const listenPort = transport.port || 'not listening';
+        const _listenPort = transport.port || 'not listening';
         return { content: [{ type: 'text', text: JSON.stringify({
           code,
           expires_in: '5 minutes',

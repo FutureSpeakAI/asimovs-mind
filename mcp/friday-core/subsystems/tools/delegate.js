@@ -109,7 +109,7 @@ export class ExecutionDelegate {
    * @param {object} args
    * @returns {{ status: 'approved'|'pending'|'denied', reason?: string }}
    */
-  #checkSafety(definition, args) {
+  #checkSafety(definition, _args) {
     const level = definition.safety_level || SAFETY_LEVELS.read_only;
 
     switch (level) {

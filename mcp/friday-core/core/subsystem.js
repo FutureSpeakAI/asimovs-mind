@@ -18,7 +18,7 @@ export class Subsystem {
   }
 
   /** Override: register MCP tools on the server */
-  registerTools(server) {}
+  registerTools(_server) {}
 
   /** Override: subscribe to event bus topics */
   registerEvents() {}
