@@ -156,6 +156,22 @@ export class PeerChannel {
   // --- Handle handshake ack (initiator receives response) ---
 
   handleHandshakeAck(msg, verifyAttestationFn) {
+    // SEC-007: Verify Ed25519 signature on the ack before processing
+    if (this.#peerSigningPubKey) {
+      if (!msg.signature) {
+        this.#state = 'closed';
+        return { success: false, error: 'Handshake ack missing required signature' };
+      }
+      // The signature covers the ack payload without the signature field itself
+      const { signature: _sig, ...ackPayload } = msg;
+      const payloadStr = JSON.stringify(ackPayload);
+      const valid = verify(Buffer.from(payloadStr), Buffer.from(msg.signature, 'base64'), this.#peerSigningPubKey);
+      if (!valid) {
+        this.#state = 'closed';
+        return { success: false, error: 'Handshake ack signature verification failed' };
+      }
+    }
+
     if (msg.attestation && verifyAttestationFn) {
       const result = verifyAttestationFn(msg.attestation);
       this.#attestationVerified = result.valid;

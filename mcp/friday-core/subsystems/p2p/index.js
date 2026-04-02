@@ -13,6 +13,7 @@ import { Subsystem } from '../../core/subsystem.js';
 import { PeerManager } from './protocol.js';
 import { P2PTransport } from './transport.js';
 import { getCanonicalLaws } from '../identity/index.js';
+import { generateExchangeKeyPair } from '../../core/crypto.js';
 
 export class P2PSubsystem extends Subsystem {
   #peerManager;
@@ -40,17 +41,36 @@ export class P2PSubsystem extends Subsystem {
           const port = await transport.start(0);
           // Wire up incoming handshakes
           transport.onIncomingHandshake(async (peerId, msg, respond) => {
-            const _channel = peerManager.createChannel({
+            const channel = peerManager.createChannel({
               peerId,
               peerName: msg.peerName || 'unknown',
               sendFn: (data) => respond(data)
             });
-            // Auto-handle handshake if we have identity
+            // Auto-complete the handshake if we have an unlocked identity
             const idResult = await vault.getIdentity();
             if (idResult.success && idResult.data) {
-              const _attest = await vault.generateAttestation(await getCanonicalLaws());
-              // TODO: derive exchange private key from vault for handshake
-              // For now, store the channel for manual completion
+              try {
+                const lawsText = await getCanonicalLaws();
+                const attestResult = await vault.generateAttestation(lawsText);
+                const exchangeKP = generateExchangeKeyPair();
+                const signingKeyResult = await vault.getSigningPrivateKey();
+                if (!signingKeyResult.success) {
+                  process.stderr.write(`[friday:p2p] Cannot complete handshake — signing key unavailable\n`);
+                  return;
+                }
+                await channel.handleHandshake(
+                  msg,
+                  exchangeKP.privateKey,
+                  exchangeKP.publicKey,
+                  signingKeyResult.privateKey,
+                  attestResult.success ? attestResult.attestation : null,
+                  null // attestation verify fn — optional for incoming
+                );
+                signingKeyResult.privateKey.destroy();
+                exchangeKP.privateKey.destroy();
+              } catch (err) {
+                process.stderr.write(`[friday:p2p] Handshake completion error: ${err.message}\n`);
+              }
             }
           });
           transport.onIncomingMessage(async (peerId, msg) => {
@@ -97,8 +117,23 @@ export class P2PSubsystem extends Subsystem {
           const lawsText = await getCanonicalLaws();
           const attestResult = await vault.generateAttestation(lawsText);
 
+          // Generate a fresh ephemeral X25519 exchange keypair for this session
+          const exchangeKP = generateExchangeKeyPair();
+          const signingKeyResult = await vault.getSigningPrivateKey();
+          if (!signingKeyResult.success) {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'Cannot retrieve signing key for handshake' }) }] };
+          }
+
           // Initiate handshake (exchange public key + attestation)
-          const _exchangePub = Buffer.from(idResult.data.exchange.publicKey, 'base64');
+          await channel.initiateHandshake(
+            exchangeKP.privateKey,
+            exchangeKP.publicKey,
+            signingKeyResult.privateKey,
+            attestResult.success ? attestResult.attestation : null
+          );
+          signingKeyResult.privateKey.destroy();
+          // Note: exchangeKP.privateKey is retained on the channel (_myExchangePrivateKey)
+          // and will be destroyed after handleHandshakeAck derives session keys.
 
           return { content: [{ type: 'text', text: JSON.stringify({
             success: true, peerId, peerName: peer_name || address,

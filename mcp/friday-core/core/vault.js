@@ -332,6 +332,32 @@ export class SovereignVault {
     return { success: true, signature: signature.toString('base64') };
   }
 
+  /**
+   * Decrypts and returns the Ed25519 signing private key as a SecureBuffer.
+   * Caller MUST call .destroy() on the returned key when done.
+   */
+  async getSigningPrivateKey() {
+    if (this.#locked) return { success: false, error: 'Vault is locked' };
+    const idResult = await this.read('agent-identity');
+    if (!idResult.success || !idResult.data) return { success: false, error: 'No identity' };
+    const encPriv = Buffer.from(idResult.data.signing.encryptedPrivateKey, 'base64');
+    const privateKey = decryptPrivateKey(encPriv, this.#identityKey);
+    return { success: true, privateKey };
+  }
+
+  /**
+   * Decrypts and returns the X25519 exchange private key as a SecureBuffer.
+   * Caller MUST call .destroy() on the returned key when done.
+   */
+  async getExchangePrivateKey() {
+    if (this.#locked) return { success: false, error: 'Vault is locked' };
+    const idResult = await this.read('agent-identity');
+    if (!idResult.success || !idResult.data) return { success: false, error: 'No identity' };
+    const encPriv = Buffer.from(idResult.data.exchange.encryptedPrivateKey, 'base64');
+    const privateKey = decryptPrivateKey(encPriv, this.#identityKey);
+    return { success: true, privateKey };
+  }
+
   verifySignature(message, signatureB64, publicKeyB64) {
     const msgBuf = Buffer.from(message, 'utf-8');
     const sigBuf = Buffer.from(signatureB64, 'base64');
