@@ -81,15 +81,10 @@ export function wireSubsystems(registry, eventBus) {
     try { await registry.get('connectors')?.registry?.initialize?.(); } catch (e) { warn('connectors detect on unlock', e); }
   });
 
-  // -----------------------------------------------------------------------
-  // vault:locking -> memory consolidates, context saves, everything flushes
-  // -----------------------------------------------------------------------
-  eventBus.on('vault:locking', async (_event) => {
-    try { await registry.get('memory')?.stop?.(); } catch (e) { warn('memory flush on lock', e); }
-    try { await registry.get('context')?.stop?.(); } catch (e) { warn('context flush on lock', e); }
-    try { await registry.get('trust')?.stop?.(); } catch (e) { warn('trust flush on lock', e); }
-    try { await registry.get('personality')?.stop?.(); } catch (e) { warn('personality flush on lock', e); }
-  });
+  // vault:locking -> shutdown is handled by session:end (which the conductor
+  // publishes in response to vault:locking). Removed duplicate stop() calls
+  // that ran before session:end arrived. All stop() calls are idempotent,
+  // but the duplication was unnecessary work on every shutdown.
 
   // -----------------------------------------------------------------------
   // memory:stored -> context adds entity, personality notes observation

@@ -269,7 +269,6 @@ export class P2PSubsystem extends Subsystem {
       {},
       async () => {
         const code = peerManager.generatePairingCode();
-        const _listenPort = transport.port || 'not listening';
         return { content: [{ type: 'text', text: JSON.stringify({
           code,
           expires_in: '5 minutes',

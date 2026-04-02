@@ -289,9 +289,9 @@ export class LLMSubsystem extends Subsystem {
 
   // ── Private ───────────────────────────────────────────────────────
 
-  async #loadApiKeys(keys) {
-    // Try to read from vault if no keys passed
-    if (!keys && this.vault) {
+  async #loadApiKeys() {
+    let keys;
+    if (this.vault) {
       try {
         keys = await this.vault.read('api-keys');
       } catch {
@@ -307,10 +307,19 @@ export class LLMSubsystem extends Subsystem {
     // OpenRouter model preference
     if (keys.openrouterModel) this.openrouter.setDefaultModel(keys.openrouterModel);
 
-    // Ollama endpoint override
+    // Ollama endpoint override — validate URL to prevent SSRF via corrupted vault
     if (keys.ollamaEndpoint) {
-      this.ollama = new OllamaProvider({ endpoint: keys.ollamaEndpoint });
-      this.client.registerProvider(this.ollama);
+      try {
+        const parsed = new URL(keys.ollamaEndpoint);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          process.stderr.write(`[friday:llm] Rejected ollamaEndpoint: invalid protocol ${parsed.protocol}\n`);
+        } else {
+          this.ollama = new OllamaProvider({ endpoint: keys.ollamaEndpoint });
+          this.client.registerProvider(this.ollama);
+        }
+      } catch {
+        process.stderr.write(`[friday:llm] Rejected ollamaEndpoint: invalid URL\n`);
+      }
     }
   }
 

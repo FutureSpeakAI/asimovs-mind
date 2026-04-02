@@ -39,6 +39,15 @@ export class ToolsSubsystem extends Subsystem {
   /** Public access to delegate for other subsystems */
   get delegate() { return this.#delegate; }
 
+  /**
+   * Called by wiring.js on connector:detected events.
+   * Connector tools are dispatched dynamically through connector_execute,
+   * so no re-registration is needed — this logs the event for observability.
+   */
+  refreshConnectorTools(connectorId) {
+    this.log.info(`Connector detected: ${connectorId}`);
+  }
+
   async start() {
     await super.start();
     this.log.info(`Tools subsystem started (${this.#registry.size} tools registered)`);

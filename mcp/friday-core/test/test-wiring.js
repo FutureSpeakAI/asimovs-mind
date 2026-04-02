@@ -102,8 +102,8 @@ describe('Event Wiring: vault:locking', () => {
     wireSubsystems(registry, bus);
   });
 
-  it('triggers subsystem flush on vault:locking', async () => {
-    bus.publish('vault:locking', {});
+  it('triggers subsystem flush on session:end (consolidates vault:locking shutdown)', async () => {
+    bus.publish('session:end', {});
     await new Promise(r => setTimeout(r, 50));
 
     assert.ok(memory._calls.includes('stop'), 'memory.stop() not called');
