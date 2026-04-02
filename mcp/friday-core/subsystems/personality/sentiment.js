@@ -114,9 +114,9 @@ export class SentimentEngine {
     this.#state = state;
     this.#eventBus = eventBus;
 
-    const saved = await state.read('mood_log');
-    if (saved && Array.isArray(saved)) {
-      this.#moodLog = saved.slice(-MAX_LOG_SIZE);
+    const result = await state.read('mood_log');
+    if (result?.success && Array.isArray(result.data)) {
+      this.#moodLog = result.data.slice(-MAX_LOG_SIZE);
     }
   }
 

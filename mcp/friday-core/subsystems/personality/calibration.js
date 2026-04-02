@@ -184,9 +184,9 @@ export class CalibrationEngine {
 
   async initialize(state) {
     this.#stateManager = state;
-    const saved = await state.read('calibration');
-    if (saved) {
-      this.#calibrationState = this.#mergeState(saved);
+    const result = await state.read('calibration');
+    if (result?.success && result.data) {
+      this.#calibrationState = this.#mergeState(result.data);
     }
   }
 

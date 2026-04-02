@@ -28,12 +28,19 @@ export function wireSubsystems(registry, eventBus) {
   // -----------------------------------------------------------------------
   const epistemicTracker = new EpistemicTracker({ eventBus, logger: { info: (m) => process.stderr.write(`${LOG_PREFIX} ${m}\n`), warn: (m) => process.stderr.write(`${LOG_PREFIX} ${m}\n`) } });
 
-  // Feed LLM interaction completions into the EIS tracker
+  // Feed LLM interaction completions into the EIS tracker.
+  // If no pre-extracted signals object is present, synthesise basic signals
+  // from the event payload so the tracker always receives something.
   eventBus.on('llm:request-completed', (event) => {
     try {
-      if (event.data?.signals) {
-        epistemicTracker.recordInteraction(event.data.signals);
-      }
+      const d = event.data || {};
+      const signals = d.signals ?? {
+        hadCorrection: false,
+        hadVerification: false,
+        queryComplexity: d.queryComplexity ?? 1,
+        hadRejection: false,
+      };
+      epistemicTracker.recordInteraction(signals);
     } catch (e) { warn('eis on llm:request-completed', e); }
   });
 
@@ -42,6 +49,24 @@ export function wireSubsystems(registry, eventBus) {
     const personality = registry.get('personality');
     if (personality) personality.epistemicTracker = epistemicTracker;
   } catch (e) { warn('eis personality binding', e); }
+
+  // EIS recommendation feedback loop: when EIS score drops and the tracker
+  // recommends a higher challenge level, apply it to the personality profile.
+  // --- TUNABLE: CHANGE_THRESHOLD in eis.js controls publish frequency ---
+  eventBus.on('eis:updated', (event) => {
+    try {
+      const recommendation = event.data?.recommendation;
+      if (recommendation === 'increase_challenge_level') {
+        const personality = registry.get('personality');
+        if (personality?.profile) {
+          const current = personality.profile.getProfile();
+          const newLevel = Math.min(5, (current.challengeLevel ?? 3) + 1);
+          personality.profile.setChallengeLevel(newLevel).catch(() => {});
+          process.stderr.write(`${LOG_PREFIX} EIS declining — challenge level raised to ${newLevel}\n`);
+        }
+      }
+    } catch (e) { warn('eis:updated feedback loop', e); }
+  });
 
   // -----------------------------------------------------------------------
   // vault:unlocked -> personality loads, memory loads, context loads,

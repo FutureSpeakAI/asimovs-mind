@@ -68,9 +68,9 @@ export class PersonalityEvolution {
 
   async initialize(state) {
     this.#state = state;
-    const saved = await state.read('evolution');
-    if (saved) {
-      this.#evolutionState = saved;
+    const result = await state.read('evolution');
+    if (result?.success && result.data) {
+      this.#evolutionState = result.data;
     }
   }
 

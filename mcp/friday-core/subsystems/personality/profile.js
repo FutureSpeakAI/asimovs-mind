@@ -80,9 +80,9 @@ export class PersonalityProfile {
 
   async initialize(state) {
     this.#state = state;
-    const saved = await state.read('profile');
-    if (saved) {
-      this.#profile = { ...DEFAULT_PROFILE, ...saved };
+    const result = await state.read('profile');
+    if (result?.success && result.data) {
+      this.#profile = { ...DEFAULT_PROFILE, ...result.data };
     }
   }
 

@@ -326,3 +326,198 @@ describe('EpistemicTracker: Window cap', () => {
     assert.equal(score.verification, 20, `Expected 20% verification (4/20), got ${score.verification}`);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// EIS: SIGNAL SYNTHESIS (llm:request-completed without pre-extracted signals)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { wireSubsystems } from '../core/wiring.js';
+import { PersonalityProfile } from '../subsystems/personality/profile.js';
+import { CalibrationEngine } from '../subsystems/personality/calibration.js';
+import { PersonalityEvolution } from '../subsystems/personality/evolution.js';
+import { SentimentEngine } from '../subsystems/personality/sentiment.js';
+
+function createMockState() {
+  const store = new Map();
+  return {
+    read: async (key) => ({ success: true, data: store.get(key) ?? null }),
+    write: async (key, data) => { store.set(key, data); return { success: true }; },
+    _store: store,
+  };
+}
+
+describe('EIS wiring: synthesises fallback signals when event lacks .signals', () => {
+  it('records interaction even when llm:request-completed has no signals field', () => {
+    const bus = createMockEventBus();
+    const registry = createMockRegistry({});
+    const { epistemicTracker } = wireSubsystems(registry, bus);
+
+    // Publish without a signals field
+    bus.publish('llm:request-completed', { queryComplexity: 3 });
+
+    // With one item: verification=0, complexity=(3-1)*25=50, correction=0
+    const score = epistemicTracker.score;
+    assert.ok(score.overall >= 0 && score.overall <= 100, 'score should be in valid range');
+    assert.equal(score.verification, 0, 'no verification signal should yield 0');
+    assert.equal(score.complexity, 50, 'queryComplexity 3 should map to 50');
+  });
+
+  it('uses pre-extracted signals when present', () => {
+    const bus = createMockEventBus();
+    const registry = createMockRegistry({});
+    const { epistemicTracker } = wireSubsystems(registry, bus);
+
+    bus.publish('llm:request-completed', {
+      signals: { hadVerification: true, hadCorrection: false, queryComplexity: 5, hadRejection: false },
+    });
+
+    const score = epistemicTracker.score;
+    assert.equal(score.verification, 100, 'explicit verification signal should yield 100');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// EIS FEEDBACK LOOP: eis:updated -> personality challenge level
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('EIS feedback loop: increase_challenge_level raises personality challenge', () => {
+  it('applies challenge level increase when eis:updated fires with declining trend', async () => {
+    const bus = createMockEventBus();
+
+    const profile = new PersonalityProfile();
+    await profile.initialize(createMockState());
+    await profile.setChallengeLevel(2);
+
+    const registry = createMockRegistry({ personality: { profile } });
+    wireSubsystems(registry, bus);
+
+    bus.publish('eis:updated', {
+      score: { overall: 20 },
+      trend: 'declining',
+      recommendation: 'increase_challenge_level',
+    });
+
+    await new Promise(r => setTimeout(r, 20));
+
+    assert.equal(profile.getProfile().challengeLevel, 3, 'challenge level should be raised from 2 to 3');
+  });
+
+  it('does not exceed challenge ceiling of 5', async () => {
+    const bus = createMockEventBus();
+
+    const profile = new PersonalityProfile();
+    await profile.initialize(createMockState());
+    await profile.setChallengeLevel(5);
+
+    const registry = createMockRegistry({ personality: { profile } });
+    wireSubsystems(registry, bus);
+
+    bus.publish('eis:updated', {
+      score: { overall: 10 },
+      trend: 'declining',
+      recommendation: 'increase_challenge_level',
+    });
+
+    await new Promise(r => setTimeout(r, 20));
+
+    assert.equal(profile.getProfile().challengeLevel, 5, 'challenge level should not exceed 5');
+  });
+
+  it('ignores eis:updated with no recommendation', async () => {
+    const bus = createMockEventBus();
+
+    const profile = new PersonalityProfile();
+    await profile.initialize(createMockState());
+    await profile.setChallengeLevel(3);
+
+    const registry = createMockRegistry({ personality: { profile } });
+    wireSubsystems(registry, bus);
+
+    bus.publish('eis:updated', {
+      score: { overall: 60 },
+      trend: 'stable',
+      recommendation: null,
+    });
+
+    await new Promise(r => setTimeout(r, 20));
+
+    assert.equal(profile.getProfile().challengeLevel, 3, 'challenge level should be unchanged when no recommendation');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// PERSONALITY SAVE/LOAD ROUND-TRIP
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('Personality save/load: profile survives re-initialise', () => {
+  it('reloads saved profile fields on second initialize', async () => {
+    const state = createMockState();
+    const profile1 = new PersonalityProfile();
+    await profile1.initialize(state);
+    await profile1.setMode('focus');
+    await profile1.setChallengeLevel(4);
+
+    // Simulate new session: fresh instance, same state store
+    const profile2 = new PersonalityProfile();
+    await profile2.initialize(state);
+
+    assert.equal(profile2.getProfile().mode, 'focus', 'mode should survive reload');
+    assert.equal(profile2.getProfile().challengeLevel, 4, 'challenge level should survive reload');
+  });
+});
+
+describe('Personality save/load: calibration state survives re-initialise', () => {
+  it('reloads dimension changes from a previous session', async () => {
+    const state = createMockState();
+    const cal1 = new CalibrationEngine();
+    await cal1.initialize(state);
+    // Apply a strong explicit signal then wait for the 2-second debounced save
+    cal1.recordSignal({ source: 'explicit', type: 'more_formal', magnitude: 1.0 });
+    cal1.incrementSession();
+    await new Promise(r => setTimeout(r, 2100));
+
+    const cal2 = new CalibrationEngine();
+    await cal2.initialize(state);
+
+    const dims = cal2.getDimensions();
+    assert.ok(dims.formality > 0.5, `formality should be above default 0.5 after reload, got ${dims.formality}`);
+  });
+});
+
+describe('Personality save/load: evolution session count survives re-initialise', () => {
+  it('preserves session count across instances', async () => {
+    const state = createMockState();
+    const evo1 = new PersonalityEvolution();
+    await evo1.initialize(state);
+    await evo1.incrementSession(['warm', 'curious']);
+    await evo1.incrementSession(['warm', 'curious']);
+
+    const evo2 = new PersonalityEvolution();
+    await evo2.initialize(state);
+
+    const evoState = evo2.getEvolutionState();
+    assert.ok(evoState !== null, 'evolution state should be loaded');
+    assert.equal(evoState.sessionCount, 2, 'session count should survive reload');
+  });
+});
+
+describe('Personality save/load: mood log survives re-initialise', () => {
+  it('reloads mood log entries on second initialize', async () => {
+    const state = createMockState();
+    const bus = createMockEventBus();
+
+    const sent1 = new SentimentEngine();
+    await sent1.initialize(state, bus);
+    // Use a string guaranteed to match 'frustrated' pattern
+    sent1.analyse('I am so frustrated, the damn thing is still broken!');
+    // Allow async #persistLog to settle
+    await new Promise(r => setTimeout(r, 50));
+
+    const sent2 = new SentimentEngine();
+    await sent2.initialize(state, bus);
+
+    const log = sent2.getMoodLog();
+    assert.ok(log.length >= 1, 'mood log should be restored from state');
+    assert.equal(log[0].mood, 'frustrated', 'mood entry should match what was recorded');
+  });
+});
