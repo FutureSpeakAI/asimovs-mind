@@ -190,7 +190,7 @@ export class ContextSubsystem extends Subsystem {
             .describe('Type of node (required for nodes)'),
           name: z.string().optional()
             .describe('Display name (required for nodes)'),
-          metadata: z.record(z.unknown()).optional()
+          metadata: z.record(z.string(), z.unknown()).optional()
             .describe('Additional metadata for the node'),
           // Edge fields
           from: z.string().optional()

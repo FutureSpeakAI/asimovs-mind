@@ -157,7 +157,7 @@ export class ConnectorSubsystem extends Subsystem {
       {
         connector: z.string().max(100).describe('Connector ID (e.g. "git-devops", "powershell", "perplexity")'),
         tool: z.string().max(100).describe('Tool name within the connector (e.g. "git_status", "powershell_execute")'),
-        args: z.record(z.any()).default({}).describe('Arguments for the tool'),
+        args: z.record(z.string(), z.any()).default({}).describe('Arguments for the tool'),
       },
       async (toolArgs) => {
         // Verify connector exists and is available

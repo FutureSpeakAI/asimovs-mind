@@ -108,7 +108,7 @@ export class AgentSubsystem extends Subsystem {
         parentTaskId: z.string().max(100).describe('Task ID of the parent agent'),
         agentType: z.string().max(50).describe('Type of agent to spawn (research, coding, analysis, creative, security, summarize, draft-email)'),
         description: z.string().max(10_000).describe('What this sub-agent should accomplish'),
-        input: z.record(z.unknown()).default({}).describe('Input data for the sub-agent'),
+        input: z.record(z.string(), z.unknown()).default({}).describe('Input data for the sub-agent'),
         trustTier: z.enum(TRUST_TIERS).optional().describe('Trust tier (can only degrade from parent)'),
         context: z.string().max(50_000).optional().describe('Additional context from parent'),
       },
@@ -166,7 +166,7 @@ export class AgentSubsystem extends Subsystem {
       {
         agentType: z.string().max(50).describe('Agent type (research, coding, analysis, creative, security, summarize, draft-email, orchestrate)'),
         description: z.string().max(10_000).describe('What this agent should accomplish'),
-        input: z.record(z.unknown()).default({}).describe('Input data for the agent'),
+        input: z.record(z.string(), z.unknown()).default({}).describe('Input data for the agent'),
         trustTier: z.enum(TRUST_TIERS).default('local').describe('Trust tier for this agent'),
       },
       async ({ agentType, description, input, trustTier }) => {

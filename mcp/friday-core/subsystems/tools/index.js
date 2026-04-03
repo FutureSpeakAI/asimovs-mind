@@ -67,7 +67,7 @@ export class ToolsSubsystem extends Subsystem {
           'code', 'project', 'communication', 'research',
           'meeting', 'memory', 'trust', 'system', 'automation', 'task'
         ]).default('system').describe('Tool category'),
-        params: z.record(z.any()).optional().describe('Parameter schema (JSON object)'),
+        params: z.record(z.string(), z.any()).optional().describe('Parameter schema (JSON object)'),
       },
       async (args) => {
         try {
@@ -110,7 +110,7 @@ export class ToolsSubsystem extends Subsystem {
       'Execute a registered tool by name. Checks safety level before execution.',
       {
         name: z.string().max(100).describe('Tool name to execute'),
-        args: z.record(z.any()).optional().describe('Arguments to pass to the tool'),
+        args: z.record(z.string(), z.any()).optional().describe('Arguments to pass to the tool'),
         skip_safety: z.boolean().default(false)
           .describe('Skip safety checks (use with caution)'),
         decision_id: z.string().optional()
