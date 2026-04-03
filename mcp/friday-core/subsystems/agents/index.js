@@ -105,8 +105,8 @@ export class AgentSubsystem extends Subsystem {
       'agent_delegate',
       'Delegate a sub-task to a child agent within a delegation tree. Enforces trust-tier inheritance, depth limits, and circuit breakers.',
       {
-        parentTaskId: z.string().describe('Task ID of the parent agent'),
-        agentType: z.string().describe('Type of agent to spawn (research, coding, analysis, creative, security, summarize, draft-email)'),
+        parentTaskId: z.string().max(100).describe('Task ID of the parent agent'),
+        agentType: z.string().max(50).describe('Type of agent to spawn (research, coding, analysis, creative, security, summarize, draft-email)'),
         description: z.string().max(10_000).describe('What this sub-agent should accomplish'),
         input: z.record(z.unknown()).default({}).describe('Input data for the sub-agent'),
         trustTier: z.enum(TRUST_TIERS).optional().describe('Trust tier (can only degrade from parent)'),
@@ -210,7 +210,7 @@ export class AgentSubsystem extends Subsystem {
       'agent_halt',
       'Halt an agent and all its descendants. Propagates halt signal through the delegation tree.',
       {
-        taskId: z.string().describe('Task ID of the agent to halt (halts entire subtree)'),
+        taskId: z.string().max(100).describe('Task ID of the agent to halt (halts entire subtree)'),
       },
       async ({ taskId }) => {
         const result = await delegation.haltTree(taskId);
@@ -248,7 +248,7 @@ export class AgentSubsystem extends Subsystem {
       'agent_status',
       'Get detailed status of an agent, its delegation tree, and awareness context.',
       {
-        taskId: z.string().describe('Task ID of the agent to check'),
+        taskId: z.string().max(100).describe('Task ID of the agent to check'),
       },
       async ({ taskId }) => {
         const node = delegation.getNode(taskId);

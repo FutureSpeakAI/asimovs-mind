@@ -155,8 +155,8 @@ export class ConnectorSubsystem extends Subsystem {
       'connector capabilities (git, docker, powershell, search, etc.). ' +
       'Use connector_list to discover available tools.',
       {
-        connector: z.string().describe('Connector ID (e.g. "git-devops", "powershell", "perplexity")'),
-        tool: z.string().describe('Tool name within the connector (e.g. "git_status", "powershell_execute")'),
+        connector: z.string().max(100).describe('Connector ID (e.g. "git-devops", "powershell", "perplexity")'),
+        tool: z.string().max(100).describe('Tool name within the connector (e.g. "git_status", "powershell_execute")'),
         args: z.record(z.any()).default({}).describe('Arguments for the tool'),
       },
       async (toolArgs) => {

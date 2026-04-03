@@ -312,7 +312,7 @@ export class MemorySubsystem extends Subsystem {
       'memory_forget',
       'Remove a specific memory by ID from any tier.',
       {
-        id: z.string().describe('Memory entry ID to forget'),
+        id: z.string().max(100).describe('Memory entry ID to forget'),
       },
       async ({ id }) => {
         // Try tiers first

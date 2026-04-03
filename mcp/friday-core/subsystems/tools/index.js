@@ -109,7 +109,7 @@ export class ToolsSubsystem extends Subsystem {
       'tool_execute',
       'Execute a registered tool by name. Checks safety level before execution.',
       {
-        name: z.string().describe('Tool name to execute'),
+        name: z.string().max(100).describe('Tool name to execute'),
         args: z.record(z.any()).optional().describe('Arguments to pass to the tool'),
         skip_safety: z.boolean().default(false)
           .describe('Skip safety checks (use with caution)'),
@@ -198,7 +198,7 @@ export class ToolsSubsystem extends Subsystem {
       'tool_safety_check',
       'Check the safety level, category, and recent audit trail for a tool before execution.',
       {
-        name: z.string().describe('Tool name to check'),
+        name: z.string().max(100).describe('Tool name to check'),
         include_audit: z.boolean().default(false).describe('Include recent audit entries for this tool'),
       },
       async (args) => {

@@ -197,7 +197,7 @@ export class LLMSubsystem extends Subsystem {
       'llm_route',
       'Given a task description, return the recommended model and the reasoning behind the selection.',
       {
-        task: z.string().describe('Natural-language description of the task'),
+        task: z.string().max(50_000).describe('Natural-language description of the task'),
       },
       async ({ task }) => {
         const profile = this.router.profileTask(task);
@@ -236,7 +236,7 @@ export class LLMSubsystem extends Subsystem {
       'llm_set_provider',
       'Set the default LLM provider. Valid: "anthropic", "ollama", "openrouter".',
       {
-        provider: z.string().describe('Provider name to set as default'),
+        provider: z.string().max(50).describe('Provider name to set as default'),
       },
       async ({ provider }) => {
         const valid = ['anthropic', 'ollama', 'openrouter'];

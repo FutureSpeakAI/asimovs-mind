@@ -294,7 +294,7 @@ export class BriefingSubsystem extends Subsystem {
       'briefing_meeting_intel',
       'Analyze meeting content for intelligence extraction. Builds structured context from notes and transcripts for action item extraction, commitment detection, and sentiment analysis. Returns the content block for AI processing.',
       {
-        meeting_id: z.string().describe('Meeting ID to analyze'),
+        meeting_id: z.string().max(200).describe('Meeting ID to analyze'),
         include_transcript: z.boolean().default(true).optional().describe('Include transcript in context'),
       },
       async ({ meeting_id, include_transcript: _include_transcript }) => {
