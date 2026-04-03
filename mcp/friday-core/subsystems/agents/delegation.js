@@ -77,6 +77,10 @@ export class DelegationEngine {
   /* -- Event Subscription -- */
 
   onUpdate(callback) {
+    if (this.#updateCallbacks.length >= 50) {
+      process.stderr.write('[friday:delegation] Warning: update callback limit reached (50)\n');
+      return () => {}; // no-op unsubscribe
+    }
     this.#updateCallbacks.push(callback);
     return () => {
       this.#updateCallbacks = this.#updateCallbacks.filter((cb) => cb !== callback);
