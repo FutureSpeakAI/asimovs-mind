@@ -341,8 +341,8 @@ export class AgentSubsystem extends Subsystem {
       'agent_team_create',
       'Create a new agent team with a shared goal, task list, and communication channel.',
       {
-        name: z.string().describe('Team name'),
-        goal: z.string().describe('Shared goal for the team'),
+        name: z.string().max(200).describe('Team name'),
+        goal: z.string().max(10_000).describe('Shared goal for the team'),
         tasks: z.array(z.object({
           description: z.string(),
           priority: z.enum(['high', 'medium', 'low']).default('medium'),

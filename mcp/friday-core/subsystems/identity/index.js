@@ -48,7 +48,7 @@ export class IdentitySubsystem extends Subsystem {
 
     server.tool('identity_sign',
       'Sign a message with the Ed25519 private key.',
-      { message: z.string().describe('Message to sign') },
+      { message: z.string().max(100_000).describe('Message to sign') },
       async ({ message }) => {
         const result = await vault.signMessage(message);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -70,7 +70,7 @@ export class IdentitySubsystem extends Subsystem {
 
     server.tool('attestation_generate',
       'Generate a cLaw attestation (laws hash + timestamp + Ed25519 signature).',
-      { laws_text: z.string().describe('Full text of the Fundamental Laws') },
+      { laws_text: z.string().max(100_000).describe('Full text of the Fundamental Laws') },
       async ({ laws_text }) => {
         const result = await vault.generateAttestation(laws_text);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };

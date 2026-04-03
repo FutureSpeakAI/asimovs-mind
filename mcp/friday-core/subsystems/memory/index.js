@@ -197,7 +197,7 @@ export class MemorySubsystem extends Subsystem {
       'memory_search',
       'Full semantic search across all indexed memories. Supports tier filtering.',
       {
-        query: z.string().describe('Search query'),
+        query: z.string().max(10_000).describe('Search query'),
         tier: z.enum(['short-term', 'medium-term', 'long-term', 'episode'])
           .optional()
           .describe('Filter by tier (optional)'),
@@ -275,7 +275,7 @@ export class MemorySubsystem extends Subsystem {
       'memory_episode_start',
       'Begin recording an episode (session). Tracks observations until ended.',
       {
-        title: z.string().describe('Episode title describing the session topic'),
+        title: z.string().max(500).describe('Episode title describing the session topic'),
       },
       async ({ title }) => {
         const episode = episodic.startEpisode(title);
@@ -289,7 +289,7 @@ export class MemorySubsystem extends Subsystem {
       'memory_episode_end',
       'End the current episode and store it with a summary.',
       {
-        summary: z.string().describe('Summary of what happened in this episode'),
+        summary: z.string().max(50_000).describe('Summary of what happened in this episode'),
         topics: z.array(z.string().max(200)).max(20).default([])
           .describe('Topic tags (1-3 words each)'),
         emotionalTone: z.string().default('neutral')

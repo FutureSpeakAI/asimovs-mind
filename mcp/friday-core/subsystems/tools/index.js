@@ -59,8 +59,8 @@ export class ToolsSubsystem extends Subsystem {
       'tool_register',
       'Register a new tool with metadata. Tools registered this way are available via tool_execute.',
       {
-        name: z.string().describe('Unique tool name'),
-        description: z.string().describe('What the tool does'),
+        name: z.string().max(100).describe('Unique tool name'),
+        description: z.string().max(5_000).describe('What the tool does'),
         safety_level: z.enum(['read_only', 'write', 'destructive']).default('read_only')
           .describe('Safety level: read_only (no confirm), write (confirm), destructive (confirm + audit)'),
         category: z.enum([
