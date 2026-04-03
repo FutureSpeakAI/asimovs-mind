@@ -20,7 +20,7 @@ export class IdentitySubsystem extends Subsystem {
 
     server.tool('identity_generate',
       'Generate Ed25519 signing + X25519 exchange keypairs. Stored encrypted in vault.',
-      { name: z.string().describe('Agent/node name for this identity') },
+      { name: z.string().max(200).describe('Agent/node name for this identity') },
       async ({ name }) => {
         const result = await vault.generateIdentity(name);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -59,8 +59,8 @@ export class IdentitySubsystem extends Subsystem {
       'Verify an Ed25519 signature.',
       {
         message: z.string(),
-        signature: z.string().describe('Base64-encoded signature'),
-        publicKey: z.string().describe('Base64-encoded Ed25519 public key')
+        signature: z.string().max(500).describe('Base64-encoded signature'),
+        publicKey: z.string().max(500).describe('Base64-encoded Ed25519 public key')
       },
       async ({ message, signature, publicKey }) => {
         const valid = vault.verifySignature(message, signature, publicKey);
@@ -86,7 +86,7 @@ export class IdentitySubsystem extends Subsystem {
           signature: z.string(),
           signerPublicKey: z.string()
         }),
-        laws_text: z.string().describe('Expected laws text to verify hash against')
+        laws_text: z.string().max(100_000).describe('Expected laws text to verify hash against')
       },
       async ({ attestation, laws_text }) => {
         const result = vault.verifyAttestation(attestation, laws_text);

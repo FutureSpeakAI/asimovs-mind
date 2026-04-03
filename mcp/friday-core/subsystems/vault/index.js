@@ -87,7 +87,7 @@ export class VaultSubsystem extends Subsystem {
 
     server.tool('vault_read',
       'Read and decrypt a named state entry from the vault.',
-      { key: z.string().describe('State key (e.g., "user-profile", "trust-scores")') },
+      { key: z.string().max(200).describe('State key (e.g., "user-profile", "trust-scores")') },
       async ({ key }) => {
         const result = await vault.read(key);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -97,7 +97,7 @@ export class VaultSubsystem extends Subsystem {
     server.tool('vault_write',
       'Encrypt and persist a named state entry in the vault.',
       {
-        key: z.string().describe('State key'),
+        key: z.string().max(200).describe('State key'),
         data: z.any().describe('JSON data to encrypt and store')
       },
       async ({ key, data }) => {
@@ -112,7 +112,7 @@ export class VaultSubsystem extends Subsystem {
     server.tool('vault_append',
       'Append an entry to an array stored in the vault.',
       {
-        key: z.string().describe('State key (must be an array)'),
+        key: z.string().max(200).describe('State key (must be an array)'),
         entry: z.any().describe('Entry to append')
       },
       async ({ key, entry }) => {
@@ -126,7 +126,7 @@ export class VaultSubsystem extends Subsystem {
 
     server.tool('vault_delete',
       'Remove a named state entry from the vault.',
-      { key: z.string().describe('State key to delete') },
+      { key: z.string().max(200).describe('State key to delete') },
       async ({ key }) => {
         const result = await vault.delete(key);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };

@@ -140,7 +140,7 @@ export class TrustSubsystem extends Subsystem {
       'trust_person_score',
       'Get trust scores for a person. Resolves name/alias using fuzzy matching. Returns multi-dimensional trust breakdown.',
       {
-        identifier: z.string().describe('Person name, email, handle, or alias to look up'),
+        identifier: z.string().max(500).describe('Person name, email, handle, or alias to look up'),
       },
       async ({ identifier }) => {
         const { person, confidence, isNew } = graph.resolvePerson(identifier);
@@ -215,7 +215,7 @@ export class TrustSubsystem extends Subsystem {
       'trust_evidence_list',
       'List trust evidence for a person, sorted by impact. Shows the raw observations that drive trust scoring.',
       {
-        identifier: z.string().describe('Person name or alias'),
+        identifier: z.string().max(500).describe('Person name or alias'),
         limit: z.number().int().min(1).max(50).default(10).describe('Max entries to return'),
       },
       async ({ identifier, limit }) => {
@@ -255,7 +255,7 @@ export class TrustSubsystem extends Subsystem {
       'trust_reevaluate',
       'Force a full hermeneutic re-evaluation of trust scores for a person. Recomputes ALL dimensions from ALL evidence.',
       {
-        identifier: z.string().describe('Person name or alias'),
+        identifier: z.string().max(500).describe('Person name or alias'),
       },
       async ({ identifier }) => {
         const { person } = graph.resolvePerson(identifier);
@@ -311,7 +311,7 @@ export class TrustSubsystem extends Subsystem {
       'trust_person_resolve',
       'Resolve an identifier to a person node without modifying trust. Shows match confidence and whether a new person was created.',
       {
-        identifier: z.string().describe('Name, email, handle, or alias'),
+        identifier: z.string().max(500).describe('Name, email, handle, or alias'),
         type: z.enum(['name', 'email', 'handle', 'phone', 'nickname']).optional()
           .describe('Hint for the identifier type'),
       },
@@ -347,7 +347,7 @@ export class TrustSubsystem extends Subsystem {
       'trust_explain',
       'Get a natural language explanation of trust for a person. Summarizes score, evidence breakdown, key factors, and last seen.',
       {
-        identifier: z.string().describe('Person name, email, handle, or alias'),
+        identifier: z.string().max(500).describe('Person name, email, handle, or alias'),
       },
       async ({ identifier }) => {
         const result = this.#explainTrust(identifier);

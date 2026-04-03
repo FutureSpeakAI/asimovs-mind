@@ -126,7 +126,7 @@ export class P2PSubsystem extends Subsystem {
     server.tool('peer_connect',
       'Connect to a remote Asimov Agent. Initiates encrypted handshake with cLaw attestation verification.',
       {
-        address: z.string().describe('WebSocket address (ws://host:port)'),
+        address: z.string().max(500).describe('WebSocket address (ws://host:port)'),
         peer_name: z.string().optional().describe('Human-readable name for the peer')
       },
       async ({ address, peer_name }) => {
@@ -203,7 +203,7 @@ export class P2PSubsystem extends Subsystem {
     server.tool('peer_send',
       'Send an encrypted message to a connected peer.',
       {
-        peer_id: z.string().describe('Peer ID to send to'),
+        peer_id: z.string().max(100).describe('Peer ID to send to'),
         message: z.string().max(1_000_000).describe('Message text (max 1MB)'),
         type: z.enum(['text', 'transaction', 'trust', 'attestation']).optional().default('text')
       },
@@ -230,8 +230,8 @@ export class P2PSubsystem extends Subsystem {
     server.tool('peer_send_file',
       'Send an encrypted file to a connected peer.',
       {
-        peer_id: z.string().describe('Peer ID'),
-        file_path: z.string().describe('Path to file to send'),
+        peer_id: z.string().max(100).describe('Peer ID'),
+        file_path: z.string().max(1000).describe('Path to file to send'),
         file_name: z.string().optional().describe('Name to give the file on the other side')
       },
       async ({ peer_id, file_path: filePath, file_name }) => {
