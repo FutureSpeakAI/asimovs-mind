@@ -59,7 +59,7 @@ export class OpenRouterProvider {
       });
 
       if (!res.ok) {
-        const text = await res.text();
+        const text = (await res.text()).slice(0, 200);
         const err = new Error(`[OpenRouterProvider] API error (${res.status}): ${text}`);
         err.status = res.status;
         throw err;
@@ -93,7 +93,7 @@ export class OpenRouterProvider {
     }
 
     if (!res.ok) {
-      const text = await res.text();
+      const text = (await res.text()).slice(0, 200);
       throw new Error(`[OpenRouterProvider] Streaming API error (${res.status}): ${text}`);
     }
 

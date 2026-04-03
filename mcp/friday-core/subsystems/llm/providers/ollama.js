@@ -70,7 +70,7 @@ export class OllamaProvider {
       });
 
       if (!res.ok) {
-        const text = await res.text();
+        const text = (await res.text()).slice(0, 200);
         const err = new Error(
           `[OllamaProvider] API error (${res.status}): ${text}`,
         );
@@ -105,7 +105,7 @@ export class OllamaProvider {
     }
 
     if (!res.ok) {
-      const text = await res.text();
+      const text = (await res.text()).slice(0, 200);
       throw new Error(`[OllamaProvider] API error (${res.status}): ${text}`);
     }
 

@@ -72,7 +72,7 @@ export class AnthropicProvider {
       });
 
       if (!res.ok) {
-        const text = await res.text();
+        const text = (await res.text()).slice(0, 200).replace(/sk-ant-[^\s"']+/g, '[REDACTED]');
         const err = new Error(`[AnthropicProvider] API error (${res.status}): ${text}`);
         err.status = res.status;
         throw err;
@@ -120,7 +120,7 @@ export class AnthropicProvider {
     }
 
     if (!res.ok) {
-      const text = await res.text();
+      const text = (await res.text()).slice(0, 200).replace(/sk-ant-[^\s"']+/g, '[REDACTED]');
       throw new Error(`[AnthropicProvider] Streaming API error (${res.status}): ${text}`);
     }
 

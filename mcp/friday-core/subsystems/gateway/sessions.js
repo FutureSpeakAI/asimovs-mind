@@ -38,7 +38,7 @@ export class SessionStore {
   // -- Session access -------------------------------------------------------
 
   #getSession(channel, senderId) {
-    const key = `${channel}:${senderId}`;
+    const key = `${channel}\0${senderId}`;
     let session = this.#sessions.get(key);
     if (!session) {
       // Hard cap: reject new sessions if at capacity (prune first)
@@ -73,7 +73,7 @@ export class SessionStore {
   // -- History retrieval ----------------------------------------------------
 
   getHistory(channel, senderId) {
-    const key = `${channel}:${senderId}`;
+    const key = `${channel}\0${senderId}`;
     const session = this.#sessions.get(key);
     if (!session) return [];
     if (Date.now() - session.lastActivity > SESSION_EXPIRY_MS) {
@@ -86,7 +86,7 @@ export class SessionStore {
   // -- Session management ---------------------------------------------------
 
   clearSession(channel, senderId) {
-    this.#sessions.delete(`${channel}:${senderId}`);
+    this.#sessions.delete(`${channel}\0${senderId}`);
     this.#queueSave();
   }
 

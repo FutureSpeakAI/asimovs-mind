@@ -304,7 +304,11 @@ export class SemanticSearchEngine {
       process.stderr.write(`[SemanticSearch] Indexed ${batch.length} entries\n`);
     } catch (err) {
       process.stderr.write(`[SemanticSearch] Batch embedding failed: ${err.message}\n`);
-      this.#pendingBatch.push(...batch);
+      // Re-queue with retry tracking; drop items that have failed 3+ times
+      for (const item of batch) {
+        item._retries = (item._retries || 0) + 1;
+        if (item._retries < 3) this.#pendingBatch.push(item);
+      }
     }
   }
 

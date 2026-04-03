@@ -66,7 +66,10 @@ export class LLMClient {
     try {
       return await provider.complete(request);
     } catch (err) {
-      // If explicit provider was requested, only fall back if it wasn't explicitly set
+      // If explicit provider was requested, do NOT fall back — prevents accidental
+      // data leakage to cloud when caller intended local-only processing
+      if (providerName) throw err;
+
       const errMsg = err instanceof Error ? err.message : String(err);
       process.stderr.write('[friday:llm] Provider \'' + provider.name + '\' failed: ' + errMsg + ' -- trying fallbacks\n');
 

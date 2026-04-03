@@ -393,13 +393,13 @@ describe('Gateway / SessionStore: pruneExpired', () => {
     const EXPIRY_MS = 4 * 60 * 60 * 1000; // 4 hours
     const oldTime = Date.now() - EXPIRY_MS - 5000;
     await backdatedState.write('sessions', {
-      'discord:stale-user': {
+      'discord\0stale-user': {
         senderId: 'stale-user',
         channel: 'discord',
         messages: [{ role: 'user', content: 'old msg', timestamp: oldTime }],
         lastActivity: oldTime,
       },
-      'discord:active-user': {
+      'discord\0active-user': {
         senderId: 'active-user',
         channel: 'discord',
         messages: [{ role: 'user', content: 'new msg', timestamp: Date.now() }],

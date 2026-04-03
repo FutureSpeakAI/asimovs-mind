@@ -449,7 +449,7 @@ export class TrustGraph {
     person.communicationLog.push({ ...event, timestamp: Date.now() });
     person.sentiment.push({
       timestamp: Date.now(),
-      score: clamp(event.sentiment, -1, 1),
+      score: clamp(typeof event.sentiment === 'number' ? event.sentiment : 0, -1, 1),
       context: event.summary,
     });
 
@@ -666,7 +666,7 @@ export class TrustGraph {
         }
       }
 
-      if (mention.sentiment !== 0) {
+      if (typeof mention.sentiment === 'number' && mention.sentiment !== 0) {
         person.sentiment.push({
           timestamp: Date.now(),
           score: clamp(mention.sentiment, -1, 1),
