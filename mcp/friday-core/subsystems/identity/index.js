@@ -58,7 +58,7 @@ export class IdentitySubsystem extends Subsystem {
     server.tool('identity_verify',
       'Verify an Ed25519 signature.',
       {
-        message: z.string(),
+        message: z.string().max(100_000),
         signature: z.string().max(500).describe('Base64-encoded signature'),
         publicKey: z.string().max(500).describe('Base64-encoded Ed25519 public key')
       },
@@ -81,10 +81,10 @@ export class IdentitySubsystem extends Subsystem {
       'Verify a peer\'s cLaw attestation.',
       {
         attestation: z.object({
-          lawsHash: z.string(),
+          lawsHash: z.string().max(200),
           timestamp: z.number(),
-          signature: z.string(),
-          signerPublicKey: z.string()
+          signature: z.string().max(500),
+          signerPublicKey: z.string().max(500)
         }),
         laws_text: z.string().max(100_000).describe('Expected laws text to verify hash against')
       },

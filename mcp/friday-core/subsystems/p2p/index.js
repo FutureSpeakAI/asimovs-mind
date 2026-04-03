@@ -260,7 +260,7 @@ export class P2PSubsystem extends Subsystem {
 
     server.tool('peer_disconnect',
       'Close the encrypted channel to a peer and destroy session keys.',
-      { peer_id: z.string() },
+      { peer_id: z.string().max(100) },
       async ({ peer_id }) => {
         peerManager.removeChannel(peer_id);
         transport.disconnect(peer_id);

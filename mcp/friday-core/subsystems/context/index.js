@@ -161,7 +161,7 @@ export class ContextSubsystem extends Subsystem {
       'context_inject',
       'Build an enriched context block for an LLM request. Finds relevant entities and recent activity based on the query. Returns markdown suitable for system prompt injection.',
       {
-        query: z.string()
+        query: z.string().max(10_000)
           .describe('What the user is asking about. Used to focus the context on relevant entities.'),
       },
       async ({ query }) => {
@@ -258,7 +258,7 @@ export class ContextSubsystem extends Subsystem {
       'context_query',
       'Query the knowledge graph. Search by name pattern and optional type filter. Returns nodes sorted by relevance (recency + connectivity).',
       {
-        pattern: z.string()
+        pattern: z.string().max(1_000)
           .describe('Substring to match against node names'),
         type: z.enum(['file', 'function', 'person', 'concept', 'project']).optional()
           .describe('Filter by node type'),
