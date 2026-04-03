@@ -344,9 +344,9 @@ export class AgentSubsystem extends Subsystem {
         name: z.string().max(200).describe('Team name'),
         goal: z.string().max(10_000).describe('Shared goal for the team'),
         tasks: z.array(z.object({
-          description: z.string(),
+          description: z.string().max(5_000),
           priority: z.enum(['high', 'medium', 'low']).default('medium'),
-        })).default([]).describe('Initial tasks for the team'),
+        })).max(100).default([]).describe('Initial tasks for the team (max 100)'),
       },
       async ({ name, goal, tasks: initialTasks }) => {
         const team = teams.create(name, goal);
