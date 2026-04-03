@@ -67,15 +67,25 @@ export class SessionConductor {
     // 3. Check if daily briefing is stale
     const briefingStale = this.#checkBriefingStale();
 
-    // 4. Compose greeting
-    this.#greeting = this.#composeGreeting(this.#cwdContext, this.#pendingCommitments, briefingStale);
+    // 4. Musical Memory baseline prompt (if subsystem registered)
+    let musicalVibePrompt = null;
+    try {
+      const musicalMemory = this.#registry.get('musical-memory');
+      if (musicalMemory?.started) {
+        musicalVibePrompt = musicalMemory.getSessionPrompt();
+      }
+    } catch { /* subsystem not available */ }
 
-    // 5. Publish session:start
+    // 5. Compose greeting
+    this.#greeting = this.#composeGreeting(this.#cwdContext, this.#pendingCommitments, briefingStale, musicalVibePrompt);
+
+    // 6. Publish session:start
     this.#eventBus.publish('session:start', {
       timestamp: this.#sessionStartTime,
       cwd: this.#cwdContext,
       pendingCommitments: this.#pendingCommitments.length,
       briefingStale,
+      musicalVibePrompt,
     });
 
     this.#logger.info(`Session started in ${this.#cwdContext.projectName}${this.#cwdContext.gitBranch ? ` (${this.#cwdContext.gitBranch})` : ''}`);
@@ -141,7 +151,7 @@ export class SessionConductor {
     return true;
   }
 
-  #composeGreeting(cwd, commitments, briefingStale) {
+  #composeGreeting(cwd, commitments, briefingStale, musicalVibePrompt) {
     // Pull personality mode if available
     let mode = 'partner';
     let userName = 'Boss';
@@ -172,6 +182,10 @@ export class SessionConductor {
 
     if (briefingStale && mode !== 'focus') {
       parts.push('Daily briefing is stale. Want me to generate a fresh one?');
+    }
+
+    if (musicalVibePrompt && mode !== 'focus') {
+      parts.push(musicalVibePrompt);
     }
 
     return parts.join(' ');

@@ -201,6 +201,51 @@ export function wireSubsystems(registry, eventBus) {
     try { await registry.get('enterprise')?.stop?.(); } catch (e) { warn('enterprise on session:end', e); }
   });
 
+  // -----------------------------------------------------------------------
+  // Musical Memory: sentiment:mood_change -> arc tracker + frustration
+  // -----------------------------------------------------------------------
+  eventBus.on('sentiment:mood_change', (event) => {
+    try {
+      const mm = registry.get('musical-memory');
+      if (mm?.started) mm.onMoodChange(event);
+    } catch (e) { warn('musical-memory on sentiment:mood_change', e); }
+  });
+
+  // -----------------------------------------------------------------------
+  // Musical Memory: agent:completed -> milestone detection + frustration
+  // -----------------------------------------------------------------------
+  eventBus.on('agent:completed', (event) => {
+    try {
+      const mm = registry.get('musical-memory');
+      if (mm?.started) mm.onAgentCompleted(event);
+    } catch (e) { warn('musical-memory on agent:completed', e); }
+  });
+
+  // -----------------------------------------------------------------------
+  // Musical Memory: agent:failed -> frustration tracking
+  // -----------------------------------------------------------------------
+  eventBus.on('agent:failed', (event) => {
+    try {
+      const mm = registry.get('musical-memory');
+      if (mm?.started) mm.onAgentFailed(event);
+    } catch (e) { warn('musical-memory on agent:failed', e); }
+  });
+
+  // -----------------------------------------------------------------------
+  // Musical Memory: agent:spawn_requested -> inject musical context
+  // -----------------------------------------------------------------------
+  eventBus.on('agent:spawn_requested', (event) => {
+    try {
+      const mm = registry.get('musical-memory');
+      if (mm?.started && event.data?.input) {
+        const injection = mm.getActiveInjection();
+        if (injection) {
+          event.data.input.__musicalContext = injection.injectionText;
+        }
+      }
+    } catch (e) { warn('musical-memory on agent:spawn_requested', e); }
+  });
+
   // -- Expose tracker for external access ---------------------------------
   return { epistemicTracker };
 }

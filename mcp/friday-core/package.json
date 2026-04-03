@@ -1,12 +1,12 @@
 {
   "name": "@asimovs-mind/friday-core",
   "version": "2.3.0",
-  "description": "Agent Friday Runtime — 18 subsystems, 91 MCP tools, encrypted vault, holographic dashboard",
+  "description": "Agent Friday Runtime — 19 subsystems, 97 MCP tools, encrypted vault, holographic dashboard",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js test/test-security.js test/test-concurrency.js test/test-coverage-gaps.js test/test-cycle-fixes.js test/test-stress.js test/test-internals.js && node --test --test-force-exit test/test-subsystems.js",
+    "test": "node --test test/test-core.js test/test-integration.js test/test-plugin.js test/test-user-paths.js test/test-wiring.js test/test-session.js test/test-security.js test/test-concurrency.js test/test-coverage-gaps.js test/test-cycle-fixes.js test/test-stress.js test/test-internals.js test/test-musical-memory.js && node --test --test-force-exit test/test-subsystems.js",
     "lint": "eslint ."
   },
   "dependencies": {

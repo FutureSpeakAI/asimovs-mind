@@ -71,6 +71,7 @@ import { BriefingSubsystem } from './subsystems/briefing/index.js';
 import { VoiceSubsystem } from './subsystems/voice/index.js';
 import { EnterpriseSubsystem } from './subsystems/enterprise/index.js';
 import { SessionSubsystem } from './subsystems/session/index.js';
+import { MusicalMemorySubsystem } from './subsystems/musical-memory/index.js';
 
 // --- Resolve paths ---
 
@@ -116,6 +117,7 @@ registry.register(new BriefingSubsystem(deps),  { tier: 3 }); // needs memory, t
 registry.register(new VoiceSubsystem(deps),     { tier: 3 }); // needs event bus
 registry.register(new EnterpriseSubsystem(deps), { tier: 3 }); // needs vault, event bus
 registry.register(new SessionSubsystem(deps),   { tier: 3 }); // needs session conductor (injected after startAll)
+registry.register(new MusicalMemorySubsystem(deps), { tier: 3 }); // needs personality, memory, agents
 
 // Inject registry reference into vault subsystem for status reporting
 registry.get('vault').setRegistry(registry);
@@ -143,6 +145,7 @@ const HTTP_TOOL_WHITELIST = new Set([
   'session_status',
   'personality_status',
   'memory_store',
+  'musical_memory_status',
 ]);
 
 // --- Token-bucket rate limiter (100 req/s per source IP) ---
