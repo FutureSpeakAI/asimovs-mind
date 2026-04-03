@@ -204,7 +204,7 @@ export class P2PSubsystem extends Subsystem {
       'Send an encrypted message to a connected peer.',
       {
         peer_id: z.string().describe('Peer ID to send to'),
-        message: z.string().describe('Message text'),
+        message: z.string().max(1_000_000).describe('Message text (max 1MB)'),
         type: z.enum(['text', 'transaction', 'trust', 'attestation']).optional().default('text')
       },
       async ({ peer_id, message, type }) => {
@@ -243,6 +243,10 @@ export class P2PSubsystem extends Subsystem {
           const pathErr = validateFilePath(filePath);
           if (pathErr) {
             return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: pathErr }) }] };
+          }
+          const stat = await fs.stat(filePath);
+          if (stat.size > 100 * 1024 * 1024) {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: 'File too large (max 100 MB)' }) }] };
           }
           const data = await fs.readFile(filePath);
           const name = file_name || path.basename(filePath);
