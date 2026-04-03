@@ -370,11 +370,15 @@ export class MemoryTiers {
    */
   #evictOne(arr) {
     if (arr.length === 0) return null;
-    arr.sort((a, b) => {
-      const diff = a.accessCount - b.accessCount;
-      return diff !== 0 ? diff : a.created - b.created;
-    });
-    return arr.shift();
+    // Linear scan for minimum — avoids O(n log n) in-place sort that mutates array order
+    let minIdx = 0;
+    for (let i = 1; i < arr.length; i++) {
+      const diff = arr[i].accessCount - arr[minIdx].accessCount;
+      if (diff < 0 || (diff === 0 && arr[i].created < arr[minIdx].created)) {
+        minIdx = i;
+      }
+    }
+    return arr.splice(minIdx, 1)[0];
   }
 
   #pruneExpired() {
