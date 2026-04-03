@@ -190,7 +190,7 @@ describe('Event bus: splice-based prune under high-frequency publishing', () => 
 
     // Busy-wait for 10ms so timestamps become stale relative to the 1ms window
     const deadline = Date.now() + 10;
-    while (Date.now() < deadline) {}
+    while (Date.now() < deadline) { /* busy wait for timestamp staleness */ }
 
     // Publishing one more event must trigger prune and evict all stale entries
     bus.publish('age:test', { seq: 100 });
@@ -830,7 +830,7 @@ describe('Connector registry: all connectors fail detection', () => {
     const logger = createMockLogger();
     const registry = new ConnectorRegistry({ log: logger });
 
-    const hangingModules = Array.from({ length: 3 }, (_, i) => ({
+    const _hangingModules = Array.from({ length: 3 }, (_, i) => ({
       id: `hanging-connector-${i}`,
       label: `Hanging ${i}`,
       category: 'test',
