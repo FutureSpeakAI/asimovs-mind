@@ -90,9 +90,9 @@ export class GatewaySubsystem extends Subsystem {
       'gateway_authenticate',
       'Resolve a sender\'s trust tier and capability policy. Returns allowed tools, memory permissions, rate limits, and iteration cap for this sender. Fails closed to "public" tier on any error.',
       {
-        channel: z.string().describe('Channel name (telegram, discord, slack, etc.)'),
-        sender_id: z.string().describe('Sender identifier within the channel'),
-        sender_name: z.string().optional().describe('Human-readable sender name'),
+        channel: z.string().max(200).describe('Channel name (telegram, discord, slack, etc.)'),
+        sender_id: z.string().max(500).describe('Sender identifier within the channel'),
+        sender_name: z.string().max(200).optional().describe('Human-readable sender name'),
       },
       async ({ channel, sender_id, sender_name }) => {
         const tier = trust.resolveTrust(channel, sender_id);
@@ -131,7 +131,7 @@ export class GatewaySubsystem extends Subsystem {
       {
         channel: z.string().min(1).describe('Channel name'),
         sender_id: z.string().min(1).describe('Sender identifier'),
-        message: z.string().describe('The user message to add'),
+        message: z.string().max(100_000).describe('The user message to add (max 100KB)'),
         role: z.enum(['user', 'assistant']).default('user').describe('Message role'),
       },
       async ({ channel, sender_id, message, role }) => {

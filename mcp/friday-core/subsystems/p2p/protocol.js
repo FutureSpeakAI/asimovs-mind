@@ -445,6 +445,15 @@ export class PeerManager {
   // --- Pairing ---
 
   generatePairingCode() {
+    // Prune expired codes before generating new ones (prevents unbounded growth)
+    const now = Date.now();
+    for (const [k, v] of this.#pairingCodes) {
+      if (now > v.expires) this.#pairingCodes.delete(k);
+    }
+    // Hard cap at 100 active codes
+    if (this.#pairingCodes.size >= 100) {
+      return null; // caller should handle this
+    }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I,O,0,1 for readability
     let code = '';
     const bytes = crypto.randomBytes(8);

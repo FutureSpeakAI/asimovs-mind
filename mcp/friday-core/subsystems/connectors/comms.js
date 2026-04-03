@@ -47,7 +47,7 @@ function validateWebhookUrl(raw, allowHttp = false) {
 
 // Sanitize SMTP header fields — strip CR/LF to prevent header injection
 function smtpSafe(s) { return String(s).replace(/[\r\n]/g, ''); }
-function psEscape(s) { return s.replace(/'/g, "''"); }
+function _psEscape(s) { return s.replace(/'/g, "''"); }
 function xmlEsc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 // -- HTTP helper --
@@ -217,7 +217,6 @@ async function webhookSend(args) {
 async function notificationToast(args) {
   if (!args.title || !args.body) throw new Error('title and body are required.');
   const tXml = xmlEsc(args.title), bXml = xmlEsc(args.body);
-  const tPs = psEscape(args.title), bPs = psEscape(args.body);
   try {
     const script = `
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
@@ -233,7 +232,9 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 Write-Output 'Toast shown.'`.trim();
     return await runPowerShell(script) || 'Toast displayed.';
   } catch {
-    const fallback = `Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.BalloonTipTitle='${tPs}'; $n.BalloonTipText='${bPs}'; $n.Visible=$true; $n.ShowBalloonTip(5000); Start-Sleep -Milliseconds 5500; $n.Dispose(); Write-Output 'Balloon shown.'`;
+    // Sanitize for single-quoted PowerShell: strip all chars that could break out
+    const safePsStr = (s) => String(s).replace(/[';$()[\]{}|`\\]/g, '');
+    const fallback = `Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.BalloonTipTitle='${safePsStr(args.title)}'; $n.BalloonTipText='${safePsStr(args.body)}'; $n.Visible=$true; $n.ShowBalloonTip(5000); Start-Sleep -Milliseconds 5500; $n.Dispose(); Write-Output 'Balloon shown.'`;
     return await runPowerShell(fallback) || 'Balloon notification displayed.';
   }
 }

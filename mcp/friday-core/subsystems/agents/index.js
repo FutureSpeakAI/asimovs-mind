@@ -107,10 +107,10 @@ export class AgentSubsystem extends Subsystem {
       {
         parentTaskId: z.string().describe('Task ID of the parent agent'),
         agentType: z.string().describe('Type of agent to spawn (research, coding, analysis, creative, security, summarize, draft-email)'),
-        description: z.string().describe('What this sub-agent should accomplish'),
+        description: z.string().max(10_000).describe('What this sub-agent should accomplish'),
         input: z.record(z.unknown()).default({}).describe('Input data for the sub-agent'),
         trustTier: z.enum(TRUST_TIERS).optional().describe('Trust tier (can only degrade from parent)'),
-        context: z.string().optional().describe('Additional context from parent'),
+        context: z.string().max(50_000).optional().describe('Additional context from parent'),
       },
       async ({ parentTaskId, agentType, description, input, trustTier, context }) => {
         const result = delegation.prepareSubAgent({
@@ -164,8 +164,8 @@ export class AgentSubsystem extends Subsystem {
       'agent_spawn',
       'Spawn a top-level agent. Creates a new delegation root and registers in the awareness mesh.',
       {
-        agentType: z.string().describe('Agent type (research, coding, analysis, creative, security, summarize, draft-email, orchestrate)'),
-        description: z.string().describe('What this agent should accomplish'),
+        agentType: z.string().max(50).describe('Agent type (research, coding, analysis, creative, security, summarize, draft-email, orchestrate)'),
+        description: z.string().max(10_000).describe('What this agent should accomplish'),
         input: z.record(z.unknown()).default({}).describe('Input data for the agent'),
         trustTier: z.enum(TRUST_TIERS).default('local').describe('Trust tier for this agent'),
       },

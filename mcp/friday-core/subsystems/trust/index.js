@@ -180,11 +180,11 @@ export class TrustSubsystem extends Subsystem {
       'trust_evidence_add',
       'Add trust evidence for a person. Evidence drives trust score computation. Types: promise_kept/broken, accurate/inaccurate_info, helpful/unhelpful_action, emotional_support, user_stated, observed, inferred.',
       {
-        identifier: z.string().describe('Person name or alias'),
+        identifier: z.string().max(200).describe('Person name or alias'),
         type: z.enum(EVIDENCE_TYPES).describe('Evidence type'),
-        description: z.string().describe('What happened'),
+        description: z.string().max(5_000).describe('What happened'),
         impact: z.number().min(-1).max(1).describe('Impact: -1 (strongly negative) to +1 (strongly positive)'),
-        domain: z.string().optional().describe('Domain (e.g. "engineering", "finance")'),
+        domain: z.string().max(100).optional().describe('Domain (e.g. "engineering", "finance")'),
       },
       async ({ identifier, type, description, impact, domain }) => {
         const { person, isNew } = graph.resolvePerson(identifier);
