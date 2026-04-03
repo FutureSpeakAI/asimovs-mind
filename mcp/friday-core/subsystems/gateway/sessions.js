@@ -14,6 +14,7 @@
 
 const MAX_MESSAGES_PER_SENDER = 10;
 const SESSION_EXPIRY_MS = 4 * 60 * 60 * 1000; // 4 hours
+const MAX_SESSIONS = 10_000;
 
 export class SessionStore {
   #sessions = new Map();
@@ -40,6 +41,11 @@ export class SessionStore {
     const key = `${channel}:${senderId}`;
     let session = this.#sessions.get(key);
     if (!session) {
+      // Hard cap: reject new sessions if at capacity (prune first)
+      if (this.#sessions.size >= MAX_SESSIONS) {
+        this.pruneExpired();
+        if (this.#sessions.size >= MAX_SESSIONS) return null;
+      }
       session = { senderId, channel, messages: [], lastActivity: Date.now() };
       this.#sessions.set(key, session);
     }
