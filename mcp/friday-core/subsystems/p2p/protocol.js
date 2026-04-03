@@ -51,6 +51,7 @@ export class PeerChannel {
   #createdAt = Date.now();
   #lastActivity = Date.now();
   #messageLog = [];
+  static #MAX_MESSAGE_LOG = 1000;
   #fileTransfers = new Map();
 
   // Callbacks
@@ -113,6 +114,21 @@ export class PeerChannel {
   // --- Handshake (responder side) ---
 
   async handleHandshake(msg, myExchangePrivateKey, myExchangePublicKey, mySigningPrivateKey, myAttestation, verifyAttestationFn) {
+    // Verify Ed25519 signature on the inbound handshake message
+    if (msg.signature && msg.attestation?.signerPublicKey) {
+      const { signature: _sig, ...payloadFields } = msg;
+      const payloadStr = JSON.stringify(payloadFields);
+      const signerKey = Buffer.from(msg.attestation.signerPublicKey, 'base64');
+      const valid = verify(Buffer.from(payloadStr), Buffer.from(msg.signature, 'base64'), signerKey);
+      if (!valid) {
+        await this.#rawSend({ type: 'error', code: 'SIGNATURE_FAILED', reason: 'Handshake signature verification failed' });
+        this.#state = 'closed';
+        return { success: false, error: 'Handshake signature verification failed' };
+      }
+      // Pin the peer's signing key for future message verification
+      this.#peerSigningPubKey = signerKey;
+    }
+
     // Verify peer's attestation
     if (msg.attestation && verifyAttestationFn) {
       const result = verifyAttestationFn(msg.attestation);
@@ -321,6 +337,7 @@ export class PeerChannel {
 
       const msg = JSON.parse(plaintext.toString('utf-8'));
       this.#messageLog.push({ direction: 'recv', type: msg.type, timestamp: msg.timestamp });
+      if (this.#messageLog.length > PeerChannel.#MAX_MESSAGE_LOG) this.#messageLog.shift();
 
       if (this.#onMessage) this.#onMessage(msg);
       return { success: true, message: msg };
@@ -367,6 +384,7 @@ export class PeerChannel {
     }
 
     this.#messageLog.push({ direction: 'send', type: msg.type, timestamp: msg.timestamp });
+    if (this.#messageLog.length > PeerChannel.#MAX_MESSAGE_LOG) this.#messageLog.shift();
     await this.#rawSend({ encrypted: ciphertext.toString('base64'), sig });
     return { success: true, sequence: Number(this.#sendSequence - 1n) };
   }

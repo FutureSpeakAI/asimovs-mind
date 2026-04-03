@@ -151,8 +151,8 @@ export class P2PTransport {
       try {
         const msg = JSON.parse(data.toString());
         if (msg.type === 'handshake' && direction === 'inbound') {
-          // New peer initiating handshake
-          const peerId = msg.attestation?.signerPublicKey?.slice(0, 16) || connId;
+          // Use the random connId as peerId — never derive from unverified message data
+          const peerId = connId;
           this.#connections.set(peerId, ws);
           if (this.#onIncomingHandshake) {
             this.#onIncomingHandshake(peerId, msg, (response) => {

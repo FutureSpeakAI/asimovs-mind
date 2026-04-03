@@ -53,7 +53,7 @@ export class LLMSubsystem extends Subsystem {
   // Zod schemas for LLM tools
   static #messageSchema = z.object({
     role: z.enum(['system', 'user', 'assistant', 'tool']),
-    content: z.string(),
+    content: z.string().max(500_000),
   });
 
   registerTools(server) {
@@ -62,12 +62,12 @@ export class LLMSubsystem extends Subsystem {
       'llm_complete',
       'Send a completion request to an LLM. Returns the full response text, model used, token usage, and latency.',
       {
-        messages: z.array(LLMSubsystem.#messageSchema).describe('Array of chat messages'),
-        model: z.string().optional().describe('Specific model ID (e.g. "claude-sonnet-4-20250514")'),
-        provider: z.string().optional().describe('Provider name: "anthropic", "ollama", or "openrouter"'),
-        systemPrompt: z.string().optional().describe('System prompt (separate from messages)'),
-        maxTokens: z.number().optional().describe('Max output tokens. Default: 1024'),
-        temperature: z.number().optional().describe('Sampling temperature 0-2'),
+        messages: z.array(LLMSubsystem.#messageSchema).max(500).describe('Array of chat messages (max 500)'),
+        model: z.string().max(200).optional().describe('Specific model ID (e.g. "claude-sonnet-4-20250514")'),
+        provider: z.string().max(50).optional().describe('Provider name: "anthropic", "ollama", or "openrouter"'),
+        systemPrompt: z.string().max(500_000).optional().describe('System prompt (separate from messages)'),
+        maxTokens: z.number().int().min(1).max(128_000).optional().describe('Max output tokens. Default: 1024'),
+        temperature: z.number().min(0).max(2).optional().describe('Sampling temperature 0-2'),
       },
       async ({ messages, model, provider, systemPrompt, maxTokens, temperature }) => {
         const response = await this.client.complete({
@@ -97,12 +97,12 @@ export class LLMSubsystem extends Subsystem {
       'llm_stream',
       'Stream a completion request. Returns accumulated text from the full stream.',
       {
-        messages: z.array(LLMSubsystem.#messageSchema).describe('Chat messages array'),
-        model: z.string().optional().describe('Model ID'),
-        provider: z.string().optional().describe('Provider name'),
-        systemPrompt: z.string().optional().describe('System prompt'),
-        maxTokens: z.number().optional().describe('Max output tokens. Default: 4096'),
-        temperature: z.number().optional().describe('Temperature'),
+        messages: z.array(LLMSubsystem.#messageSchema).max(500).describe('Chat messages array (max 500)'),
+        model: z.string().max(200).optional().describe('Model ID'),
+        provider: z.string().max(50).optional().describe('Provider name'),
+        systemPrompt: z.string().max(500_000).optional().describe('System prompt'),
+        maxTokens: z.number().int().min(1).max(128_000).optional().describe('Max output tokens. Default: 4096'),
+        temperature: z.number().min(0).max(2).optional().describe('Temperature'),
       },
       async ({ messages, model, provider, systemPrompt, maxTokens, temperature }) => {
         let fullText = '';

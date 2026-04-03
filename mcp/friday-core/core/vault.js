@@ -220,10 +220,12 @@ export class SovereignVault {
   }
 
   async append(key, entry) {
-    // Read existing array, append, write back
+    // Read existing array, append, write back. Cap at 10,000 entries to prevent
+    // unbounded growth from high-frequency callers (e.g., third-law.py session ledger).
     const result = await this.read(key);
     const arr = (result.success && Array.isArray(result.data)) ? result.data : [];
     arr.push(entry);
+    if (arr.length > 10_000) arr.splice(0, arr.length - 10_000);
     return this.write(key, arr);
   }
 

@@ -52,7 +52,7 @@ export class VaultSubsystem extends Subsystem {
 
     server.tool('vault_initialize',
       'Initialize a new vault with a passphrase (>= 8 words). Creates encrypted storage.',
-      { passphrase: z.string().describe('Passphrase (minimum 8 words, 24+ characters)') },
+      { passphrase: z.string().max(1024).describe('Passphrase (minimum 8 words, 24+ characters, max 1KB)') },
       async ({ passphrase }) => {
         const result = await vault.initialize(passphrase);
         return {
@@ -63,7 +63,7 @@ export class VaultSubsystem extends Subsystem {
 
     server.tool('vault_unlock',
       'Unlock an existing vault with the passphrase. Derives keys, verifies canary.',
-      { passphrase: z.string().describe('Vault passphrase') },
+      { passphrase: z.string().max(1024).describe('Vault passphrase') },
       async ({ passphrase }) => {
         const result = await vault.unlock(passphrase);
         if (result.success) {

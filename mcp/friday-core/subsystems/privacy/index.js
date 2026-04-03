@@ -118,7 +118,7 @@ export class PrivacySubsystem extends Subsystem {
 
     server.tool('privacy_scrub',
       'Scrub PII from text using the Privacy Shield. Returns scrubbed text.',
-      { text: z.string().describe('Text to scrub for PII') },
+      { text: z.string().max(500_000).describe('Text to scrub for PII (max 500KB)') },
       async ({ text }) => {
         const shield = vault.privacyShield;
         const nonce = shield.getNonce();
@@ -136,7 +136,7 @@ export class PrivacySubsystem extends Subsystem {
 
     server.tool('privacy_rehydrate',
       'Restore PII in text using stored mappings.',
-      { text: z.string().describe('Text with PII placeholders to restore') },
+      { text: z.string().max(500_000).describe('Text with PII placeholders to restore (max 500KB)') },
       async ({ text }) => {
         const shield = vault.privacyShield;
         const restored = rehydratePii(text, shield);
