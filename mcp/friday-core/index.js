@@ -151,6 +151,17 @@ const RATE_LIMIT_MAX = 100;      // max tokens (= max burst)
 const RATE_LIMIT_REFILL = 100;   // tokens added per second
 const rateBuckets = new Map();   // IP -> { tokens, lastRefill }
 
+// Sweep stale rate-limit buckets every 5 minutes (prevents unbounded Map growth)
+const RATE_BUCKET_SWEEP_INTERVAL = 5 * 60 * 1000;
+const RATE_BUCKET_STALE_MS = 10 * 60 * 1000; // 10 minutes without activity
+const rateBucketSweep = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, bucket] of rateBuckets) {
+    if (now - bucket.lastRefill > RATE_BUCKET_STALE_MS) rateBuckets.delete(ip);
+  }
+}, RATE_BUCKET_SWEEP_INTERVAL);
+rateBucketSweep.unref();
+
 // Tighter rate limit for passphrase-sensitive endpoints (5 attempts per minute)
 const UNLOCK_RATE_MAX = 5;
 const UNLOCK_RATE_REFILL = 5 / 60; // 5 per 60 seconds
@@ -216,10 +227,13 @@ async function startHttpBridge() {
       const url = new URL(req.url, `http://localhost`);
       const route = url.pathname;
 
-      // Require bearer token on all write endpoints and generic tool endpoint
+      // Require bearer token on all write/mutation endpoints
       const requiresAuth = (
         (route === '/write' && req.method === 'POST') ||
         (route === '/append' && req.method === 'POST') ||
+        (route === '/scrub' && req.method === 'POST') ||
+        (route === '/rehydrate' && req.method === 'POST') ||
+        (route === '/initialize' && req.method === 'POST') ||
         (route.startsWith('/tool/') && (req.method === 'POST' || req.method === 'GET'))
       );
       if (requiresAuth) {

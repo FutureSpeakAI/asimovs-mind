@@ -262,7 +262,8 @@ export class TrustGraph {
         if (scoreDiff !== 0) return scoreDiff;
         return a.lastSeen - b.lastSeen;
       });
-      this.#persons.shift();
+      const evicted = this.#persons.shift();
+      if (evicted) this.#evidenceCountSinceReEval.delete(evicted.id);
     }
 
     const newPerson = createPersonNode(identifier.trim(), aliasType);

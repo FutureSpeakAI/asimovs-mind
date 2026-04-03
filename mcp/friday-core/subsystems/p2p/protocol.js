@@ -208,7 +208,10 @@ export class PeerChannel {
     this.#safetyNumber = session.safetyNumber;
 
     sharedSecret.fill(0);
-    // Clean up temporary keys
+    // Clean up temporary keys — destroy SecureBuffer to wipe key material
+    if (this._myExchangePrivateKey && typeof this._myExchangePrivateKey.destroy === 'function') {
+      this._myExchangePrivateKey.destroy();
+    }
     this._myExchangePrivateKey = null;
     this._myExchangePublicKey = null;
 
@@ -241,6 +244,9 @@ export class PeerChannel {
   }
 
   async sendFileStart(fileId, fileName, totalSize, totalChunks) {
+    if (this.#fileTransfers.size >= 50) {
+      throw new Error('Too many concurrent file transfers (max 50)');
+    }
     this.#fileTransfers.set(fileId, { fileName, totalSize, totalChunks, sent: 0 });
     return this.#sendEncrypted({
       type: 'file_start', fileId, fileName, totalSize, totalChunks, timestamp: Date.now()
