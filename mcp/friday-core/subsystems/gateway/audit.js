@@ -17,7 +17,7 @@ export class AuditLog {
   #entries = [];
   #state = null;
   #currentMonth = '';
-  #saveQueued = false;
+  // #saveQueued replaced by #saveTimer (see #queueSave)
 
   async initialize(state) {
     this.#state = state;
@@ -40,7 +40,8 @@ export class AuditLog {
     try {
       const month = this.#getMonth();
       if (month !== this.#currentMonth) {
-        // Month rotated; flush old month before clearing entries
+        // Month rotated; cancel pending timer and flush old month
+        this.#cancelPendingSave();
         await this.#save();
         this.#currentMonth = month;
         this.#entries = [];
@@ -114,13 +115,21 @@ export class AuditLog {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }
 
+  #saveTimer = null;
+
   #queueSave() {
-    if (this.#saveQueued || !this.#state) return;
-    this.#saveQueued = true;
-    setTimeout(() => {
-      this.#saveQueued = false;
+    if (this.#saveTimer || !this.#state) return;
+    this.#saveTimer = setTimeout(() => {
+      this.#saveTimer = null;
       this.#save();
     }, 2000);
+  }
+
+  #cancelPendingSave() {
+    if (this.#saveTimer) {
+      clearTimeout(this.#saveTimer);
+      this.#saveTimer = null;
+    }
   }
 
   async #save() {

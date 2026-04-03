@@ -117,18 +117,14 @@ export class MemoryTiers {
       }
 
       case 'medium': {
-        // Duplicate check via Jaccard similarity
-        const isDup = this.#isDuplicate(content, this.#store.mediumTerm.map(e => e.content));
-        if (isDup) {
-          // Reinforce existing
-          const existing = this.#findDuplicate(content, this.#store.mediumTerm);
-          if (existing) {
-            existing.accessCount++;
-            existing.accessed = Date.now();
-            existing.confidence = Math.min(1, existing.confidence + 0.1);
-            await this.#save('medium-term');
-            return existing;
-          }
+        // Duplicate check via Jaccard similarity (single pass)
+        const existing = this.#findDuplicate(content, this.#store.mediumTerm);
+        if (existing) {
+          existing.accessCount++;
+          existing.accessed = Date.now();
+          existing.confidence = Math.min(1, existing.confidence + 0.1);
+          await this.#save('medium-term');
+          return existing;
         }
 
         // Enforce cap via LFU+age eviction before inserting
