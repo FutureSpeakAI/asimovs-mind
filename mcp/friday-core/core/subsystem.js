@@ -123,7 +123,11 @@ export class SubsystemRegistry {
 
   async stopAll() {
     for (const name of [...this.#startOrder].reverse()) {
-      await this.#subsystems.get(name).stop();
+      try {
+        await this.#subsystems.get(name).stop();
+      } catch (err) {
+        process.stderr.write(`[friday:registry] ${name}.stop() failed: ${err?.message || err}\n`);
+      }
     }
   }
 
