@@ -220,15 +220,15 @@ export class EnterpriseSubsystem extends Subsystem {
       'enterprise_confidence',
       'Assess confidence in an LLM response using structural signals. Returns a score (0-1) and whether the response should be escalated for review. Checks for: malformed tool calls, unknown tools, truncation, empty responses, unexpectedly brief responses.',
       {
-        content: z.string().optional().describe('Response text content'),
+        content: z.string().max(500_000).optional().describe('Response text content'),
         tool_calls: z.array(z.object({
-          name: z.string(),
+          name: z.string().max(100),
           input: z.unknown(),
-        })).optional().describe('Tool calls in the response'),
-        stop_reason: z.string().optional().describe('Stop reason (end_turn, max_tokens, etc.)'),
+        })).max(100).optional().describe('Tool calls in the response (max 100)'),
+        stop_reason: z.string().max(50).optional().describe('Stop reason (end_turn, max_tokens, etc.)'),
         tool_definitions: z.array(z.object({
-          name: z.string(),
-        })).optional().describe('Known tool definitions for validation'),
+          name: z.string().max(100),
+        })).max(500).optional().describe('Known tool definitions for validation'),
         threshold: z.number().min(0).max(1).default(0.5).optional().describe('Escalation threshold'),
       },
       async ({ content, tool_calls, stop_reason, tool_definitions, threshold }) => {
