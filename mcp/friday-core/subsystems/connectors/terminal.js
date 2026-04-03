@@ -253,7 +253,9 @@ async function terminalWaitFor(args) {
       return { error: 'Pattern rejected: exceeds maximum length of 200 characters' };
     }
     // Reject nested quantifier patterns that cause catastrophic backtracking
-    if (/([+*?]|\{\d).*[)]\s*[+*?{]/.test(pat) || /[(].*[+*?].*[+*?]/.test(pat)) {
+    // Covers: (x+)+, (a|aa)+, (.*){n}, and any group followed by a quantifier
+    // that contains a quantifier inside
+    if (/([+*?]|\{\d).*[)]\s*[+*?{]/.test(pat) || /[(].*[+*?].*[+*?]/.test(pat) || /\([^)]*[|][^)]*\)[+*]/.test(pat)) {
       return { error: 'Pattern rejected: potential catastrophic backtracking' };
     }
     regex = new RegExp(pat, 'm');
