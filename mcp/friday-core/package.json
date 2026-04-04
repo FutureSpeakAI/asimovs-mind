@@ -1,5 +1,5 @@
 {
-  "name": "@asimovs-mind/friday-core",
+  "name": "@futurespeak-ai/friday-core",
   "version": "2.3.0",
   "description": "Agent Friday Runtime — 19 subsystems, 97 MCP tools, encrypted vault, holographic dashboard",
   "type": "module",
