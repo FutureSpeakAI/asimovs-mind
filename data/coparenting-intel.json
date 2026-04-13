@@ -1,0 +1,1885 @@
+{
+  "generated": "2026-04-13T07:18:42",
+  "source": "OurFamilyWizard Message Report",
+  "total_messages": 852,
+  "date_range": {
+    "start": "2021-08-27",
+    "end": "2026-04-07"
+  },
+  "child": "Liberty Webster",
+  "by_sender": {
+    "stephen": 307,
+    "elisabeth": 473,
+    "third_party": 72
+  },
+  "threads_initiated": {
+    "stephen": 66,
+    "elisabeth": 141
+  },
+  "response_analysis": {
+    "avg_response_hours": {
+      "stephen": 5.8,
+      "elisabeth": 4.9
+    },
+    "median_response_hours": {
+      "stephen": 0.4,
+      "elisabeth": 0.4
+    },
+    "response_count": {
+      "stephen": 159,
+      "elisabeth": 230
+    },
+    "avg_read_time_hours": {
+      "stephen": 25.0,
+      "elisabeth": 3.3
+    }
+  },
+  "response_by_topic": {
+    "scheduling": {
+      "stephen_avg_hours": 4.4,
+      "elisabeth_avg_hours": 3.9,
+      "stephen_responses": 115,
+      "elisabeth_responses": 167
+    },
+    "education": {
+      "stephen_avg_hours": 6.7,
+      "elisabeth_avg_hours": 4.6,
+      "stephen_responses": 58,
+      "elisabeth_responses": 71
+    },
+    "medical": {
+      "stephen_avg_hours": 4.7,
+      "elisabeth_avg_hours": 5.7,
+      "stephen_responses": 48,
+      "elisabeth_responses": 54
+    },
+    "general": {
+      "stephen_avg_hours": 5.5,
+      "elisabeth_avg_hours": 12.4,
+      "stephen_responses": 18,
+      "elisabeth_responses": 22
+    },
+    "financial": {
+      "stephen_avg_hours": 10.1,
+      "elisabeth_avg_hours": 2.3,
+      "stephen_responses": 47,
+      "elisabeth_responses": 66
+    }
+  },
+  "topics": {
+    "medical": 293,
+    "scheduling": 581,
+    "financial": 232,
+    "education": 294,
+    "general": 91
+  },
+  "top_subjects": [
+    {
+      "subject": "Tutor Time/possible weather delay",
+      "count": 34
+    },
+    {
+      "subject": "Today",
+      "count": 30
+    },
+    {
+      "subject": "Therapy next week",
+      "count": 27
+    },
+    {
+      "subject": "Pickup today",
+      "count": 20
+    },
+    {
+      "subject": "Another outcry",
+      "count": 20
+    },
+    {
+      "subject": "Pickup/weekend",
+      "count": 19
+    },
+    {
+      "subject": "CPS records",
+      "count": 18
+    },
+    {
+      "subject": "New address; tonight",
+      "count": 17
+    },
+    {
+      "subject": "Friday pickup",
+      "count": 17
+    },
+    {
+      "subject": "Liberty\u2019s Kung Fu Belt Test \u2013 December 20th",
+      "count": 16
+    },
+    {
+      "subject": "This week",
+      "count": 15
+    },
+    {
+      "subject": "Pickup",
+      "count": 13
+    },
+    {
+      "subject": "Medicine, credit, and debit",
+      "count": 11
+    },
+    {
+      "subject": "Negative for covid",
+      "count": 11
+    },
+    {
+      "subject": "Your weekend",
+      "count": 11
+    },
+    {
+      "subject": "Court ordered exchange",
+      "count": 11
+    },
+    {
+      "subject": "School report",
+      "count": 11
+    },
+    {
+      "subject": "Direct deposit form",
+      "count": 10
+    },
+    {
+      "subject": "Cough",
+      "count": 10
+    },
+    {
+      "subject": "School to school",
+      "count": 10
+    },
+    {
+      "subject": "School note",
+      "count": 10
+    },
+    {
+      "subject": "Tuition",
+      "count": 9
+    },
+    {
+      "subject": "Transfer",
+      "count": 8
+    },
+    {
+      "subject": "Thanksgiving",
+      "count": 8
+    },
+    {
+      "subject": "Montessori & Prodigy",
+      "count": 8
+    }
+  ],
+  "unanswered": [
+    {
+      "date": "2026-03-17",
+      "sender": "elisabeth",
+      "topic": "Tonight",
+      "summary": "Stephen,\nYou referenced travel plans. If you are planning out-of-state travel with Liberty, please provide the required \nnotice including dates, locat...",
+      "thread_length": 8
+    },
+    {
+      "date": "2026-01-14",
+      "sender": "elisabeth",
+      "topic": "Therapy appointment next week",
+      "summary": "Stephen,\nThe appointment occurs every Monday at 1p. I will confirm with Rachel that Janet will bring Liberty on \nMonday.\nElisabeth",
+      "thread_length": 3
+    },
+    {
+      "date": "2025-11-05",
+      "sender": "elisabeth",
+      "topic": "Therapy appointments",
+      "summary": "Stephen,\nIn April of this year, we agreed with Lara's help that I would make therapy appointments 1st-15th and you \nwould cover 16th-end of month. I r...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-09-04",
+      "sender": "elisabeth",
+      "topic": "Adhesions/Urology",
+      "summary": "Stephen,\nYesterday Liberty had an appointment with Dell Children's Urology per Dr. Shah's referral. Liberty was \nexamined, and we discussed the histor...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-08-22",
+      "sender": "elisabeth",
+      "topic": "Sept. 2 Appointments",
+      "summary": "Stephen,\nLiberty has two important health appointments on Tuesday, September 2, 2025: a 2:00 p.m. urology \nappointment with Dr. McQuiston\u2019s office (pe...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-08-12",
+      "sender": "elisabeth",
+      "topic": "5th weekends",
+      "summary": "Good morning,\nReceived and acknowledged. Please also note Liberty has two appointments on 9/2 which have been posted \nto the OFW calendar. I intend to...",
+      "thread_length": 2
+    },
+    {
+      "date": "2025-08-02",
+      "sender": "elisabeth",
+      "topic": "Exchange",
+      "summary": "Stephen and Lara,\nAs of 5p on August 2, I am present at the court-ordered exchange location and have checked in via OFW. \nLiberty has not been dropped...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-07-21",
+      "sender": "elisabeth",
+      "topic": "Adhesions",
+      "summary": "Stephen,\nI brought Liberty to Dr. Shah today for a follow-up on the labial adhesions concern. She confirmed that the \nadhesions have returned, and sai...",
+      "thread_length": 4
+    },
+    {
+      "date": "2025-07-21",
+      "sender": "elisabeth",
+      "topic": "Noon",
+      "summary": "Stephen, \nI have deadlines this afternoon. 1p, please.\nElisabeth",
+      "thread_length": 2
+    },
+    {
+      "date": "2025-07-13",
+      "sender": "elisabeth",
+      "topic": "Check-ins?",
+      "summary": "Stephen,\nI will be at HEB at 3p today to pick up Liberty. I will also continue to remove her as a recipient from these \nmessages. It is not appropriat...",
+      "thread_length": 5
+    },
+    {
+      "date": "2025-06-15",
+      "sender": "elisabeth",
+      "topic": "Father's Day posession",
+      "summary": "Stephen, \nI went back to the order and read that you have Liberty until 8am tomorrow. When you drop her off at school",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-06-12",
+      "sender": "elisabeth",
+      "topic": "Therapy logistics for tomorrow & next month",
+      "summary": "Stephen,\nThanks for letting me know. She\u2019ll be back at school by 4p. Incidentally, when you return her to me on \nSunday at 6pm, please also return her...",
+      "thread_length": 3
+    },
+    {
+      "date": "2025-04-07",
+      "sender": "elisabeth",
+      "topic": "School today",
+      "summary": "Stephen, \nAs Liberty was not sick when she was with me on Thursday, I could not have notified you of something that I \ndid not observe. You were aware...",
+      "thread_length": 8
+    },
+    {
+      "date": "2025-04-01",
+      "sender": "elisabeth",
+      "topic": "Summer plans",
+      "summary": "Stephen,\nFor my weekends this summer, I am choosing June 6-8, and July 18-20. Please let me know if/where you will \nbe out of town for July 18 or 20 s...",
+      "thread_length": 4
+    },
+    {
+      "date": "2025-03-28",
+      "sender": "elisabeth",
+      "topic": "Swapping clothing/shoes/items",
+      "summary": "Stephen,\nI will be cleaning out too-small/out-of-season clothes and baby toys in the next week, and am happy to set \naside items you purchased to retu...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-03-04",
+      "sender": "elisabeth",
+      "topic": "Parenting coach/tuition/items/piano",
+      "summary": "Stephen,\nThese are interesting takes. Thank you for letting me know of your opinions.\n1) You owe some $19,000 in past tuition reimbursements since our...",
+      "thread_length": 3
+    },
+    {
+      "date": "2025-02-03",
+      "sender": "elisabeth",
+      "topic": "Returning items you are taking",
+      "summary": "Stephen,\nToday, Liberty's teacher expressed concern that you are not providing Liberty with supplies she is required to \nhave.\nYou have now kept 4 wat...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-01-20",
+      "sender": "elisabeth",
+      "topic": "Exchange/weather",
+      "summary": "Stephen,\nLiberty's school will be closed tomorrow due to the weather. Would you please meet me at HEB at noon \ntomorrow, 1/21, for the exchange? Temps...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-01-18",
+      "sender": "elisabeth",
+      "topic": "Therapy Monday",
+      "summary": "Stephen, \nLibby has a therapy appointment on Monday, 4pm at My Emerge with Rachel Hodgdon. Can you take her, or \nshall I reschedule? Your weekend is b...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-01-15",
+      "sender": "elisabeth",
+      "topic": "Piano lessons",
+      "summary": "Stephen,\nTomorrow Liberty will attend a trial group piano lesson at school with Lulu's Piano Studio. You may wish to \nask her about it when you pick h...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-01-13",
+      "sender": "elisabeth",
+      "topic": "Expenses",
+      "summary": "Stephen,\nDoes that mean you will be paying Liberty's tuition this month directly, and finally paying your half of Lara \nNixon's retainer?\nBest wishes ...",
+      "thread_length": 3
+    },
+    {
+      "date": "2025-01-13",
+      "sender": "elisabeth",
+      "topic": "January tuition due",
+      "summary": "Stephen,\nPlease find attached a note from Pflugerville Montessori School regarding Libby's January tuition. It is due, \nand you are responsible for it...",
+      "thread_length": 1
+    },
+    {
+      "date": "2025-01-10",
+      "sender": "elisabeth",
+      "topic": "Sick",
+      "summary": "Stephen,\nPlease meet me at HEB Parmer/Mopac at noon today for the exchange.\nElisabeth",
+      "thread_length": 2
+    },
+    {
+      "date": "2024-12-10",
+      "sender": "elisabeth",
+      "topic": "Health insurance/upcoming month",
+      "summary": "Stephen, \nFour items for today:\n1) I saw you uploaded a dental insurance card for alibby to the info bank; when will you be providing her \nhealth insu...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-12-09",
+      "sender": "elisabeth",
+      "topic": "Pflugerville Montessori - December",
+      "summary": "Stephen, \nPlease find attached receipts for December payments made to Pflugerville Montessori. The late pickup fee is \nyour responsibility in full, as...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-12-06",
+      "sender": "elisabeth",
+      "topic": "Weekend",
+      "summary": "Stephen, \nAgain you are incorrect. This is the first Friday of the month, and as you are forfeiting your weekend with \nLibby unless you pick her up fr...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-12-02",
+      "sender": "elisabeth",
+      "topic": "School pickup",
+      "summary": "Stephen, \nPoor beautiful, may I pick her up at noon at HEB? Thank you for collecting her.\nElisabeth",
+      "thread_length": 2
+    },
+    {
+      "date": "2024-11-08",
+      "sender": "elisabeth",
+      "topic": "Medication",
+      "summary": "Stephen, \nI noticed the steroid cream prescribed for Libby\u2019s adhesions was still sealed and unopened when she returned. \nAs her doctor instructed, the...",
+      "thread_length": 6
+    },
+    {
+      "date": "2024-10-30",
+      "sender": "elisabeth",
+      "topic": "Pflugerville Montessori Update",
+      "summary": "Stephen,\nA couple of updates and bits of important information about Pflugerville Montessori:\n1) I scanned the Parent Handbook provided on the first d...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-10-25",
+      "sender": "elisabeth",
+      "topic": "October/November tuition; therapy appointment",
+      "summary": "Stephen,\nPlease find attached proof of payment for Liberty\u2019s enrollment and tuition fees for Pflugerville Montessori in \nOctober. The cover letter als...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-10-18",
+      "sender": "elisabeth",
+      "topic": "Makeup time for 8/28/24 withholding",
+      "summary": "Stephen,\nBecause you withheld Liberty from me on August 28, 2024 in violation of the previous possession schedule, \njust as I offered you makeup time ...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-10-18",
+      "sender": "elisabeth",
+      "topic": "Pflugerville Montessori Start Date",
+      "summary": "Stephen,\nLiberty's first day at Pflugerville Montessori will be Wednesday, October 23. Unless you prefer to pay the \n$1110.43 for annual, materials, a...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-09-25",
+      "sender": "elisabeth",
+      "topic": "Education change",
+      "summary": "Stephen,\nToday I received a call from Prodigy CDC staff stating Liberty\u2019s daycare, will be closing down ASAP. With \nthis sudden change, we need to mak...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-09-18",
+      "sender": "elisabeth",
+      "topic": "Last night",
+      "summary": "Stephen,\nI have no idea why she is saying these things. He did not comment on her body, and has not seen her since \nearly August. There was never any ...",
+      "thread_length": 2
+    },
+    {
+      "date": "2024-09-12",
+      "sender": "elisabeth",
+      "topic": "Playground incident report from Prodigy",
+      "summary": "Stephen, \nPlease see attached an incident report I just signed for at Libby's school. She fell and scraped her elbow on \nthe playground yesterday; aft...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-09-05",
+      "sender": "elisabeth",
+      "topic": "Cough, ears, and stye",
+      "summary": "Liberty is positive for mycoplasma, and been prescribed azithromycin. I will provide her meds to Prodigy \nadmins at the front desk since you have stil...",
+      "thread_length": 3
+    },
+    {
+      "date": "2024-09-01",
+      "sender": "elisabeth",
+      "topic": "Backpack",
+      "summary": "Stephen,\nIf you are going to collect Liberty's backpack from school, please return it. School is back on Tuesday. Please \ndrop off Libby's backpack di...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-08-31",
+      "sender": "elisabeth",
+      "topic": "Stye",
+      "summary": "Stephen,\nThank you for letting me know. Was beautiful prescribed medication? I wash and change sheets at my house \nweekly at minimum, and more often i...",
+      "thread_length": 2
+    },
+    {
+      "date": "2024-08-28",
+      "sender": "elisabeth",
+      "topic": "Marcus's Birthday Party",
+      "summary": "Stephen,\nLibby has been invited to her classmate Marcus's birthday party on your next weekend. Please RSVP to the \nhost whether you plan to attend or ...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-08-07",
+      "sender": "elisabeth",
+      "topic": "Cough",
+      "summary": "Stephen,\nI will follow her doctor's orders.\nI am unclear on why you took her to a new facility when I provided her pediatrician\u2019s name, office, and \nl...",
+      "thread_length": 10
+    },
+    {
+      "date": "2024-08-02",
+      "sender": "elisabeth",
+      "topic": "Libby is sick again",
+      "summary": "Stephen,\nShe did not throw up yesterday, though she did have a poop accident when she almost made it to the toilet \nlast night. I cleaned her up and g...",
+      "thread_length": 2
+    },
+    {
+      "date": "2024-07-12",
+      "sender": "elisabeth",
+      "topic": "Cease and desist",
+      "summary": "Stephen,\nI paid my half of this month's daycare last month, on June 13. Not sure why you paid the full amount, when \nonly half was due, but I'll take ...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-06-14",
+      "sender": "elisabeth",
+      "topic": "Doctor appointment & Insurance update",
+      "summary": "Stephen,\nIn keeping with Prodigy's requirements for enrollment, I've scheduled Libby's annual well check for next \nweek, in the first available slot w...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-04-25",
+      "sender": "elisabeth",
+      "topic": "Pick up today",
+      "summary": "Stephen,\nWould you please meet me at HEB at 6pm so I may pick up beautiful girl? Happy birthday.\nElisabeth",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-03-18",
+      "sender": "elisabeth",
+      "topic": "Sore ears and throat",
+      "summary": "Stephen, \nYesterday when Libby and I got home, she told me her ears were hurting; she did not have a fever, so I made \nan appointment for today at Aus...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-01-25",
+      "sender": "elisabeth",
+      "topic": "covid",
+      "summary": "Stephen,\nIf I had any symptoms remaining, I would not have asked to pick Libby up. I was masked around her, \naccordingly. Please find attached my (Neg...",
+      "thread_length": 6
+    },
+    {
+      "date": "2024-01-24",
+      "sender": "elisabeth",
+      "topic": "Pick up now?",
+      "summary": "Do you need me to meet you now?",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-01-23",
+      "sender": "elisabeth",
+      "topic": "Update",
+      "summary": "Stephen,\nMy 5 day paxlovid course ends today, and I am feeling much better. I have spent the last few days cleaning \nhouse as I recuperate to sanitize...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-01-18",
+      "sender": "elisabeth",
+      "topic": "COVID",
+      "summary": "Stephen,\nTonight I tested positive for COVID and immediately took Libby to my parents' home next door to minimize \nher exposure to the virus. Libby is...",
+      "thread_length": 1
+    },
+    {
+      "date": "2024-01-16",
+      "sender": "elisabeth",
+      "topic": "Flights + messages",
+      "summary": "Stephen, \nAs previously offered, we'll try to call you though OFW at 6:30. Please consent to receiving OFW video calls \nthrough the app in order to pa...",
+      "thread_length": 6
+    }
+  ],
+  "timeline": [
+    {
+      "date": "2021-08-27",
+      "event": "Court order referenced",
+      "subject": "Medication/pickups/returns",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2021-08-30",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Pickup?",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2021-08-30",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Pickup?",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2021-09-04",
+      "event": "Court order referenced",
+      "subject": "Re: Calendar",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2021-09-24",
+      "event": "Custody/possession matter",
+      "subject": "Re: Can't make it today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2021-09-24",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Can't make it today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2021-11-20",
+      "event": "Legal/attorney matter",
+      "subject": "Tuesday/Wednesday",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2021-12-28",
+      "event": "Custody/possession matter",
+      "subject": "Re: Today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2021-12-28",
+      "event": "Relocation discussion",
+      "subject": "Re: Today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2021-12-28",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-01-04",
+      "event": "Relocation discussion",
+      "subject": "Re: Money",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-01-07",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Pickup today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-02-23",
+      "event": "Custody/possession matter",
+      "subject": "Re: Tutor Time/possible weather delay",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-02-23",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Tutor Time/possible weather delay",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-02-24",
+      "event": "Relocation discussion",
+      "subject": "Re: Tutor Time/possible weather delay",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-04-06",
+      "event": "Custody/possession matter",
+      "subject": "Re: Short visits/Friday",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-04-06",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Short visits/Friday",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-04-26",
+      "event": "Emergency/urgent matter",
+      "subject": "Doctor/pickup today",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-05-10",
+      "event": "Court order referenced",
+      "subject": "Court order",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-05-10",
+      "event": "Relocation discussion",
+      "subject": "Re: Court order",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-05-10",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Court order",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-06-20",
+      "event": "Court order referenced",
+      "subject": "Re: Direct deposit form",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-07-03",
+      "event": "Court order referenced",
+      "subject": "Re: Pickup",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-07-06",
+      "event": "Emergency/urgent matter",
+      "subject": "Libby's surgery tomorrow - time/address",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-07-19",
+      "event": "Custody/possession matter",
+      "subject": "Today",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-07-19",
+      "event": "Legal/attorney matter",
+      "subject": "Today",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-08-15",
+      "event": "Relocation discussion",
+      "subject": "Bedtime tantrum/injury",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-08-15",
+      "event": "Emergency/urgent matter",
+      "subject": "Bedtime tantrum/injury",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-10-11",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Visit this weekend",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-11-05",
+      "event": "Emergency/urgent matter",
+      "subject": "Today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-11-30",
+      "event": "Legal/attorney matter",
+      "subject": "Today and proposals",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-11-30",
+      "event": "Court order referenced",
+      "subject": "Re: Today and proposals",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-11-30",
+      "event": "Custody/possession matter",
+      "subject": "Re: Today and proposals",
+      "sender": "stephen"
+    },
+    {
+      "date": "2022-12-07",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Dolls",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2022-12-07",
+      "event": "Court order referenced",
+      "subject": "Re: Dolls",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-01-31",
+      "event": "Emergency/urgent matter",
+      "subject": "Pickup today and Friday; New daycare",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-04-11",
+      "event": "Court order referenced",
+      "subject": "Re: Pickup today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-06-04",
+      "event": "Relocation discussion",
+      "subject": "New address; tonight",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-06-04",
+      "event": "Court order referenced",
+      "subject": "Re: New address; tonight",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-06-04",
+      "event": "Legal/attorney matter",
+      "subject": "Re: New address; tonight",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-06-08",
+      "event": "Custody/possession matter",
+      "subject": "Re: New address; tonight",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-07-06",
+      "event": "Relocation discussion",
+      "subject": "Re: Cigna PPO",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-07-06",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Cigna PPO",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-07-07",
+      "event": "Custody/possession matter",
+      "subject": "Re: Pickup",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-08-09",
+      "event": "Custody/possession matter",
+      "subject": "Re: Cigna PPO",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-08-20",
+      "event": "Court order referenced",
+      "subject": "Re: Today",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-09-01",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Friday pickup",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-09-02",
+      "event": "Custody/possession matter",
+      "subject": "Re: Friday pickup",
+      "sender": "stephen"
+    },
+    {
+      "date": "2023-09-02",
+      "event": "Court order referenced",
+      "subject": "Re: Friday pickup",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-11-03",
+      "event": "Emergency/urgent matter",
+      "subject": "Flu shot",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2023-11-22",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Thanksgiving",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-01-16",
+      "event": "Court order referenced",
+      "subject": "Re: Flights + messages",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-01-16",
+      "event": "Custody/possession matter",
+      "subject": "Re: Flights + messages",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-03-18",
+      "event": "Emergency/urgent matter",
+      "subject": "Sore ears and throat",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-04-26",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Notice",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-05-08",
+      "event": "Court order referenced",
+      "subject": "Re: Tuition",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-06-14",
+      "event": "School enrollment",
+      "subject": "Doctor appointment & Insurance update",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-06-14",
+      "event": "Emergency/urgent matter",
+      "subject": "Doctor appointment & Insurance update",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-07-31",
+      "event": "Emergency/urgent matter",
+      "subject": "Sick too",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-08-07",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Cough",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-08-28",
+      "event": "Legal/attorney matter",
+      "subject": "Marcus's Birthday Party",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-09-05",
+      "event": "Relocation discussion",
+      "subject": "Re: Cough, ears, and stye",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-09-27",
+      "event": "Court order referenced",
+      "subject": "Re: Play therapy",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-09-27",
+      "event": "Custody/possession matter",
+      "subject": "Re: Play therapy",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-09-27",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Play therapy",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-10-10",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Today",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-10-15",
+      "event": "School enrollment",
+      "subject": "Montessori & Prodigy",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-10-18",
+      "event": "Relocation discussion",
+      "subject": "Re: Montessori & Prodigy",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-10-20",
+      "event": "Court order referenced",
+      "subject": "Re: School to school",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-10-20",
+      "event": "Custody/possession matter",
+      "subject": "Re: School to school",
+      "sender": "stephen"
+    },
+    {
+      "date": "2024-10-30",
+      "event": "Emergency/urgent matter",
+      "subject": "Pflugerville Montessori Update",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-11-05",
+      "event": "Court order referenced",
+      "subject": "Re: School to school",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-11-05",
+      "event": "Custody/possession matter",
+      "subject": "Re: School to school",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-11-05",
+      "event": "Legal/attorney matter",
+      "subject": "Re: School to school",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-12-06",
+      "event": "Court order referenced",
+      "subject": "Weekend",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-12-06",
+      "event": "Custody/possession matter",
+      "subject": "Weekend",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-12-09",
+      "event": "School enrollment",
+      "subject": "Pflugerville Montessori - December",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2024-12-10",
+      "event": "Legal/attorney matter",
+      "subject": "Health insurance/upcoming month",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-01-05",
+      "event": "Custody/possession matter",
+      "subject": "Exchange at 5pm",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-01-13",
+      "event": "Legal/attorney matter",
+      "subject": "Janet",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-01-13",
+      "event": "School enrollment",
+      "subject": "January tuition due",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-02-03",
+      "event": "School enrollment",
+      "subject": "Returning items you are taking",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-03-01",
+      "event": "Custody/possession matter",
+      "subject": "Spring Break 2025",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-03-01",
+      "event": "School enrollment",
+      "subject": "Spring Break 2025",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-03-07",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Your weekend",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-04-01",
+      "event": "School enrollment",
+      "subject": "Summer school",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-04-03",
+      "event": "Relocation discussion",
+      "subject": "Re: Travel",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-04-07",
+      "event": "Court order referenced",
+      "subject": "Re: School today",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-06-10",
+      "event": "Relocation discussion",
+      "subject": "Re: Weekend of the 20th",
+      "sender": "third_party"
+    },
+    {
+      "date": "2025-06-10",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Weekend of the 20th",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-06-12",
+      "event": "School enrollment",
+      "subject": "Therapy logistics for tomorrow & next month",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-07-11",
+      "event": "Relocation discussion",
+      "subject": "Libby's needs",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-07-12",
+      "event": "Court order referenced",
+      "subject": "Re: Check-ins?",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-07-31",
+      "event": "Emergency/urgent matter",
+      "subject": "Court ordered exchange",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-08-01",
+      "event": "Court order referenced",
+      "subject": "Re: Court ordered exchange",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-08-01",
+      "event": "Legal/attorney matter",
+      "subject": "Re: Court ordered exchange",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-08-02",
+      "event": "Custody/possession matter",
+      "subject": "Return",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-08-08",
+      "event": "School enrollment",
+      "subject": "Pickup/weekend",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-08-10",
+      "event": "Relocation discussion",
+      "subject": "Re: Pickup/weekend",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-08-11",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Pickup/weekend",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-10-11",
+      "event": "Emergency/urgent matter",
+      "subject": "Pattern of missed medical notices",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-10-15",
+      "event": "Legal/attorney matter",
+      "subject": "Another outcry",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-10-15",
+      "event": "Court order referenced",
+      "subject": "Re: Posting of medical appoinments",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-10-23",
+      "event": "Custody/possession matter",
+      "subject": "School incident and failure to notify",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-10-24",
+      "event": "Relocation discussion",
+      "subject": "Re: Meeting with Liberty's school",
+      "sender": "third_party"
+    },
+    {
+      "date": "2025-11-11",
+      "event": "Court order referenced",
+      "subject": "Re: School report",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2025-11-15",
+      "event": "Emergency/urgent matter",
+      "subject": "Thanksgiving travel",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-12-06",
+      "event": "School enrollment",
+      "subject": "Re: Liberty\u2019s Kung Fu Belt Test \u2013 December 20th",
+      "sender": "stephen"
+    },
+    {
+      "date": "2025-12-18",
+      "event": "Legal/attorney matter",
+      "subject": "Re: School report",
+      "sender": "stephen"
+    },
+    {
+      "date": "2026-01-12",
+      "event": "Legal/attorney matter",
+      "subject": "Re: School note",
+      "sender": "stephen"
+    },
+    {
+      "date": "2026-01-12",
+      "event": "School enrollment",
+      "subject": "Re: School note",
+      "sender": "elisabeth"
+    },
+    {
+      "date": "2026-01-19",
+      "event": "Custody/possession matter",
+      "subject": "Re: Attempting drop off",
+      "sender": "stephen"
+    },
+    {
+      "date": "2026-02-20",
+      "event": "Emergency/urgent matter",
+      "subject": "Re: Ear infection",
+      "sender": "third_party"
+    },
+    {
+      "date": "2026-03-09",
+      "event": "Court order referenced",
+      "subject": "Therapy appointment 3/16",
+      "sender": "elisabeth"
+    }
+  ],
+  "monthly_volume": [
+    {
+      "month": "2021-08",
+      "stephen": 2,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 8
+    },
+    {
+      "month": "2021-09",
+      "stephen": 7,
+      "elisabeth": 19,
+      "third_party": 0,
+      "total": 26
+    },
+    {
+      "month": "2021-10",
+      "stephen": 5,
+      "elisabeth": 8,
+      "third_party": 0,
+      "total": 13
+    },
+    {
+      "month": "2021-11",
+      "stephen": 4,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 10
+    },
+    {
+      "month": "2021-12",
+      "stephen": 13,
+      "elisabeth": 16,
+      "third_party": 0,
+      "total": 29
+    },
+    {
+      "month": "2022-01",
+      "stephen": 7,
+      "elisabeth": 9,
+      "third_party": 0,
+      "total": 16
+    },
+    {
+      "month": "2022-02",
+      "stephen": 22,
+      "elisabeth": 26,
+      "third_party": 0,
+      "total": 48
+    },
+    {
+      "month": "2022-03",
+      "stephen": 2,
+      "elisabeth": 4,
+      "third_party": 0,
+      "total": 6
+    },
+    {
+      "month": "2022-04",
+      "stephen": 2,
+      "elisabeth": 8,
+      "third_party": 0,
+      "total": 10
+    },
+    {
+      "month": "2022-05",
+      "stephen": 9,
+      "elisabeth": 12,
+      "third_party": 1,
+      "total": 22
+    },
+    {
+      "month": "2022-06",
+      "stephen": 5,
+      "elisabeth": 10,
+      "third_party": 0,
+      "total": 15
+    },
+    {
+      "month": "2022-07",
+      "stephen": 4,
+      "elisabeth": 9,
+      "third_party": 0,
+      "total": 13
+    },
+    {
+      "month": "2022-08",
+      "stephen": 1,
+      "elisabeth": 7,
+      "third_party": 0,
+      "total": 8
+    },
+    {
+      "month": "2022-09",
+      "stephen": 0,
+      "elisabeth": 4,
+      "third_party": 0,
+      "total": 4
+    },
+    {
+      "month": "2022-10",
+      "stephen": 2,
+      "elisabeth": 9,
+      "third_party": 0,
+      "total": 11
+    },
+    {
+      "month": "2022-11",
+      "stephen": 2,
+      "elisabeth": 5,
+      "third_party": 0,
+      "total": 7
+    },
+    {
+      "month": "2022-12",
+      "stephen": 8,
+      "elisabeth": 10,
+      "third_party": 0,
+      "total": 18
+    },
+    {
+      "month": "2023-01",
+      "stephen": 3,
+      "elisabeth": 4,
+      "third_party": 0,
+      "total": 7
+    },
+    {
+      "month": "2023-02",
+      "stephen": 0,
+      "elisabeth": 1,
+      "third_party": 0,
+      "total": 1
+    },
+    {
+      "month": "2023-04",
+      "stephen": 3,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 9
+    },
+    {
+      "month": "2023-05",
+      "stephen": 2,
+      "elisabeth": 4,
+      "third_party": 0,
+      "total": 6
+    },
+    {
+      "month": "2023-06",
+      "stephen": 7,
+      "elisabeth": 14,
+      "third_party": 0,
+      "total": 21
+    },
+    {
+      "month": "2023-07",
+      "stephen": 5,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 11
+    },
+    {
+      "month": "2023-08",
+      "stephen": 4,
+      "elisabeth": 5,
+      "third_party": 0,
+      "total": 9
+    },
+    {
+      "month": "2023-09",
+      "stephen": 10,
+      "elisabeth": 14,
+      "third_party": 0,
+      "total": 24
+    },
+    {
+      "month": "2023-10",
+      "stephen": 3,
+      "elisabeth": 8,
+      "third_party": 0,
+      "total": 11
+    },
+    {
+      "month": "2023-11",
+      "stephen": 4,
+      "elisabeth": 5,
+      "third_party": 0,
+      "total": 9
+    },
+    {
+      "month": "2023-12",
+      "stephen": 0,
+      "elisabeth": 1,
+      "third_party": 0,
+      "total": 1
+    },
+    {
+      "month": "2024-01",
+      "stephen": 11,
+      "elisabeth": 17,
+      "third_party": 0,
+      "total": 28
+    },
+    {
+      "month": "2024-03",
+      "stephen": 0,
+      "elisabeth": 2,
+      "third_party": 0,
+      "total": 2
+    },
+    {
+      "month": "2024-04",
+      "stephen": 1,
+      "elisabeth": 3,
+      "third_party": 0,
+      "total": 4
+    },
+    {
+      "month": "2024-05",
+      "stephen": 1,
+      "elisabeth": 1,
+      "third_party": 0,
+      "total": 2
+    },
+    {
+      "month": "2024-06",
+      "stephen": 8,
+      "elisabeth": 11,
+      "third_party": 0,
+      "total": 19
+    },
+    {
+      "month": "2024-07",
+      "stephen": 2,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 8
+    },
+    {
+      "month": "2024-08",
+      "stephen": 11,
+      "elisabeth": 15,
+      "third_party": 0,
+      "total": 26
+    },
+    {
+      "month": "2024-09",
+      "stephen": 5,
+      "elisabeth": 11,
+      "third_party": 0,
+      "total": 16
+    },
+    {
+      "month": "2024-10",
+      "stephen": 6,
+      "elisabeth": 15,
+      "third_party": 0,
+      "total": 21
+    },
+    {
+      "month": "2024-11",
+      "stephen": 3,
+      "elisabeth": 7,
+      "third_party": 0,
+      "total": 10
+    },
+    {
+      "month": "2024-12",
+      "stephen": 3,
+      "elisabeth": 8,
+      "third_party": 0,
+      "total": 11
+    },
+    {
+      "month": "2025-01",
+      "stephen": 5,
+      "elisabeth": 13,
+      "third_party": 0,
+      "total": 18
+    },
+    {
+      "month": "2025-02",
+      "stephen": 0,
+      "elisabeth": 2,
+      "third_party": 0,
+      "total": 2
+    },
+    {
+      "month": "2025-03",
+      "stephen": 8,
+      "elisabeth": 14,
+      "third_party": 5,
+      "total": 27
+    },
+    {
+      "month": "2025-04",
+      "stephen": 11,
+      "elisabeth": 19,
+      "third_party": 5,
+      "total": 35
+    },
+    {
+      "month": "2025-05",
+      "stephen": 3,
+      "elisabeth": 5,
+      "third_party": 2,
+      "total": 10
+    },
+    {
+      "month": "2025-06",
+      "stephen": 4,
+      "elisabeth": 4,
+      "third_party": 2,
+      "total": 10
+    },
+    {
+      "month": "2025-07",
+      "stephen": 10,
+      "elisabeth": 10,
+      "third_party": 1,
+      "total": 21
+    },
+    {
+      "month": "2025-08",
+      "stephen": 12,
+      "elisabeth": 18,
+      "third_party": 9,
+      "total": 39
+    },
+    {
+      "month": "2025-09",
+      "stephen": 6,
+      "elisabeth": 7,
+      "third_party": 2,
+      "total": 15
+    },
+    {
+      "month": "2025-10",
+      "stephen": 31,
+      "elisabeth": 12,
+      "third_party": 34,
+      "total": 77
+    },
+    {
+      "month": "2025-11",
+      "stephen": 3,
+      "elisabeth": 6,
+      "third_party": 0,
+      "total": 9
+    },
+    {
+      "month": "2025-12",
+      "stephen": 9,
+      "elisabeth": 9,
+      "third_party": 3,
+      "total": 21
+    },
+    {
+      "month": "2026-01",
+      "stephen": 7,
+      "elisabeth": 9,
+      "third_party": 6,
+      "total": 22
+    },
+    {
+      "month": "2026-02",
+      "stephen": 1,
+      "elisabeth": 2,
+      "third_party": 1,
+      "total": 4
+    },
+    {
+      "month": "2026-03",
+      "stephen": 9,
+      "elisabeth": 10,
+      "third_party": 1,
+      "total": 20
+    },
+    {
+      "month": "2026-04",
+      "stephen": 1,
+      "elisabeth": 1,
+      "third_party": 0,
+      "total": 2
+    }
+  ],
+  "quarterly_volume": [
+    {
+      "quarter": "2021-Q3",
+      "stephen": 9,
+      "elisabeth": 25,
+      "total": 34
+    },
+    {
+      "quarter": "2021-Q4",
+      "stephen": 22,
+      "elisabeth": 30,
+      "total": 52
+    },
+    {
+      "quarter": "2022-Q1",
+      "stephen": 31,
+      "elisabeth": 39,
+      "total": 70
+    },
+    {
+      "quarter": "2022-Q2",
+      "stephen": 16,
+      "elisabeth": 30,
+      "total": 47
+    },
+    {
+      "quarter": "2022-Q3",
+      "stephen": 5,
+      "elisabeth": 20,
+      "total": 25
+    },
+    {
+      "quarter": "2022-Q4",
+      "stephen": 12,
+      "elisabeth": 24,
+      "total": 36
+    },
+    {
+      "quarter": "2023-Q1",
+      "stephen": 3,
+      "elisabeth": 5,
+      "total": 8
+    },
+    {
+      "quarter": "2023-Q2",
+      "stephen": 12,
+      "elisabeth": 24,
+      "total": 36
+    },
+    {
+      "quarter": "2023-Q3",
+      "stephen": 19,
+      "elisabeth": 25,
+      "total": 44
+    },
+    {
+      "quarter": "2023-Q4",
+      "stephen": 7,
+      "elisabeth": 14,
+      "total": 21
+    },
+    {
+      "quarter": "2024-Q1",
+      "stephen": 11,
+      "elisabeth": 19,
+      "total": 30
+    },
+    {
+      "quarter": "2024-Q2",
+      "stephen": 10,
+      "elisabeth": 15,
+      "total": 25
+    },
+    {
+      "quarter": "2024-Q3",
+      "stephen": 18,
+      "elisabeth": 32,
+      "total": 50
+    },
+    {
+      "quarter": "2024-Q4",
+      "stephen": 12,
+      "elisabeth": 30,
+      "total": 42
+    },
+    {
+      "quarter": "2025-Q1",
+      "stephen": 13,
+      "elisabeth": 29,
+      "total": 47
+    },
+    {
+      "quarter": "2025-Q2",
+      "stephen": 18,
+      "elisabeth": 28,
+      "total": 55
+    },
+    {
+      "quarter": "2025-Q3",
+      "stephen": 28,
+      "elisabeth": 35,
+      "total": 75
+    },
+    {
+      "quarter": "2025-Q4",
+      "stephen": 43,
+      "elisabeth": 27,
+      "total": 107
+    },
+    {
+      "quarter": "2026-Q1",
+      "stephen": 17,
+      "elisabeth": 21,
+      "total": 46
+    },
+    {
+      "quarter": "2026-Q2",
+      "stephen": 1,
+      "elisabeth": 1,
+      "total": 2
+    }
+  ],
+  "yearly_volume": [
+    {
+      "year": "2021",
+      "stephen": 31,
+      "elisabeth": 55,
+      "total": 86
+    },
+    {
+      "year": "2022",
+      "stephen": 64,
+      "elisabeth": 113,
+      "total": 178
+    },
+    {
+      "year": "2023",
+      "stephen": 41,
+      "elisabeth": 68,
+      "total": 109
+    },
+    {
+      "year": "2024",
+      "stephen": 51,
+      "elisabeth": 96,
+      "total": 147
+    },
+    {
+      "year": "2025",
+      "stephen": 102,
+      "elisabeth": 119,
+      "total": 284
+    },
+    {
+      "year": "2026",
+      "stephen": 18,
+      "elisabeth": 22,
+      "total": 48
+    }
+  ],
+  "longest_gaps": [
+    {
+      "start": "2023-02-07",
+      "end": "2023-04-07",
+      "hours": 1421.0,
+      "days": 59.2
+    },
+    {
+      "start": "2024-01-28",
+      "end": "2024-03-18",
+      "hours": 1201.8,
+      "days": 50.1
+    },
+    {
+      "start": "2024-05-08",
+      "end": "2024-06-12",
+      "hours": 837.6,
+      "days": 34.9
+    },
+    {
+      "start": "2023-05-02",
+      "end": "2023-06-04",
+      "hours": 784.5,
+      "days": 32.7
+    },
+    {
+      "start": "2024-03-24",
+      "end": "2024-04-25",
+      "hours": 773.9,
+      "days": 32.2
+    },
+    {
+      "start": "2023-11-22",
+      "end": "2023-12-23",
+      "hours": 749.6,
+      "days": 31.2
+    },
+    {
+      "start": "2022-09-07",
+      "end": "2022-10-07",
+      "hours": 724.0,
+      "days": 30.2
+    },
+    {
+      "start": "2022-03-08",
+      "end": "2022-04-06",
+      "hours": 693.8,
+      "days": 28.9
+    },
+    {
+      "start": "2023-01-03",
+      "end": "2023-01-31",
+      "hours": 673.3,
+      "days": 28.1
+    },
+    {
+      "start": "2026-01-20",
+      "end": "2026-02-17",
+      "hours": 669.5,
+      "days": 27.9
+    },
+    {
+      "start": "2025-06-15",
+      "end": "2025-07-11",
+      "hours": 617.1,
+      "days": 25.7
+    },
+    {
+      "start": "2023-12-23",
+      "end": "2024-01-16",
+      "hours": 568.4,
+      "days": 23.7
+    },
+    {
+      "start": "2025-05-16",
+      "end": "2025-06-07",
+      "hours": 530.5,
+      "days": 22.1
+    },
+    {
+      "start": "2025-02-07",
+      "end": "2025-03-01",
+      "hours": 528.0,
+      "days": 22.0
+    },
+    {
+      "start": "2025-12-20",
+      "end": "2026-01-10",
+      "hours": 507.5,
+      "days": 21.1
+    },
+    {
+      "start": "2025-09-09",
+      "end": "2025-09-30",
+      "hours": 503.2,
+      "days": 21.0
+    },
+    {
+      "start": "2024-11-11",
+      "end": "2024-12-02",
+      "hours": 498.3,
+      "days": 20.8
+    },
+    {
+      "start": "2023-04-11",
+      "end": "2023-05-01",
+      "hours": 475.0,
+      "days": 19.8
+    },
+    {
+      "start": "2023-07-21",
+      "end": "2023-08-09",
+      "hours": 456.9,
+      "days": 19.0
+    },
+    {
+      "start": "2023-11-03",
+      "end": "2023-11-22",
+      "hours": 449.5,
+      "days": 18.7
+    }
+  ]
+}
