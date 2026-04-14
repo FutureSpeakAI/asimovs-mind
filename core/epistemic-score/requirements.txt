@@ -1,0 +1,6 @@
+# Epistemic Score System
+# Python 3.10+ required (uses match syntax-compatible patterns)
+# No external runtime dependencies — stdlib only
+
+# Development / testing
+pytest>=7.0

@@ -1,0 +1,22 @@
+# Asimov's Mind — Python Dependencies
+# Install: pip install -r requirements.txt
+#
+# These cover the Python components (core systems, MCP servers, desktop).
+# The Node.js Claude Code plugin (mcp/friday-core/) uses npm instead.
+
+# ── MCP Protocol ─────────────────────────────────────────────────
+mcp[cli]>=1.0.0
+
+# ── Core Systems ─────────────────────────────────────────────────
+cryptography>=41.0.0        # Sovereign Vault: AES-256-GCM, Argon2id KDF
+argon2-cffi>=23.1.0         # Sovereign Vault: Argon2id key derivation
+click>=8.1.0                # CLI interfaces for core systems
+pydantic>=2.0.0             # Data validation across MCP servers
+
+# ── Gemini MCP Server ───────────────────────────────────────────
+google-genai>=1.0.0         # Google Generative AI SDK (image, TTS, video, music)
+httpx                       # Async HTTP (video download)
+Pillow                      # Image processing
+
+# ── Friday Desktop ───────────────────────────────────────────────
+flask>=3.0.0                # Desktop OS web server

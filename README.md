@@ -1,20 +1,37 @@
 # Asimov's Mind
 
-### Agent Friday lives here. 18 subsystems. 91 MCP tools. One holographic dashboard.
+### The complete Agent Friday ecosystem. 18 subsystems. 91+ MCP tools. 7 core Python systems. Holographic desktop. AI career pipeline.
 
-A Claude Code plugin that is Agent Friday: a full AI runtime with 18 subsystems, 3-provider LLM routing, 3-tier memory with semantic search, person-level trust graphs, personality evolution with anti-sycophancy calibration, recursive agent delegation, 8 connectors with ~65 dynamic tools, enterprise consent gates, daily briefings, meeting intelligence, and a Three.js holographic dashboard. All state AES-256-GCM encrypted. Ed25519 cryptographic identity. Privacy Shield PII scrubbing. Ollama local-first routing. Coordinated N-agent swarm. Bounded by Asimov's cLaws.
+Asimov's Mind is the overarching AI agent architecture. Agent Friday is the AI persona that runs on it. Friday Desktop is one of its interfaces. This repo bundles the complete ecosystem:
+
+- **Claude Code Plugin** — 18 subsystems, 91 MCP tools, 17 slash commands, 10 Python hooks, 16 specialist agents
+- **7 Core Python Systems** — Sovereign Vault, Privacy Shield, Trust Graph, Cognitive Memory, Personality Evolution, Epistemic Score, HMAC Integrity
+- **Python MCP Servers** — Core systems FastMCP server (33 tools) + Gemini creative capabilities (8 tools: image gen, TTS, video, music)
+- **Friday Desktop** — Holographic OS with Flask backend, React frontend, Three.js 3D visualization with 13 evolution structures
+- **Career-Ops** — AI-powered job search pipeline (evaluation, CV generation, portal scanning, batch processing)
+
+All state AES-256-GCM encrypted. Ed25519 cryptographic identity. Privacy Shield PII scrubbing. Ollama local-first routing. Coordinated N-agent swarm. Bounded by Asimov's cLaws.
 
 Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI). Standing on the shoulders of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
-> **New here?** See [GETTING_STARTED.md](GETTING_STARTED.md) for installation and first-run setup in under two minutes.
+> **New here?** Run `setup.sh` (Mac/Linux) or `setup.bat` (Windows) and you're up in two minutes.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install from GitHub
-claude plugin add https://github.com/FutureSpeakAI/asimovs-mind
+# Clone and install everything
+git clone https://github.com/FutureSpeakAI/asimovs-mind.git
+cd asimovs-mind
+
+# One-command setup (creates venv, installs deps, builds UI)
+./setup.sh          # Mac/Linux
+setup.bat           # Windows
+
+# Edit .env with your API keys
+# Then install the Claude Code plugin:
+claude plugin add .
 
 # First session
 /friday unlock              # initialize encrypted vault
@@ -235,6 +252,132 @@ Built with Three.js. Live-polling every 5 seconds. Mobile-responsive via Tailsca
 | [CHANGELOG.md](CHANGELOG.md) | Version history (Keep a Changelog format) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to add connectors, subsystems, and skills |
 | [SECURITY.md](SECURITY.md) | Security model, known limitations, vulnerability reporting |
+| [tools/career-ops/README.md](tools/career-ops/README.md) | Career-ops job search pipeline documentation |
+| [tools/career-ops/DATA_CONTRACT.md](tools/career-ops/DATA_CONTRACT.md) | User vs system layer data contract |
+| [mcp-servers/gemini-mcp/README.md](mcp-servers/gemini-mcp/README.md) | Gemini MCP server setup and tools |
+| [interfaces/desktop/vibe-mode/README.md](interfaces/desktop/vibe-mode/README.md) | Vibe Mode 3D visualization architecture |
+
+---
+
+## Full Ecosystem Map
+
+This repo contains the complete Asimov's Mind ecosystem. The hierarchy:
+
+```
+asimovs-mind/                        ← you are here
+│
+├── mcp/friday-core/                  Node.js MCP server (18 subsystems, 91 tools)
+│   ├── core/                         Vault, crypto, event bus, session conductor, EIS
+│   ├── subsystems/                   19 subsystem directories
+│   └── test/                         442 tests (0 failures)
+│
+├── core/                             7 standalone Python systems (with tests + CLI)
+│   ├── cognitive-memory/             3-tier memory: short → medium → long
+│   ├── epistemic-score/              6-metric user independence tracking
+│   ├── personality-evolution/        30 traits, maturity ramp, anti-sycophancy
+│   ├── privacy-shield/               9-category PII detection with FNV-1a hashing
+│   ├── sovereign-vault/              AES-256-GCM with Argon2id KDF
+│   ├── trust-graph/                  5-dimension person-level credibility model
+│   └── hmac-integrity/               HMAC-SHA256 governance file protection
+│
+├── mcp-servers/                      Python MCP servers (FastMCP)
+│   ├── core-mcp/                     Unified server wrapping all 7 core systems (33 tools)
+│   └── gemini-mcp/                   Gemini creative: image, TTS, video, music (8 tools)
+│
+├── interfaces/
+│   └── desktop/                      Friday Desktop OS
+│       ├── server.py                 Flask backend with REST API
+│       ├── ui_parts/                 Modular HTML/React components
+│       ├── vibe-mode/                Three.js 3D: 13 structures, audio-reactive, mood system
+│       └── build_ui.py               Assembles ui_parts/ into index.html
+│
+├── tools/
+│   └── career-ops/                   AI job search pipeline
+│       ├── modes/                    Evaluation, PDF gen, scanning, interview prep
+│       ├── dashboard/                Go TUI dashboard
+│       └── templates/                CV template, portal config, state definitions
+│
+├── hooks/                            10 Python governance hooks
+├── skills/                           17 slash commands
+├── agents/                           16 specialist agent definitions
+├── governance/                       cLaws, protected zones, safety floors
+├── templates/                        New user setup templates + .env.example
+├── docs/                             Architecture, API reference, guides
+│
+├── setup.sh / setup.bat              One-command installer
+├── requirements.txt                  Python dependencies (all components)
+├── plugin.json                       Claude Code plugin manifest
+└── README.md                         This file
+```
+
+### Prerequisites
+
+| Requirement | Minimum | What it's for |
+|------------|---------|---------------|
+| Python | 3.10+ | Core systems, MCP servers, Desktop OS, hooks |
+| Node.js | 18+ | Claude Code plugin (friday-core MCP server) |
+| Claude Code | Latest | Plugin host |
+| Gemini API key | — | Image gen, TTS, video, music (optional) |
+| Anthropic API key | — | Claude Code (required) |
+
+### Python Core Systems
+
+Each of the 7 core systems is a standalone Python module with its own test suite and CLI. They can be used independently or composed through the unified MCP server.
+
+| System | Module | Tests | Purpose |
+|--------|--------|:-----:|---------|
+| Sovereign Vault | `core/sovereign-vault/` | 20+ | AES-256-GCM encryption with Argon2id KDF |
+| Privacy Shield | `core/privacy-shield/` | 50+ | PII detection across 9 categories |
+| Trust Graph | `core/trust-graph/` | 50+ | 5-dimension person-level credibility |
+| Cognitive Memory | `core/cognitive-memory/` | 50+ | 3-tier memory with consolidation |
+| Personality Evolution | `core/personality-evolution/` | 50+ | 30-trait evolution with anti-sycophancy |
+| Epistemic Score | `core/epistemic-score/` | 50+ | 6-metric independence tracking |
+| HMAC Integrity | `core/hmac-integrity/` | 68 | HMAC-SHA256 governance protection |
+
+Run all tests: `cd core/<system> && python -m pytest test_*.py`
+
+### Career-Ops
+
+AI-powered job search pipeline. Evaluate offers (A-F scoring), generate ATS-optimized CVs, scan 45+ company portals, batch process, and track applications.
+
+Originally by [santifer](https://github.com/santifer/career-ops). Integrated into Asimov's Mind as a tool.
+
+```bash
+cd tools/career-ops
+npm install            # Playwright for PDF generation
+node doctor.mjs        # Verify setup
+```
+
+User data (applications, reports, CVs) lives in gitignored directories. See `tools/career-ops/DATA_CONTRACT.md`.
+
+### Gemini Creative MCP Server
+
+8 tools for creative generation via Google's Gemini API:
+
+| Tool | What it does |
+|------|-------------|
+| `gemini_generate_image` | Text-to-image (Nano Banana Pro, Flash fallback) |
+| `gemini_generate_text` | Creative text generation |
+| `gemini_describe_image` | Vision analysis of image files |
+| `gemini_text_to_speech` | TTS with 8 voice options |
+| `gemini_creative_remix` | Style transfer on existing images |
+| `gemini_generate_code_art` | p5.js generative art from description |
+| `gemini_generate_video` | Veo video generation (1-3 min async) |
+| `gemini_generate_music` | Lyria music generation (full tracks or clips) |
+
+Add to Claude Code: `claude mcp add friday-gemini -- python mcp-servers/gemini-mcp/server.py`
+
+### Friday Desktop
+
+Holographic desktop OS with 10+ workspaces, real-time data feeds, and a Three.js 3D scene that evolves with Friday's personality.
+
+```bash
+cd interfaces/desktop
+python build_ui.py     # Assemble UI from parts
+python server.py       # Start at http://localhost:3000
+```
+
+Vibe Mode features 13 evolution structures (CUBES → EDEN), audio-reactive animation, mood system (6 moods), and personality-to-visual mapping.
 
 ---
 

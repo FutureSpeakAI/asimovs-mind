@@ -1,0 +1,1989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FRIDAY Desktop — FutureSpeak.AI</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; cursor: default; }
+        canvas { display: block; }
+        
+        /* --- ETHEREAL HUD OVERLAY --- */
+        #hud-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 50;
+            --hud-r: 0; --hud-g: 255; --hud-b: 255;
+            --hud-opacity: 0.25;
+        }
+
+        /* ELEGANT OPTICAL ARCS */
+        .hud-corner {
+            position: absolute; width: 6vw; height: 6vw; max-width: 60px; max-height: 60px;
+            border: 1px solid rgba(var(--hud-r), var(--hud-g), var(--hud-b), var(--hud-opacity));
+            transition: border-color 1s ease, box-shadow 1s ease;
+        }
+        .top-left { top: 60px; left: 80px; border-right: none; border-bottom: none; border-top-left-radius: 100%; }
+        .top-right { top: 60px; right: 80px; border-left: none; border-bottom: none; border-top-right-radius: 100%; }
+        .bottom-left { bottom: 60px; left: 80px; border-right: none; border-top: none; border-bottom-left-radius: 100%; }
+        .bottom-right { bottom: 60px; right: 80px; border-left: none; border-top: none; border-bottom-right-radius: 100%; }
+
+        .hud-corner .dot {
+            position: absolute; width: 4px; height: 4px; border-radius: 50%;
+            background: rgba(var(--hud-r), var(--hud-g), var(--hud-b), calc(var(--hud-opacity) + 0.4));
+            box-shadow: 0 0 10px rgba(var(--hud-r), var(--hud-g), var(--hud-b), 1.0);
+        }
+        .top-left .dot { top: 25%; left: 25%; }
+        .top-right .dot { top: 25%; right: 25%; }
+        .bottom-left .dot { bottom: 25%; left: 25%; }
+        .bottom-right .dot { bottom: 25%; right: 25%; }
+
+        /* HEADER */
+        .hud-header {
+            position: absolute; top: 80px; left: 140px; right: 140px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            font-family: 'Courier New', Courier, monospace; font-size: 9px;
+            color: rgba(var(--hud-r), var(--hud-g), var(--hud-b), calc(var(--hud-opacity) + 0.5));
+            letter-spacing: 4px; text-shadow: 0 0 10px rgba(var(--hud-r), var(--hud-g), var(--hud-b), 0.5);
+            font-weight: 300; text-transform: uppercase;
+        }
+
+        .hud-title-container { display: flex; flex-direction: column; gap: 6px; }
+        .hud-main-title { 
+            font-size: 13px; color: #fff; letter-spacing: 6px; font-weight: 400; 
+            text-decoration: none; pointer-events: auto; cursor: pointer; transition: text-shadow 0.3s;
+        }
+        .hud-main-title:hover { text-shadow: 0 0 15px rgba(255,255,255,0.8); }
+        
+        .hud-laws { display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .status-dot.green { background: #00ff66; box-shadow: 0 0 10px #00ff66, 0 0 2px #fff inset; }
+        .status-dot.red { background: #ff0033; box-shadow: 0 0 10px #ff0033, 0 0 2px #fff inset; }
+        .status-dot.yellow { background: #ffcc00; box-shadow: 0 0 10px #ffcc00, 0 0 2px #fff inset; }
+
+        /* Camera indicator: only visible when holo mode active */
+        #camera-indicator.holo-active { background: #00ff66; box-shadow: 0 0 8px #00ff66; }
+
+        /* MINORITY REPORT HAND CURSOR */
+        #hand-cursor {
+            position: fixed; top: -50px; left: -50px; width: 24px; height: 24px;
+            border-radius: 50%; border: 4px solid rgba(0, 255, 255, 0.8);
+            transform: translate(-50%, -50%); pointer-events: none; z-index: 9999;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5), inset 0 0 6px rgba(0, 255, 255, 0.3);
+            display: none; opacity: 0; transition: transform 0.1s, border-color 0.2s, opacity 0.3s;
+            justify-content: center; align-items: center;
+        }
+        #hand-cursor.active { display: flex; opacity: 1; }
+        #hand-cursor.hidden { opacity: 0; }
+        #hand-cursor.pinching { transform: translate(-50%, -50%) scale(0.8); border-color: #fff; box-shadow: 0 0 15px #fff; }
+        
+        #pinch-progress { position: absolute; top: -5px; left: -5px; width: 34px; height: 34px; transform: rotate(-90deg); opacity: 0; }
+        .pinch-circle { fill: none; stroke: #ff00ff; stroke-width: 4; stroke-dasharray: 95; stroke-dashoffset: 95; transition: stroke-dashoffset 0.1s linear; }
+        
+        .ripple {
+            position: fixed; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 9998;
+            animation: rippleAnim 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+        @keyframes rippleAnim {
+            0% { width: 0px; height: 0px; opacity: 1; border: 4px solid var(--r-color); }
+            100% { width: 100px; height: 100px; opacity: 0; border: 1px solid var(--r-color); }
+        }
+
+        /* CAMERA TRACKING INDICATOR */
+        #camera-indicator {
+            position: fixed; bottom: 20px; right: 20px; width: 6px; height: 6px; 
+            border-radius: 50%; background: #444; z-index: 200; transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        /* --- REACT UI LAYER STYLES --- */
+
+        /* Base button (used by React UI) */
+        .btn {
+            background: none; border: 1px solid rgba(255,255,255,0.08); color: rgba(255, 255, 255, 0.5);
+            padding: 6px 14px; font-size: 10px; cursor: pointer; border-radius: 4px;
+            transition: all 0.3s ease; letter-spacing: 1px;
+            font-family: 'Inter', sans-serif; pointer-events: auto;
+        }
+        .btn:hover { background: rgba(255, 255, 255, 0.05); color: #fff; border-color: rgba(255,255,255,0.2); }
+        .btn.active { color: #fff; background: rgba(255, 255, 255, 0.08); border-color: rgba(0,212,255,0.4); }
+        .btn-magenta { border-color: rgba(255,0,128,0.2); color: rgba(255,0,128,0.7); }
+        .btn-magenta:hover { background: rgba(255,0,128,0.08); color: #ff0080; border-color: rgba(255,0,128,0.4); }
+
+        /* Top bar */
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 70;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 16px; background: rgba(3,3,8,0.7); backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        /* Model status pills */
+        .model-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 2px 8px; border-radius: 10px; font-size: 9px;
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.5); transition: all 0.3s;
+        }
+        .model-pill .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .model-pill .dot.active { background: #00ff80; box-shadow: 0 0 6px #00ff80; }
+        .model-pill .dot.idle { background: #555; }
+
+        /* Dock */
+        .dock {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 70;
+            display: flex; justify-content: center; gap: 2px;
+            padding: 6px 12px 8px; background: rgba(3,3,8,0.7);
+            backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.04);
+        }
+        .dock-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            padding: 6px 12px 4px; background: none; border: 1px solid transparent;
+            border-radius: 8px; color: rgba(255,255,255,0.35); cursor: pointer;
+            font-family: 'Inter', sans-serif; font-size: 9px; transition: all 0.25s ease;
+            min-width: 56px; position: relative;
+        }
+        .dock-btn .ico { font-size: 18px; line-height: 1; }
+        .dock-btn .dot {
+            width: 3px; height: 3px; border-radius: 50%;
+            background: transparent; transition: all 0.3s;
+        }
+        .dock-btn:hover {
+            color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.04);
+            border-color: rgba(0,212,255,0.15);
+            box-shadow: 0 0 12px rgba(0,212,255,0.06), inset 0 0 12px rgba(0,212,255,0.03);
+        }
+        .dock-btn.active {
+            color: #00d4ff; background: rgba(0,212,255,0.06);
+            border-color: rgba(0,212,255,0.2);
+            box-shadow: 0 0 16px rgba(0,212,255,0.1), inset 0 0 16px rgba(0,212,255,0.04);
+        }
+        .dock-btn.active .dot { background: #00d4ff; box-shadow: 0 0 6px #00d4ff; }
+
+        /* Floating windows — glassmorphism */
+        .fwin {
+            position: fixed; display: flex; flex-direction: column;
+            background: rgba(6,6,14,0.65); backdrop-filter: blur(14px) saturate(1.2);
+            border: 1px solid rgba(0,212,255,0.1); border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 1px rgba(0,212,255,0.2);
+            overflow: hidden; transition: box-shadow 0.3s;
+        }
+        .fwin:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(0,212,255,0.06); }
+        .fwin-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; cursor: grab; user-select: none;
+            background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .fwin-bar:active { cursor: grabbing; }
+        .fwin-title { font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 500; }
+        .fwin-btns button {
+            background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer;
+            font-size: 16px; padding: 0 4px; transition: color 0.2s;
+        }
+        .fwin-btns button:hover { color: #ff0080; }
+        .fwin-body { flex: 1; overflow-y: auto; padding: 12px; }
+        .fwin-body::-webkit-scrollbar { width: 4px; }
+        .fwin-body::-webkit-scrollbar-track { background: transparent; }
+        .fwin-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+        .resize-h {
+            position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
+            cursor: nwse-resize; opacity: 0;
+        }
+
+        /* Cards */
+        .card {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 8px; padding: 12px; transition: border-color 0.2s;
+        }
+        .card:hover { border-color: rgba(255,255,255,0.08); }
+        .card-title {
+            font-family: 'Orbitron', monospace; font-size: 10px; color: rgba(0,212,255,0.6);
+            letter-spacing: 0.08em; margin-bottom: 8px;
+        }
+        .stat { font-family: 'Orbitron', monospace; font-size: 22px; color: #fff; }
+        .stat-label { font-size: 11px; color: #555; margin-top: 2px; }
+
+        /* Badges */
+        .badge-green { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; background: rgba(0,255,128,0.1); color: #00ff80; border: 1px solid rgba(0,255,128,0.2); }
+        .badge-cyan { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; background: rgba(0,212,255,0.1); color: #00d4ff; border: 1px solid rgba(0,212,255,0.2); }
+        .badge-magenta { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; background: rgba(255,0,128,0.1); color: #ff0080; border: 1px solid rgba(255,0,128,0.2); }
+        .badge-amber { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
+
+        /* Progress bars */
+        .progress-bar { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+        /* Inputs */
+        .input {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 6px; padding: 7px 10px; color: #ddd; font-size: 12px;
+            font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s;
+        }
+        .input:focus { border-color: rgba(0,212,255,0.3); }
+
+        /* Chat panel */
+        .chat-panel {
+            position: fixed; top: 36px; right: -340px; bottom: 44px;
+            width: 320px; z-index: 65; display: flex; flex-direction: column;
+            background: rgba(6,6,14,0.8); backdrop-filter: blur(16px);
+            border-left: 1px solid rgba(255,255,255,0.04);
+            transition: right 0.3s ease;
+        }
+        .chat-panel.open { right: 0; }
+
+        /* Greeting ticker */
+        .greeting-ticker {
+            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+            justify-content: center;
+        }
+        .greeting-ticker-item {
+            display: flex; align-items: baseline; gap: 6px;
+            font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(255,255,255,0.35);
+        }
+        .greeting-ticker-item .days {
+            font-family: 'Orbitron', monospace; font-size: 18px; color: #00d4ff;
+            text-shadow: 0 0 12px rgba(0,212,255,0.3);
+        }
+        .greeting-ticker-sep {
+            width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.15);
+        }
+
+        /* Settings panel */
+        .settings-panel {
+            position: fixed; top: 36px; right: -360px; bottom: 44px;
+            width: 340px; z-index: 68; display: flex; flex-direction: column;
+            background: rgba(6,6,14,0.75); backdrop-filter: blur(18px) saturate(1.2);
+            border-left: 1px solid rgba(0,212,255,0.1);
+            box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+            transition: right 0.35s cubic-bezier(0.2, 0.8, 0.3, 1);
+            overflow-y: auto;
+        }
+        .settings-panel.open { right: 0; }
+        .settings-panel::-webkit-scrollbar { width: 4px; }
+        .settings-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+        .settings-section {
+            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .settings-section-title {
+            font-family: 'Orbitron', monospace; font-size: 9px; color: rgba(0,212,255,0.5);
+            letter-spacing: 0.12em; margin-bottom: 10px; text-transform: uppercase;
+        }
+        .settings-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+        }
+        .settings-btn {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 5px; padding: 6px 8px; color: rgba(255,255,255,0.4);
+            font-family: 'JetBrains Mono', monospace; font-size: 9px; cursor: pointer;
+            transition: all 0.2s; text-align: left; letter-spacing: 0.03em;
+        }
+        .settings-btn:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.12); }
+        .settings-btn.active { color: #00d4ff; border-color: rgba(0,212,255,0.3); background: rgba(0,212,255,0.06); box-shadow: 0 0 10px rgba(0,212,255,0.08); }
+        .settings-toggle {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; cursor: pointer;
+        }
+        .settings-toggle-label { font-size: 11px; color: rgba(255,255,255,0.6); font-family: 'Inter', sans-serif; }
+        .settings-toggle-switch {
+            width: 32px; height: 18px; border-radius: 9px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+            position: relative; transition: all 0.25s; cursor: pointer;
+        }
+        .settings-toggle-switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: rgba(255,255,255,0.3); transition: all 0.25s;
+        }
+        .settings-toggle-switch.on { background: rgba(0,212,255,0.2); border-color: rgba(0,212,255,0.4); }
+        .settings-toggle-switch.on::after { left: 16px; background: #00d4ff; box-shadow: 0 0 6px rgba(0,212,255,0.5); }
+
+        /* Discord footer */
+        .discord-footer {
+            position: fixed; bottom: 48px; left: 12px; z-index: 55;
+            font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1px;
+        }
+        .discord-footer a {
+            color: rgba(0,255,255,0.4); text-decoration: none;
+            border-bottom: 1px solid rgba(0,255,255,0.15); padding-bottom: 1px;
+            transition: all 0.3s;
+        }
+        .discord-footer a:hover { color: #00ffff; border-bottom-color: rgba(0,255,255,0.5); text-shadow: 0 0 8px rgba(0,255,255,0.4); }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+
+<body>
+    <!-- Hand Cursor -->
+    <div id="hand-cursor" class="hidden">
+        <svg id="pinch-progress">
+            <circle class="pinch-circle" cx="17" cy="17" r="15" />
+        </svg>
+    </div>
+
+    <!-- Parallax Tracker Dot -->
+    <div id="camera-indicator"></div>
+
+    <div id="hud-overlay">
+        <!-- Minimalist Optical Arcs -->
+        <div class="hud-corner top-left"><div class="dot"></div></div>
+        <div class="hud-corner top-right"><div class="dot"></div></div>
+        <div class="hud-corner bottom-left"><div class="dot"></div></div>
+        <div class="hud-corner bottom-right"><div class="dot"></div></div>
+        
+        <div class="hud-header">
+            <div class="hud-title-container">
+                <a href="https://futurespeak.ai" target="_blank" class="hud-main-title">FutureSpeak.AI</a>
+                <span>AGENT FRIDAY v.2.0.0 // <span id="evolution-day-text">DAY 1: GENESIS LATTICE</span></span>
+            </div>
+            <div class="hud-laws">
+                ASIMOV cLAWS VERIFIED <div class="status-dot green"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Friday OS React UI Layer -->
+    <div id="ui-root" style="position:fixed;inset:0;z-index:60;pointer-events:none">
+        <div id="ui-inner" style="pointer-events:auto;height:100vh"></div>
+    </div>
+    <div style="position:fixed;bottom:8px;left:12px;z-index:1;font-family:Orbitron,monospace;font-size:10px;color:rgba(124,58,237,0.08);letter-spacing:.1em;pointer-events:none">FutureSpeak.AI</div>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- Three.js + Post-Processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <script>
+        // --- UI INTERACTION LOGIC ---
+
+        // Mouse Tracker Fallback
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth - 0.5) * 2.0;
+            mouseY = (e.clientY / window.innerHeight - 0.5) * 2.0;
+        });
+
+        // --- COMPUTER VISION ENGINE (MediaPipe Shared Camera) ---
+        let cameraMP = null;
+        let videoElement = document.createElement('video');
+        videoElement.setAttribute('autoplay', ''); videoElement.setAttribute('playsinline', '');
+        
+        // Hologram (Face) State
+        let isHologramMode = false;
+        let faceDetectionMP = null;
+        let rawFaceX = 0, rawFaceY = 0, rawFaceZ = 0; 
+        let currFaceX = 0, currFaceY = 0, currFaceZ = 0; 
+        let isFaceVisible = false;
+        let faceLostTimeout = null;
+
+        // Hands State
+        let isHandTrackingMode = false;
+        let handsMP = null;
+        let rawHandX = window.innerWidth/2, rawHandY = window.innerHeight/2;
+        let currHandX = window.innerWidth/2, currHandY = window.innerHeight/2;
+        let isPinching = false, wasPinching = false;
+        let pinchStartTime = 0;
+        let rightClickFired = false;
+        let handVisible = false;
+        const PINCH_HOLD_TIME = 1000; // ms for right click
+
+        async function startSharedCamera() {
+            if (!cameraMP) {
+                cameraMP = new Camera(videoElement, {
+                    onFrame: async () => { 
+                        if (isHologramMode && faceDetectionMP) await faceDetectionMP.send({image: videoElement}); 
+                        if (isHandTrackingMode && handsMP) await handsMP.send({image: videoElement});
+                    },
+                    width: 320, height: 240
+                });
+                await cameraMP.start();
+            }
+        }
+
+        // --- HAND TRACKING (Minority Report) ---
+        async function toggleHands() {
+            isHandTrackingMode = !isHandTrackingMode;
+            const cursor = document.getElementById('hand-cursor');
+            if (isHandTrackingMode) {
+                if (cursor) cursor.classList.add('active');
+                if (!handsMP) {
+                    handsMP = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+                    handsMP.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+                    handsMP.onResults(onHandsResults);
+                }
+                await startSharedCamera();
+            } else {
+                if (cursor) cursor.classList.remove('active');
+            }
+        }
+
+        function onHandsResults(results) {
+            const cursor = document.getElementById('hand-cursor');
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const indexTip = landmarks[8]; const thumbTip = landmarks[4];
+                const targetX = (1.0 - (indexTip.x + thumbTip.x) / 2) * window.innerWidth;
+                const targetY = ((indexTip.y + thumbTip.y) / 2) * window.innerHeight;
+                const dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                isPinching = dist < 0.06;
+                const isApproachingPinch = dist < 0.1;
+                if (!handVisible) {
+                    currHandX = targetX; currHandY = targetY;
+                    rawHandX = targetX; rawHandY = targetY;
+                    handVisible = true;
+                    cursor.classList.remove('hidden');
+                } else {
+                    if (!isApproachingPinch) {
+                        rawHandX = targetX; rawHandY = targetY;
+                    } else {
+                        rawHandX += (targetX - rawHandX) * 0.05;
+                        rawHandY += (targetY - rawHandY) * 0.05;
+                    }
+                }
+            } else {
+                isPinching = false; handVisible = false;
+                cursor.classList.add('hidden');
+            }
+        }
+
+        function spawnRipple(x, y, color) {
+            const r = document.createElement('div');
+            r.className = 'ripple'; r.style.left = x + 'px'; r.style.top = y + 'px'; r.style.setProperty('--r-color', color);
+            document.body.appendChild(r);
+            setTimeout(() => r.remove(), 600);
+        }
+
+        // --- FACE TRACKING (Parallax) ---
+        async function toggleHologram() {
+            isHologramMode = !isHologramMode;
+            if (isHologramMode) {
+                if (!faceDetectionMP) {
+                    faceDetectionMP = new FaceDetection({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`});
+                    faceDetectionMP.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
+                    faceDetectionMP.onResults(onFaceResults);
+                }
+                await startSharedCamera();
+            } else {
+                isFaceVisible = false; updateCameraIndicator(false);
+            }
+            updateCameraIndicator(isHologramMode && isFaceVisible);
+        }
+
+        function onFaceResults(results) {
+            if (results.detections.length > 0) {
+                const bbox = results.detections[0].boundingBox;
+                rawFaceX = (bbox.xCenter - 0.5) * 2.0; 
+                rawFaceY = (bbox.yCenter - 0.5) * 2.0;
+                let fw = Math.max(0.05, Math.min(bbox.width, 0.4)); 
+                let targetZ = (fw - 0.18) * 3.0; 
+                rawFaceZ += (targetZ - rawFaceZ) * 0.1;
+                isFaceVisible = true; updateCameraIndicator(true);
+                clearTimeout(faceLostTimeout);
+                faceLostTimeout = setTimeout(() => { isFaceVisible = false; updateCameraIndicator(false); }, 2000); 
+            }
+        }
+
+        function updateCameraIndicator(active) {
+            const ind = document.getElementById('camera-indicator');
+            if (!ind) return;
+            if (active && isHologramMode) { ind.classList.add('holo-active'); }
+            else { ind.classList.remove('holo-active'); }
+        }
+
+        // --- AESTHETIC CONFIGURATION ---
+        const MOODS = {
+            LISTENING: { baseColor: 0x00d2ff, accentColor: 0x8a2be2, rotationSpeed: 0.001, bloomStrength: 0.8, particleSpeedScale: 1.0, grain: 0.035 },
+            REASONING: { baseColor: 0x4b0082, accentColor: 0x00ffff, rotationSpeed: 0.003, bloomStrength: 0.6, particleSpeedScale: 0.5, grain: 0.02 },
+            EXECUTING: { baseColor: 0xffaa00, accentColor: 0xff3300, rotationSpeed: 0.008, bloomStrength: 1.2, particleSpeedScale: 1.8, grain: 0.05 },
+            EXCITED:   { baseColor: 0xffffff, accentColor: 0x00e5ff, rotationSpeed: 0.015, bloomStrength: 1.8, particleSpeedScale: 2.5, grain: 0.08 },
+            CALM:      { baseColor: 0x001133, accentColor: 0x0055aa, rotationSpeed: 0.0002, bloomStrength: 0.4, particleSpeedScale: 0.2, grain: 0.05 }
+        };
+
+        const EVOLUTION_PATH = [
+            { id: 'CUBES', name: 'GENESIS LATTICE' }, { id: 'ICOSAHEDRON', name: 'SACRED SPHERE' }, { id: 'NETWORK', name: 'SHANNON NETWORK' },
+            { id: 'DOME', name: 'GEODESIC CATHEDRAL' }, { id: 'ASTROLABE', name: 'LOVELACE ASTROLABE' }, { id: 'TESSERACT', name: 'VON NEUMANN TESSERACT' },
+            { id: 'QUANTUM', name: 'DIRAC PROBABILITY' }, { id: 'MANDELBROT', name: 'MANDELBROT SET' }, { id: 'MOBIUS', name: 'TURING MOBIUS' },
+            { id: 'GRID', name: 'OCEAN OF LIGHT' }, { id: 'CABLES', name: 'FIBONACCI NERVE' }, { id: 'NONE', name: 'TRANSCENDENCE' },
+            { id: 'EDEN', name: 'GIGA EARTH (REZ)' }
+        ];
+
+        const HolographicShader = {
+            uniforms: { "tDiffuse": { value: null }, "time": { value: 0.0 }, "amount": { value: 0.003 }, "angle": { value: 0.0 }, "grainAmount": { value: 0.04 } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+                uniform sampler2D tDiffuse; uniform float time; uniform float amount; uniform float angle; uniform float grainAmount; varying vec2 vUv;
+                float rand(vec2 co) { return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+                void main() {
+                    vec2 offset = amount * vec2(cos(angle + vUv.y * 2.0), sin(angle + vUv.x * 2.0));
+                    vec4 cr = texture2D(tDiffuse, vUv + offset); vec4 cga = texture2D(tDiffuse, vUv); vec4 cb = texture2D(tDiffuse, vUv - offset);
+                    vec4 finalColor = vec4(cr.r, cga.g, cb.b, cga.a);
+                    finalColor.rgb += (rand(vUv + time) - 0.5) * grainAmount;
+                    finalColor.rgb -= sin(vUv.y * 800.0 + time * 2.0) * 0.01;
+                    gl_FragColor = finalColor;
+                }
+            `
+        };
+
+        // --- THREE.JS ENGINE ---
+        let scene, camera, renderer, composer, bloomPass, holoPass;
+        let particleSystem, energyLines = [], starField, nebulaClouds = [];
+        let clock = new THREE.Clock();
+        let glowTexture, cloudTexture;
+        
+        let structures = {};
+        let currentEvolutionIdx = 0;
+        let currentStructure = EVOLUTION_PATH[0].id;
+        let targetStructure = EVOLUTION_PATH[0].id;
+        let transitionProgress = 1.0;
+        let metamorphosisFlash = 0.0; 
+        let currentMood = 'LISTENING';
+        let timeLapseActive = false;
+        let timeLapseTimer = 0;
+        
+        let coreCubes = [], matrixLines = [], gridOcean = null, mandelbrotSystem = null;
+        let tesseractLines = null, astrolabeRings = [], shannonNodes = [], shannonLines = null;
+        let mobiusSystem = null, quantumRings = [], abyssParticles = null, cathedralRings = [];
+        let edenDebris = [], edenPlayer = null, edenLady = null; 
+        
+        let audioContext, analyser, dataArray;
+        let micActive = false;
+        let lastSoundTime = -10; 
+        let audioData = { low: 0, mid: 0, high: 0, total: 0 };
+        let idleFactor = 0.4;
+        
+        let moodLerpValues = { ...MOODS.LISTENING };
+        moodLerpValues.baseColor = new THREE.Color(MOODS.LISTENING.baseColor);
+        moodLerpValues.accentColor = new THREE.Color(MOODS.LISTENING.accentColor);
+
+        let targetCamPos = new THREE.Vector3(0, 5, 15);
+        let targetCamLook = new THREE.Vector3(0, 0, 0);
+        let baseCamPos = new THREE.Vector3(0, 5, 15); 
+
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)'); gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        function createCloudTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.05)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, 128, 128);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function setMood(m) {
+            currentMood = m;
+        }
+
+        function setEvolution(idx) {
+            if (idx === currentEvolutionIdx && transitionProgress === 1.0) return;
+            currentEvolutionIdx = idx;
+            currentStructure = targetStructure; targetStructure = EVOLUTION_PATH[idx].id;
+            transitionProgress = 0.0; metamorphosisFlash = 1.0;
+            if (structures[targetStructure]) structures[targetStructure].visible = true;
+            const dayText = document.getElementById('evolution-day-text');
+            if (dayText) dayText.innerText = `DAY ${idx + 1}: ${EVOLUTION_PATH[idx].name}`;
+        }
+
+        function toggleTimeLapse() {
+            timeLapseActive = !timeLapseActive;
+            if (timeLapseActive) { timeLapseTimer = 0; }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000205, 0.012);
+            glowTexture = createGlowTexture(); cloudTexture = createCloudTexture();
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.copy(targetCamPos); camera.lookAt(targetCamLook);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x000103, 1);
+            document.body.appendChild(renderer.domElement);
+
+            buildBackgroundEnvironment(); buildAllStructures();
+
+            const renderScene = new THREE.RenderPass(scene, camera);
+            bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.6, 0.15);
+            holoPass = new THREE.ShaderPass(HolographicShader);
+            composer = new THREE.EffectComposer(renderer);
+            composer.addPass(renderScene); composer.addPass(bloomPass); composer.addPass(holoPass);
+
+            window.addEventListener('resize', onWindowResize);
+
+            // Auto-start audio on first user interaction (no overlay needed)
+            const autoStartAudio = () => { setupAudio(); document.removeEventListener('click', autoStartAudio); document.removeEventListener('keydown', autoStartAudio); };
+            document.addEventListener('click', autoStartAudio);
+            document.addEventListener('keydown', autoStartAudio);
+
+            Object.values(structures).forEach(g => { if(g) { scene.add(g); g.visible = false; setGroupOpacity(g, 0); }});
+            if (structures['CUBES']) { structures['CUBES'].visible = true; setGroupOpacity(structures['CUBES'], 1); }
+
+            document.getElementById('evolution-day-text').innerText = `DAY 1: ${EVOLUTION_PATH[0].name}`;
+            animate();
+        }
+
+        function buildBackgroundEnvironment() {
+            const particleCount = 800; const positions = new Float32Array(particleCount * 3); const colors = new Float32Array(particleCount * 3);
+            const particleData = [];
+            for (let i = 0; i < particleCount; i++) {
+                const radius = 8 + Math.random() * 15; const theta = Math.random() * Math.PI * 2; const phi = Math.acos((Math.random() * 2) - 1);
+                positions[i*3] = radius * Math.sin(phi) * Math.cos(theta); positions[i*3+1] = radius * Math.sin(phi) * Math.sin(theta); positions[i*3+2] = radius * Math.cos(phi);
+                particleData.push({ radius, baseRadius: radius, theta, basePhi: phi, phi: phi, speed: 0.01 + Math.random() * 0.04 });
+            }
+            const pGeom = new THREE.BufferGeometry(); pGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3)); pGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particleSystem = new THREE.Points(pGeom, new THREE.PointsMaterial({ size: 0.4, map: glowTexture, vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+            particleSystem.userData.data = particleData; scene.add(particleSystem);
+
+            for (let i = 0; i < 20; i++) createEnergyFlare();
+
+            for (let i = 0; i < 15; i++) {
+                const material = new THREE.SpriteMaterial({ map: cloudTexture, color: 0x00ffff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false });
+                const sprite = new THREE.Sprite(material);
+                const scale = 30 + Math.random() * 50; sprite.scale.set(scale, scale, 1);
+                sprite.position.set((Math.random()-0.5)*100, (Math.random()-0.5)*100, -50 - Math.random()*80);
+                sprite.userData = { isAccent: Math.random() > 0.5, speed: (Math.random()-0.5)*0.001 };
+                scene.add(sprite); nebulaClouds.push(sprite);
+            }
+        }
+
+        function createEnergyFlare() {
+            const start = new THREE.Vector3((Math.random()-0.5)*8, (Math.random()-0.5)*8, (Math.random()-0.5)*8);
+            const end = new THREE.Vector3((Math.random()-0.5)*30, (Math.random()-0.5)*30, (Math.random()-0.5)*30);
+            const mid1 = start.clone().lerp(end, 0.3).add(new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10));
+            const mid2 = start.clone().lerp(end, 0.7).add(new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10));
+            const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(new THREE.CatmullRomCurve3([start, mid1, mid2, end]).getPoints(50)), new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, linewidth: 2 }));
+            line.userData = { pulse: Math.random()*Math.PI, pulseSpeed: 0.05+Math.random()*0.1, intensity: 0 }; 
+            scene.add(line); energyLines.push(line);
+        }
+
+
+        function createMaterial(type, color, opacity, additive = true, wireframe = false, dashed = false) {
+            let mat;
+            if (dashed) mat = new THREE.LineDashedMaterial({ color: color, dashSize: 0.2, gapSize: 0.1 });
+            else mat = type === 'line' ? new THREE.LineBasicMaterial() : new THREE.MeshBasicMaterial();
+            mat.color.setHex(color); mat.transparent = true; mat.opacity = opacity; mat.wireframe = wireframe;
+            mat.userData = { baseOpacity: opacity, isAccent: false };
+            if (additive) { mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; }
+            return mat;
+        }
+
+        function buildAllStructures() {
+            // 1. CUBES (Genesis Lattice)
+            const gCubes = new THREE.Group();
+            const boxMat = createMaterial('mesh', 0x00ffff, 0.85, false);
+            const edgeMat = createMaterial('line', 0x00ffff, 0.8, true); edgeMat.userData.isAccent = true;
+            const boxGeo = new THREE.BoxGeometry(1.4, 1.4, 1.4); const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+            const gridSize = 3; const spacing = 1.6; const offset = (gridSize * spacing) / 2 - (spacing / 2);
+            for(let x=0; x<gridSize; x++) { for(let y=0; y<gridSize; y++) { for(let z=0; z<gridSize; z++) {
+                if (Math.random() > 0.85) continue;
+                const mesh = new THREE.Mesh(boxGeo, boxMat); 
+                mesh.add(new THREE.LineSegments(edgeGeo, edgeMat));
+                const posX = (x * spacing) - offset; const posY = (y * spacing) - offset; const posZ = (z * spacing) - offset;
+                mesh.position.set(posX, posY, posZ); 
+                const dir = new THREE.Vector3(posX, posY, posZ).normalize();
+                if(dir.length() === 0) dir.set(0,1,0);
+                mesh.userData = { baseX: posX, baseY: posY, baseZ: posZ, dir: dir, rx: Math.random()*Math.PI*2, speed: 0.5+Math.random()*0.5 };
+                gCubes.add(mesh); coreCubes.push(mesh);
+            }}}
+            gCubes.scale.set(1.5, 1.5, 1.5);
+            structures['CUBES'] = gCubes;
+
+            // 2. ICOSAHEDRON
+            const gIco = new THREE.Group();
+            gIco.add(new THREE.Mesh(new THREE.IcosahedronGeometry(5.0, 3), createMaterial('mesh', 0x00ffff, 0.15, true, true)));
+            const midIco = createMaterial('mesh', 0x00ffff, 0.3, true, true); midIco.userData.isAccent = true;
+            gIco.add(new THREE.Mesh(new THREE.IcosahedronGeometry(3.5, 2), midIco));
+            gIco.add(new THREE.Mesh(new THREE.IcosahedronGeometry(2.0, 1), createMaterial('mesh', 0xffffff, 0.6, true, true)));
+            structures['ICOSAHEDRON'] = gIco;
+
+            // 3. DOME (Cathedral)
+            const gDome = new THREE.Group();
+            const dMat = createMaterial('mesh', 0x00ffff, 0.1, true, true);
+            gDome.add(new THREE.Mesh(new THREE.SphereGeometry(35, 48, 32, 0, Math.PI*2, 0, Math.PI/2), dMat));
+            for(let i=0; i<8; i++) {
+                const angle = (i/8)*Math.PI*2; const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.8, 50, 8), createMaterial('mesh', 0x00ffff, 0.15, true, true));
+                pillar.position.set(Math.cos(angle)*18, -10, Math.sin(angle)*18); gDome.add(pillar);
+            }
+            const chMat = createMaterial('mesh', 0xffffff, 0.5, true, true); chMat.userData.isAccent = true;
+            for(let i=0; i<6; i++) {
+                const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(4 - i*0.5, 1), chMat);
+                crystal.position.y = 25 - i*4; crystal.rotation.y = i * Math.PI/4; gDome.add(crystal); cathedralRings.push(crystal);
+            }
+            const abyssGeo = new THREE.BufferGeometry(); const aPts = [];
+            for(let i=0; i<2000; i++) {
+                const r = Math.random() * 40; const theta = Math.random() * Math.PI * 2; const depth = -10 - Math.pow(r, 1.2) * 0.4; 
+                aPts.push(r * Math.cos(theta), depth, r * Math.sin(theta));
+            }
+            abyssGeo.setAttribute('position', new THREE.Float32BufferAttribute(aPts, 3));
+            abyssParticles = new THREE.Points(abyssGeo, new THREE.PointsMaterial({ size: 0.5, map: glowTexture, color: 0x00ffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+            abyssParticles.userData = { isAccent: true }; gDome.add(abyssParticles);
+            structures['DOME'] = gDome;
+
+            // 4. CABLES
+            const gCables = new THREE.Group();
+            const cableMat = createMaterial('mesh', 0x00ffff, 0.15, true, false); cableMat.userData.isAccent = true;
+            const phiFib = Math.PI * (3.0 - Math.sqrt(5.0)); 
+            for(let i=0; i<80; i++) {
+                const y = 1 - (i / 79) * 2; const radius = Math.sqrt(1 - y * y); const theta = phiFib * i;
+                const start = new THREE.Vector3(Math.cos(theta)*radius*30, y*30, Math.sin(theta)*radius*30);
+                const end = new THREE.Vector3(0,0,0); const mid = start.clone().lerp(end, 0.5).applyAxisAngle(new THREE.Vector3(0,1,0), Math.PI/1.5);
+                gCables.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([start, mid, end]), 50, 0.15, 6, false), cableMat));
+            }
+            structures['CABLES'] = gCables;
+
+            // 5. GRID
+            const gGrid = new THREE.Group();
+            const oceanGeo = new THREE.PlaneGeometry(100, 100, 80, 80); oceanGeo.rotateX(-Math.PI / 2);
+            gridOcean = new THREE.Points(oceanGeo, new THREE.PointsMaterial({ size: 0.35, map: glowTexture, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+            gridOcean.material.userData = { baseOpacity: 0.5, isAccent: true }; gridOcean.userData.baseY = new Float32Array(oceanGeo.attributes.position.count);
+            for(let i=0; i<oceanGeo.attributes.position.count; i++) gridOcean.userData.baseY[i] = oceanGeo.attributes.position.getY(i);
+            gGrid.add(gridOcean); structures['GRID'] = gGrid;
+
+            // 6. MANDELBROT SET
+            const gMandel = new THREE.Group();
+            const mPts = [], mCols = [], mData = [];
+            const maxIter = 40;
+            for(let x = -2.1; x < 0.8; x += 0.012) {
+                for(let y = -1.2; y < 1.2; y += 0.012) {
+                    let cx = x, cy = y, zx = 0, zy = 0, iter = 0;
+                    while(zx*zx + zy*zy < 4 && iter < maxIter) { let tmp = zx*zx - zy*zy + cx; zy = 2*zx*zy + cy; zx = tmp; iter++; }
+                    if(iter < maxIter && iter > 2) {
+                        let smooth = iter + 1 - Math.log(Math.log(Math.sqrt(zx*zx + zy*zy))) / Math.log(2);
+                        let height = (smooth / maxIter) * 6.0; 
+                        mPts.push((x + 0.65) * 10, height - 3.0, y * 10); mCols.push(1, 1, 1); 
+                        mData.push({ baseX: (x+0.65)*10, baseZ: y*10, baseY: height - 3.0, iterRatio: smooth/maxIter });
+                    }
+                }
+            }
+            const mGeom = new THREE.BufferGeometry(); mGeom.setAttribute('position', new THREE.Float32BufferAttribute(mPts, 3)); mGeom.setAttribute('color', new THREE.Float32BufferAttribute(mCols, 3));
+            mandelbrotSystem = new THREE.Points(mGeom, new THREE.PointsMaterial({ size: 0.25, map: glowTexture, vertexColors: true, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+            mandelbrotSystem.userData.data = mData; gMandel.add(mandelbrotSystem);
+            structures['MANDELBROT'] = gMandel;
+
+            // 7. ASTROLABE
+            const gAstrolabe = new THREE.Group();
+            const astroMatSolid = createMaterial('mesh', 0x00ffff, 0.15, true, false); const astroMatDash = createMaterial('line', 0x00ffff, 0.6, true, false, true); astroMatDash.userData.isAccent = true;
+            for(let i=1; i<=8; i++) {
+                const ringGroup = new THREE.Group(); const radius = i * 2.0;
+                ringGroup.add(new THREE.Mesh(new THREE.TorusGeometry(radius, 0.05, 8, 80), astroMatSolid));
+                const dashedEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.TorusGeometry(radius, 0.2, 4, 40)), astroMatDash);
+                dashedEdges.computeLineDistances(); ringGroup.add(dashedEdges);
+                ringGroup.rotation.x = Math.random() * Math.PI; ringGroup.rotation.y = Math.random() * Math.PI;
+                ringGroup.userData = { rxSpeed: (Math.random()-0.5)*0.015, rySpeed: (Math.random()-0.5)*0.015 };
+                gAstrolabe.add(ringGroup); astrolabeRings.push(ringGroup);
+            }
+            structures['ASTROLABE'] = gAstrolabe;
+
+            // 8. TESSERACT
+            const gTesseract = new THREE.Group();
+            const tessMat = createMaterial('line', 0x00ffff, 0.8, true, false); tessMat.userData.isAccent = true;
+            const tessNodesMat = new THREE.PointsMaterial({ size: 1.0, map: glowTexture, color: 0x00ffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
+            const tPts4D = []; for(let i=0; i<16; i++) tPts4D.push({ x: (i&1)?1:-1, y: (i&2)?1:-1, z: (i&4)?1:-1, w: (i&8)?1:-1 });
+            const tEdges = [];
+            for(let i=0; i<16; i++) { for(let j=i+1; j<16; j++) { if(Math.abs(tPts4D[i].x-tPts4D[j].x) + Math.abs(tPts4D[i].y-tPts4D[j].y) + Math.abs(tPts4D[i].z-tPts4D[j].z) + Math.abs(tPts4D[i].w-tPts4D[j].w) === 2) tEdges.push(i, j); } }
+            const tessGeo = new THREE.BufferGeometry(); tessGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(tEdges.length*3), 3));
+            tesseractLines = new THREE.LineSegments(tessGeo, tessMat); tesseractLines.userData = { pts4D: tPts4D, edges: tEdges, angleXW: 0, angleYW: 0 };
+            const tessNodesGeo = new THREE.BufferGeometry(); tessNodesGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(16*3), 3));
+            const tessNodes = new THREE.Points(tessNodesGeo, tessNodesMat); tessNodes.userData.isAccent = true;
+            gTesseract.add(tesseractLines); gTesseract.add(tessNodes); gTesseract.scale.set(3,3,3);
+            structures['TESSERACT'] = gTesseract;
+
+            // 9. NETWORK
+            const gNet = new THREE.Group();
+            const netNodeMat = new THREE.PointsMaterial({ size: 0.6, map: glowTexture, color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+            const netLineMat = createMaterial('line', 0x00ffff, 0.2, true, false); netLineMat.userData.isAccent = true;
+            const netPts = [];
+            for(let i=0; i<120; i++) {
+                let p = new THREE.Vector3((Math.random()-0.5)*20, (Math.random()-0.5)*20, (Math.random()-0.5)*20);
+                netPts.push(p); shannonNodes.push({ pos: p, velocity: new THREE.Vector3((Math.random()-0.5)*0.015, (Math.random()-0.5)*0.015, (Math.random()-0.5)*0.015) });
+            }
+            gNet.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(netPts), netNodeMat));
+            shannonLines = new THREE.LineSegments(new THREE.BufferGeometry(), netLineMat); gNet.add(shannonLines);
+            structures['NETWORK'] = gNet;
+
+            // 10. MOBIUS
+            const gMobius = new THREE.Group();
+            const mobPts = [];
+            for(let u=0; u<Math.PI*2; u+=0.04) { for(let v=-1; v<=1; v+=0.15) mobPts.push({u: u, v: v}); }
+            const mobGeo = new THREE.BufferGeometry(); mobGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(mobPts.length*3), 3));
+            mobiusSystem = new THREE.Points(mobGeo, new THREE.PointsMaterial({ size: 0.25, map: glowTexture, color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+            mobiusSystem.userData = { data: mobPts, isAccent: true }; gMobius.add(mobiusSystem); gMobius.scale.set(4,4,4);
+            structures['MOBIUS'] = gMobius;
+
+            // 11. QUANTUM
+            const gQuantum = new THREE.Group();
+            gQuantum.add(new THREE.Points(new THREE.SphereGeometry(3.5, 64, 64), new THREE.PointsMaterial({ size: 0.4, map: glowTexture, color: 0xffffff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false })));
+            const numQRings = 30;
+            for(let i=0; i<numQRings; i++) {
+                const qLineMat = createMaterial('line', 0xffffff, 0.5, true, false); qLineMat.userData.isAccent = true;
+                const qGeo = new THREE.BufferGeometry(); qGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(300 * 3), 3));
+                const qLine = new THREE.LineLoop(qGeo, qLineMat);
+                qLine.rotation.x = Math.random()*Math.PI; qLine.rotation.y = Math.random()*Math.PI;
+                qLine.userData = { radius: 6 + (i*0.4), waveSpeed: 2 + Math.random()*4, colorPhase: i/numQRings };
+                gQuantum.add(qLine); quantumRings.push(qLine);
+            }
+            structures['QUANTUM'] = gQuantum;
+
+            // 12. NONE (Transcendence)
+            const gNone = new THREE.Group();
+            const lineMat = createMaterial('line', 0x00ffff, 0.2, true, false); lineMat.userData.isAccent = true;
+            for(let i=0; i<100; i++) {
+                const x = (Math.random()-0.5)*40; const z = (Math.random()-0.5)*40; const y = (Math.random()-0.5)*40;
+                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y-5, z), new THREE.Vector3(x, y+5, z)]), lineMat);
+                line.userData = { speed: 0.01 + Math.random()*0.02, baseY: y }; 
+                gNone.add(line); matrixLines.push(line);
+            }
+            structures['NONE'] = gNone;
+
+            // 13. EDEN TRANCE (Giga Earth Rez Tribute)
+            const gEden = new THREE.Group();
+            const tunnelGroup = new THREE.Group();
+            const tunnelGeo = new THREE.BoxGeometry(40, 40, 200, 4, 4, 20);
+            const tunnelWireMat = createMaterial('line', 0xff00ff, 0.3, true, false); tunnelWireMat.userData.isAccent = true;
+            const tunnelWire = new THREE.LineSegments(new THREE.EdgesGeometry(tunnelGeo), tunnelWireMat);
+            const tunnelSolidMat = new THREE.MeshBasicMaterial({ color: 0x050515, side: THREE.BackSide });
+            tunnelSolidMat.userData = { isTunnelSolid: true };
+            const tunnelSolid = new THREE.Mesh(tunnelGeo, tunnelSolidMat);
+            tunnelGroup.add(tunnelWire); tunnelGroup.add(tunnelSolid);
+            gEden.add(tunnelGroup);
+
+            const sphereGeo = new THREE.SphereGeometry(6, 24, 16, 0, Math.PI*2, 0.2, Math.PI - 0.4);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.9 });
+            sphereMat.userData = { isBossSphere: true };
+            edenLady = new THREE.Mesh(sphereGeo, sphereMat);
+            const sphereWire = new THREE.WireframeGeometry(sphereGeo);
+            const sphereWireMat = new THREE.LineBasicMaterial({ color: 0x550000, transparent: true, opacity: 0.6 });
+            sphereWireMat.userData = { isBossWire: true };
+            edenLady.add(new THREE.LineSegments(sphereWire, sphereWireMat));
+            gEden.add(edenLady);
+
+            const spineGroup = new THREE.Group();
+            const spineMat = createMaterial('line', 0xff3300, 0.8, true, false); spineMat.userData.isAccent = true;
+            for(let i=0; i<15; i++) {
+                const x = (Math.random() - 0.5) * 4; const z = (Math.random() - 0.5) * 4;
+                const pts = [new THREE.Vector3(x, -50, z), new THREE.Vector3(x, 50, z)];
+                spineGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), spineMat));
+            }
+            gEden.add(spineGroup);
+
+            edenPlayer = new THREE.Group();
+            const pBodyMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); pBodyMat.userData = { isPlayerBody: true };
+            const pBody = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 1.5, 8), pBodyMat);
+            const pHead = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), pBodyMat);
+            pHead.position.y = 0.9;
+            const ringPts = [];
+            for(let i=0; i<=32; i++) { const th = (i/32) * Math.PI * 2; ringPts.push(new THREE.Vector3(Math.cos(th)*1.5, Math.sin(th)*1.5, 0)); }
+            const pRingMat = createMaterial('line', 0x00ffff, 0.8, true, false); pRingMat.userData.isAccent = true;
+            const pRing = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ringPts), pRingMat);
+            pRing.rotation.x = Math.PI / 2;
+            edenPlayer.add(pBody); edenPlayer.add(pHead); edenPlayer.add(pRing);
+            gEden.add(edenPlayer);
+
+            edenDebris = [];
+            const debrisMat = createMaterial('mesh', 0x00ffff, 0.4, true, true);
+            for(let i=0; i<60; i++) {
+                const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0, -2 - Math.random()*3)]);
+                const mesh = new THREE.Line(geo, debrisMat);
+                mesh.position.set((Math.random()-0.5)*35, (Math.random()-0.5)*35, (Math.random()-0.5)*100);
+                mesh.userData = { speed: 1.0 + Math.random()*3.0 };
+                gEden.add(mesh); edenDebris.push(mesh);
+            }
+            structures['EDEN'] = gEden;
+        }
+
+        function setGroupOpacity(group, opacityMultiplier) {
+            if(!group) return;
+            group.traverse(child => {
+                if (child && child.material && child.material.userData && child.material.userData.baseOpacity !== undefined) {
+                    child.material.opacity = child.material.userData.baseOpacity * opacityMultiplier;
+                }
+            });
+        }
+
+        function updateGroupColors(group) {
+            if(!group) return;
+            group.traverse(child => {
+                if (child && child.material && child.material.userData) {
+                    const targetColor = child.material.userData.isAccent || (child.userData && child.userData.isAccent) ? moodLerpValues.accentColor : moodLerpValues.baseColor;
+                    
+                    if (child === mandelbrotSystem && mandelbrotSystem && mandelbrotSystem.geometry && mandelbrotSystem.geometry.attributes.color) {
+                        const colors = child.geometry.attributes.color.array; const mData = child.userData.data;
+                        for(let i=0; i<mData.length; i++) {
+                            const c = new THREE.Color().copy(moodLerpValues.baseColor).lerp(moodLerpValues.accentColor, mData[i].iterRatio);
+                            colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+                        }
+                        child.geometry.attributes.color.needsUpdate = true;
+                    } else if (child.material.userData.isTunnelSolid) {
+                        child.material.color.copy(moodLerpValues.baseColor).multiplyScalar(0.05);
+                    } else if (child.material.userData.isBossSphere) {
+                        child.material.color.copy(moodLerpValues.baseColor);
+                    } else if (child.material.userData.isBossWire) {
+                        child.material.color.copy(moodLerpValues.accentColor).multiplyScalar(0.3);
+                    } else if (child.material.userData.isPlayerBody) {
+                        child.material.color.setHex(0xffffff); 
+                    } else if (child.material.color && targetStructure !== 'QUANTUM') {
+                        child.material.color.copy(targetColor);
+                        if(child.geometry && child.geometry.type === 'BoxGeometry' && !child.material.wireframe && (currentStructure === 'CUBES' || targetStructure === 'CUBES')) {
+                            child.material.color.copy(moodLerpValues.baseColor).multiplyScalar(0.15); 
+                        }
+                    }
+                }
+            });
+        }
+
+        async function setupAudio() {
+            if (audioContext) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') await audioContext.resume();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser(); analyser.fftSize = 256;
+                source.connect(analyser); dataArray = new Uint8Array(analyser.frequencyBinCount);
+                micActive = true; lastSoundTime = clock.getElapsedTime(); 
+            } catch (err) { console.warn("Using procedural heartbeat."); }
+        }
+
+        function onWindowResize() {
+            if(!camera || !renderer || !composer) return;
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function smoothstep(x) { return x * x * (3 - 2 * x); }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1); 
+            const elapsed = clock.getElapsedTime() * 0.5;
+
+            // --- HAND CURSOR LOGIC (Minority Report) ---
+            const cursor = document.getElementById('hand-cursor');
+            const pRing = document.querySelector('.pinch-circle');
+            if (isHandTrackingMode) {
+                currHandX += (rawHandX - currHandX) * 0.25; 
+                currHandY += (rawHandY - currHandY) * 0.25; 
+                cursor.style.left = `${currHandX}px`; cursor.style.top = `${currHandY}px`;
+                
+                if (isPinching) {
+                    if(!wasPinching) { pinchStartTime = performance.now(); rightClickFired = false; cursor.classList.add('pinching'); }
+                    const duration = performance.now() - pinchStartTime;
+                    if (duration > 200) {
+                        document.getElementById('pinch-progress').style.opacity = 1;
+                        const progress = Math.min(1.0, (duration - 200) / PINCH_HOLD_TIME);
+                        pRing.style.strokeDashoffset = 95 * (1.0 - progress);
+                        if (progress >= 1.0 && !rightClickFired) {
+                            rightClickFired = true; spawnRipple(currHandX, currHandY, '#ff00ff');
+                        }
+                    }
+                } else {
+                    if (wasPinching) {
+                        const duration = performance.now() - pinchStartTime;
+                        cursor.classList.remove('pinching');
+                        document.getElementById('pinch-progress').style.opacity = 0; pRing.style.strokeDashoffset = 95;
+                        if (duration < 500) {
+                            spawnRipple(currHandX, currHandY, '#00ffff');
+                            cursor.style.display = 'none'; 
+                            let el = document.elementFromPoint(currHandX, currHandY);
+                            cursor.style.display = 'flex';
+                            if (el && typeof el.click === 'function') el.click();
+                        }
+                    }
+                }
+                wasPinching = isPinching;
+            }
+
+            // --- STABILIZED TRUE 3D HOLOGRAPHIC PARALLAX OFFSET ---
+            if (isHologramMode && isFaceVisible) {
+                currFaceX += (rawFaceX - currFaceX) * 0.08; 
+                currFaceY += (rawFaceY - currFaceY) * 0.08;
+                currFaceZ += (rawFaceZ - currFaceZ) * 0.05; 
+            } else {
+                currFaceX += (mouseX - currFaceX) * 0.04; 
+                currFaceY += (mouseY - currFaceY) * 0.04; 
+                currFaceZ += (0 - currFaceZ) * 0.04;
+            }
+
+            // --- TIME LAPSE LOGIC ---
+            if (timeLapseActive) {
+                timeLapseTimer += delta;
+                if (timeLapseTimer > 10.0) { timeLapseTimer = 0; setEvolution((currentEvolutionIdx + 1) % EVOLUTION_PATH.length); }
+            }
+
+            if (metamorphosisFlash > 0) metamorphosisFlash = Math.max(0, metamorphosisFlash - delta * 0.3);
+
+            // --- AUDIO PROCESSING ---
+            const heartbeat = (Math.sin(elapsed * Math.PI) + 1) / 2;
+            if (micActive && analyser && dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                let low = 0, mid = 0, high = 0;
+                for(let i=0; i<8; i++) low += dataArray[i]; for(let i=8; i<40; i++) mid += dataArray[i]; for(let i=40; i<100; i++) high += dataArray[i];
+                audioData.low = (low / 8 / 255) + (heartbeat * 0.05); audioData.mid = mid / 32 / 255; audioData.high = high / 60 / 255;
+                audioData.total = (audioData.low + audioData.mid + audioData.high) / 3;
+                if (audioData.total > 0.02) lastSoundTime = elapsed;
+            } else {
+                audioData.low = heartbeat * 0.15; audioData.mid = heartbeat * 0.05; audioData.high = 0; audioData.total = audioData.low;
+            }
+
+            const isQuiet = (elapsed - lastSoundTime > 6.0);
+            const targetIdle = isQuiet ? 0.2 : 1.0;
+            idleFactor = THREE.MathUtils.lerp(idleFactor, targetIdle, delta * (isQuiet ? 0.3 : 2.0));
+
+            // --- MOOD LERPING ---
+            const moodLerp = delta * 0.5; const tMood = MOODS[currentMood];
+            if(tMood) {
+                moodLerpValues.baseColor.lerp(new THREE.Color(tMood.baseColor), moodLerp);
+                moodLerpValues.accentColor.lerp(new THREE.Color(tMood.accentColor), moodLerp);
+                moodLerpValues.rotationSpeed = THREE.MathUtils.lerp(moodLerpValues.rotationSpeed, tMood.rotationSpeed, moodLerp);
+                moodLerpValues.bloomStrength = THREE.MathUtils.lerp(moodLerpValues.bloomStrength, tMood.bloomStrength, moodLerp);
+                moodLerpValues.particleSpeedScale = THREE.MathUtils.lerp(moodLerpValues.particleSpeedScale, tMood.particleSpeedScale, moodLerp);
+                moodLerpValues.grain = THREE.MathUtils.lerp(moodLerpValues.grain, tMood.grain, moodLerp);
+            }
+
+            // --- HUD UPDATES ---
+            const hudEl = document.getElementById('hud-overlay');
+            if (hudEl) {
+                hudEl.style.setProperty('--hud-r', Math.floor(moodLerpValues.baseColor.r * 255));
+                hudEl.style.setProperty('--hud-g', Math.floor(moodLerpValues.baseColor.g * 255));
+                hudEl.style.setProperty('--hud-b', Math.floor(moodLerpValues.baseColor.b * 255));
+                hudEl.style.setProperty('--hud-opacity', Math.min(0.8, 0.2 + (audioData.total * 1.5) + (metamorphosisFlash * 0.5)));
+                hudEl.style.transform = `perspective(1000px) rotateY(${currFaceX * -2}deg) rotateX(${currFaceY * 2}deg) translateZ(0px)`;
+            }
+
+
+            nebulaClouds.forEach(cloud => {
+                if(cloud && cloud.material && cloud.userData && cloud.rotation) {
+                    const targetColor = cloud.userData.isAccent ? moodLerpValues.accentColor : moodLerpValues.baseColor;
+                    cloud.material.color.copy(targetColor);
+                    cloud.material.opacity = 0.03 + audioData.low * 0.05 + (metamorphosisFlash * 0.1);
+                    cloud.rotation.z += cloud.userData.speed;
+                    cloud.position.z += delta * 0.5; if(cloud.position.z > 0) cloud.position.z = -100;
+                }
+            });
+
+            // --- STRUCTURE TRANSITIONS ---
+            if (transitionProgress < 1.0) transitionProgress = Math.min(1.0, transitionProgress + delta * 0.125);
+            const ease = smoothstep(transitionProgress); 
+            const scatterIntensity = Math.sin(transitionProgress * Math.PI) + (metamorphosisFlash * 1.5); 
+
+            Object.keys(structures).forEach(key => {
+                const g = structures[key];
+                if(g) {
+                    updateGroupColors(g);
+                    if (key === targetStructure) { g.visible = true; setGroupOpacity(g, ease); g.scale.setScalar(1.2 - ease * 0.2); }
+                    else if (key === currentStructure && transitionProgress < 1.0) { setGroupOpacity(g, 1 - ease); g.scale.setScalar(1.0 + ease * 0.5); }
+                    else g.visible = false;
+                }
+            });
+            if (transitionProgress >= 1.0 && currentStructure !== targetStructure) currentStructure = targetStructure;
+
+            // --- CINEMATIC TRUE-3D CAMERA PARALLAX ---
+            if(camera) {
+                if (targetStructure === 'DOME') { targetCamPos.set(0, -6 + Math.sin(elapsed*0.2)*2, 18); targetCamLook.set(0, 5, 0); } 
+                else if (targetStructure === 'GRID') { targetCamPos.set(0, 2 + Math.sin(elapsed*0.2)*1, 15 - (elapsed*2) % 10); targetCamLook.set(0, 1, 0); } 
+                else if (targetStructure === 'CABLES' || targetStructure === 'ASTROLABE') { targetCamPos.set(Math.sin(elapsed*0.1)*12, Math.cos(elapsed*0.1)*12, 15 + Math.sin(elapsed*0.2)*5); targetCamLook.set(0, 0, 0); } 
+                else if (targetStructure === 'MANDELBROT') { targetCamPos.set(Math.sin(elapsed*0.2)*14, 8 + Math.sin(elapsed*0.3)*3, Math.cos(elapsed*0.2)*14); targetCamLook.set(0, 0, 0); } 
+                else if (targetStructure === 'NETWORK') { targetCamPos.set(Math.sin(elapsed*0.2)*10, Math.sin(elapsed*0.3)*6, Math.cos(elapsed*0.2)*10); targetCamLook.set(0, 0, 0); } 
+                else if (targetStructure === 'EDEN') { targetCamPos.set(Math.sin(elapsed*0.5)*2, Math.cos(elapsed*0.3)*1.5, 28); targetCamLook.set(0, 0, 0); } 
+                else { targetCamPos.set(Math.sin(elapsed*0.15)*6, 5 + Math.cos(elapsed*0.2)*2, 18 + Math.sin(elapsed*0.1)*3); targetCamLook.set(0, 0, 0); }
+
+                baseCamPos.lerp(targetCamPos, delta * 0.8);
+
+                const parallaxX = currFaceX * 5.0; 
+                const parallaxY = currFaceY * -5.0; 
+                const parallaxZ = currFaceZ * -8.0; 
+
+                camera.position.x = baseCamPos.x + parallaxX;
+                camera.position.y = baseCamPos.y + parallaxY;
+                camera.position.z = baseCamPos.z + parallaxZ;
+
+                const lookTarget = targetCamLook.clone();
+                lookTarget.x += parallaxX * 0.15; 
+                lookTarget.y += parallaxY * 0.15;
+
+                const currentLook = new THREE.Vector3(); camera.getWorldDirection(currentLook);
+                const idealLook = lookTarget.sub(camera.position).normalize();
+                currentLook.lerp(idealLook, delta * 2.0); 
+                camera.lookAt(camera.position.clone().add(currentLook));
+            }
+
+            // --- ANIMATE ACTIVE STRUCTURES ---
+            const activeGroup = structures[targetStructure];
+            const interactionForce = Math.min(1.0, Math.abs(currFaceX) + Math.abs(currFaceY) + Math.abs(currFaceZ)); 
+            
+            if (activeGroup && activeGroup.rotation && !['GRID','MANDELBROT','TESSERACT','NETWORK','EDEN'].includes(targetStructure)) {
+                activeGroup.rotation.y += moodLerpValues.rotationSpeed * idleFactor;
+                if (targetStructure !== 'DOME') activeGroup.rotation.z += moodLerpValues.rotationSpeed * 0.5 * idleFactor;
+            }
+
+            if (structures['CUBES'] && structures['CUBES'].visible && coreCubes.length > 0) {
+                coreCubes.forEach(c => {
+                    if (c && c.rotation && c.position && c.userData) {
+                        c.rotation.x += 0.01 * c.userData.speed * idleFactor; c.rotation.y += 0.012 * c.userData.speed * idleFactor;
+                        const organicBreathe = Math.sin(elapsed * 2.0 * c.userData.speed + c.userData.rx) * 0.15;
+                        const expansion = organicBreathe + (audioData.low * 1.5) + (interactionForce * 1.5);
+                        c.position.set(
+                            c.userData.baseX + c.userData.dir.x * expansion, 
+                            c.userData.baseY + c.userData.dir.y * expansion, 
+                            c.userData.baseZ + c.userData.dir.z * expansion
+                        );
+                    }
+                });
+            }
+
+            if (structures['DOME'] && structures['DOME'].visible) {
+                if(abyssParticles && abyssParticles.rotation && abyssParticles.scale) {
+                    abyssParticles.rotation.y -= 0.005 * idleFactor;
+                    abyssParticles.scale.setScalar(1.0 + audioData.low * 0.3 * idleFactor);
+                }
+                cathedralRings.forEach((c, i) => {
+                    if(c && c.rotation && c.scale) {
+                        c.rotation.y += 0.002 * (i%2==0?1:-1) * idleFactor;
+                        c.scale.setScalar(1.0 + audioData.mid * 0.1);
+                    }
+                });
+            }
+
+            if (structures['GRID'] && structures['GRID'].visible && gridOcean && gridOcean.geometry && gridOcean.geometry.attributes.position && gridOcean.userData) {
+                const positions = gridOcean.geometry.attributes.position.array; const baseYs = gridOcean.userData.baseY;
+                for(let i=0; i<gridOcean.geometry.attributes.position.count; i++) {
+                    positions[i*3+1] = baseYs[i] + Math.sin(positions[i*3] * 0.1 + elapsed) * 0.8 + Math.cos(positions[i*3+2] * 0.1 - elapsed * 1.2) * 0.8 + Math.sin(positions[i*3]*0.3 + positions[i*3+2]*0.3) * (audioData.low * 3.0 * idleFactor);
+                }
+                gridOcean.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (structures['MANDELBROT'] && structures['MANDELBROT'].visible && mandelbrotSystem && mandelbrotSystem.rotation && mandelbrotSystem.geometry && mandelbrotSystem.geometry.attributes.position && mandelbrotSystem.userData) {
+                mandelbrotSystem.rotation.y = elapsed * 0.05;
+                const positions = mandelbrotSystem.geometry.attributes.position.array; const mData = mandelbrotSystem.userData.data;
+                const colors = mandelbrotSystem.geometry.attributes.color.array;
+                for(let i=0; i<mData.length; i++) {
+                    const wave = Math.sin(mData[i].baseX*0.5 + elapsed) * Math.cos(mData[i].baseZ*0.5 + elapsed) * (audioData.low * 3.0);
+                    positions[i*3+1] = mData[i].baseY + (audioData.low * 4.0 * mData[i].iterRatio * idleFactor) + wave;
+                    const c = new THREE.Color().copy(moodLerpValues.baseColor).lerp(moodLerpValues.accentColor, mData[i].iterRatio + audioData.mid);
+                    colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+                }
+                mandelbrotSystem.geometry.attributes.position.needsUpdate = true;
+                mandelbrotSystem.geometry.attributes.color.needsUpdate = true;
+            }
+
+            if (structures['ASTROLABE'] && structures['ASTROLABE'].visible && astrolabeRings.length > 0) {
+                astrolabeRings.forEach((ring, i) => {
+                    if (ring && ring.rotation && ring.userData) {
+                        ring.rotation.x += ring.userData.rxSpeed * (1 + audioData.mid*3);
+                        ring.rotation.y += ring.userData.rySpeed * (1 + audioData.mid*3);
+                    }
+                });
+            }
+
+            if (structures['TESSERACT'] && structures['TESSERACT'].visible && tesseractLines && tesseractLines.userData && tesseractLines.geometry && tesseractLines.geometry.attributes.position) {
+                const tessGroup = structures['TESSERACT'];
+                if (tessGroup && tessGroup.children.length > 1) {
+                    const tessNodes = tessGroup.children[1];
+                    tesseractLines.userData.angleXW += (0.5 + audioData.low * 3.0) * delta * idleFactor;
+                    tesseractLines.userData.angleYW += (0.3 + audioData.low * 2.0) * delta * idleFactor;
+                    const cosXW = Math.cos(tesseractLines.userData.angleXW), sinXW = Math.sin(tesseractLines.userData.angleXW);
+                    const cosYW = Math.cos(tesseractLines.userData.angleYW), sinYW = Math.sin(tesseractLines.userData.angleYW);
+                    const pts3D = [];
+                    if (tesseractLines.userData.pts4D) {
+                        tesseractLines.userData.pts4D.forEach(p => {
+                            let x = p.x, y = p.y, z = p.z, w = p.w;
+                            let nx = x*cosXW - w*sinXW; let nw = x*sinXW + w*cosXW; x = nx; w = nw;
+                            let ny = y*cosYW - w*sinYW; nw = y*sinYW + w*cosYW; y = ny; w = nw;
+                            let w_factor = 2 / (4 - w);
+                            pts3D.push(new THREE.Vector3(x*w_factor, y*w_factor, z*w_factor));
+                        });
+                    }
+                    const lPositions = tesseractLines.geometry.attributes.position.array;
+                    const edges = tesseractLines.userData.edges;
+                    if (edges && pts3D.length > 0) {
+                        for(let i=0; i<edges.length; i+=2) {
+                            let idx = (i/2)*6; let e1 = edges[i]; let e2 = edges[i+1];
+                            if (pts3D[e1] && pts3D[e2]) {
+                                lPositions[idx] = pts3D[e1].x; lPositions[idx+1] = pts3D[e1].y; lPositions[idx+2] = pts3D[e1].z;
+                                lPositions[idx+3] = pts3D[e2].x; lPositions[idx+4] = pts3D[e2].y; lPositions[idx+5] = pts3D[e2].z;
+                            }
+                        }
+                    }
+                    tesseractLines.geometry.attributes.position.needsUpdate = true;
+                    if (tessNodes && tessNodes.geometry && tessNodes.geometry.attributes.position) {
+                        const nPositions = tessNodes.geometry.attributes.position.array;
+                        pts3D.forEach((p, i) => { if(p) { nPositions[i*3] = p.x; nPositions[i*3+1] = p.y; nPositions[i*3+2] = p.z; } });
+                        tessNodes.geometry.attributes.position.needsUpdate = true;
+                    }
+                }
+            }
+
+            if (structures['NETWORK'] && structures['NETWORK'].visible && shannonLines && shannonLines.geometry && shannonNodes.length > 0) {
+                const netGroup = structures['NETWORK'];
+                if (netGroup && netGroup.children.length > 0 && netGroup.children[0].geometry && netGroup.children[0].geometry.attributes.position) {
+                    const nodePos = netGroup.children[0].geometry.attributes.position.array;
+                    const linePts = [];
+                    for(let i=0; i<120; i++) {
+                        if (!shannonNodes[i] || !shannonNodes[i].pos || !shannonNodes[i].velocity) continue;
+                        let p = shannonNodes[i].pos; let v = shannonNodes[i].velocity;
+                        p.add(v); if(p.length() > 20) v.multiplyScalar(-1); 
+                        nodePos[i*3] = p.x; nodePos[i*3+1] = p.y; nodePos[i*3+2] = p.z;
+                        let connected = 0;
+                        for(let j=i+1; j<120; j++) {
+                            if(connected > 3 || !shannonNodes[j] || !shannonNodes[j].pos) break;
+                            if(p.distanceTo(shannonNodes[j].pos) < 6 + (audioData.high * 6)) { 
+                                linePts.push(p, shannonNodes[j].pos); connected++; 
+                            }
+                        }
+                    }
+                    netGroup.children[0].geometry.attributes.position.needsUpdate = true;
+                    if(linePts.length > 0) shannonLines.geometry.setFromPoints(linePts);
+                    else shannonLines.geometry.setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]);
+                }
+            }
+
+            if (structures['MOBIUS'] && structures['MOBIUS'].visible && mobiusSystem && mobiusSystem.geometry && mobiusSystem.geometry.attributes.position && mobiusSystem.userData) {
+                const positions = mobiusSystem.geometry.attributes.position.array; const mData = mobiusSystem.userData.data;
+                const flowOffset = elapsed * (2 + audioData.mid * 4);
+                if (mData) {
+                    for(let i=0; i<mData.length; i++) {
+                        const u = mData[i].u + flowOffset; const v = mData[i].v; const R = 3.0, r = 1.5;
+                        positions[i*3] = (R + r * v * Math.cos(u/2)) * Math.cos(u);
+                        positions[i*3+1] = (R + r * v * Math.cos(u/2)) * Math.sin(u);
+                        positions[i*3+2] = r * v * Math.sin(u/2);
+                    }
+                }
+                mobiusSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (structures['QUANTUM'] && structures['QUANTUM'].visible && quantumRings.length > 0) {
+                quantumRings.forEach(qLine => {
+                    if(qLine && qLine.geometry && qLine.geometry.attributes.position && qLine.userData) {
+                        const positions = qLine.geometry.attributes.position.array;
+                        for(let i=0; i<300; i++) {
+                            const theta = (i/300) * Math.PI * 2;
+                            const wave = Math.sin(theta * 10 + elapsed * qLine.userData.waveSpeed) * (audioData.high * 4.0);
+                            const r = qLine.userData.radius + wave;
+                            positions[i*3] = Math.cos(theta) * r; positions[i*3+1] = Math.sin(theta) * r; positions[i*3+2] = 0;
+                        }
+                        qLine.geometry.attributes.position.needsUpdate = true;
+                        if (qLine.material && qLine.material.color) {
+                            qLine.material.color.setHSL((qLine.userData.colorPhase + elapsed*0.1 + audioData.mid) % 1.0, 1.0, 0.5);
+                        }
+                    }
+                });
+            }
+
+            if (structures['EDEN'] && structures['EDEN'].visible) {
+                if (edenLady) {
+                    edenLady.rotation.y += moodLerpValues.rotationSpeed * 5.0 * idleFactor;
+                    edenLady.scale.setScalar(1.0 + audioData.low * 0.5 * moodLerpValues.bloomStrength);
+                }
+                if (edenPlayer) {
+                    const r = 8 + audioData.mid * 5 * moodLerpValues.particleSpeedScale;
+                    edenPlayer.position.x = Math.cos(elapsed * 2.0) * r + currFaceX * 3.0;
+                    edenPlayer.position.z = Math.sin(elapsed * 2.0) * r;
+                    edenPlayer.position.y = -3 + Math.sin(elapsed * 4.0) * 2 + currFaceY * 3.0;
+                    edenPlayer.rotation.y = -elapsed * 2.0;
+                    edenPlayer.rotation.z = Math.sin(elapsed * 1.5) * 0.1 - currFaceX * 0.2;
+                    edenPlayer.rotation.x = 0.2;
+                }
+                edenDebris.forEach(d => {
+                    if(d && d.position && d.userData) {
+                        d.position.z += (d.userData.speed * moodLerpValues.particleSpeedScale) + (audioData.mid * 5);
+                        if(d.position.z > 30) {
+                            d.position.z = -100;
+                            d.position.x = (Math.random()-0.5)*35;
+                            d.position.y = (Math.random()-0.5)*35;
+                        }
+                    }
+                });
+            }
+
+            if (structures['NONE'] && structures['NONE'].visible && matrixLines.length > 0) {
+                matrixLines.forEach(line => { 
+                    if(line && line.position && line.userData) {
+                        line.position.y += line.userData.speed * (1 + audioData.mid * 3); 
+                        if (line.position.y > 20) line.position.y = -20; 
+                    }
+                });
+            }
+
+            // --- GLOBAL PARTICLES (Galactic Supernova Logic) ---
+            if (particleSystem && particleSystem.geometry && particleSystem.geometry.attributes.position && particleSystem.geometry.attributes.color && particleSystem.userData) {
+                const positions = particleSystem.geometry.attributes.position.array;
+                const pData = particleSystem.userData.data; const colors = particleSystem.geometry.attributes.color.array;
+                const targetPhiIsHorizontal = (targetStructure === 'DOME' || targetStructure === 'GRID');
+
+                if (pData) {
+                    for (let i = 0; i < pData.length; i++) {
+                        const p = pData[i];
+                        let speed = (p.speed + audioData.mid * 0.5) * moodLerpValues.particleSpeedScale * idleFactor;
+                        if (scatterIntensity > 0) { 
+                            speed += scatterIntensity * 3.0; 
+                            p.phi += (Math.PI/2 - p.phi) * scatterIntensity * delta * 0.5; 
+                        }
+                        p.theta += speed * delta;
+                        if (scatterIntensity === 0) {
+                            const targetPhi = targetPhiIsHorizontal ? (Math.PI / 2 + (Math.random()-0.5)*0.1) : p.basePhi;
+                            p.phi = THREE.MathUtils.lerp(p.phi, targetPhi, delta * 1.0);
+                        }
+                        const moodRadialForce = tMood && tMood.radialForce !== undefined ? tMood.radialForce : 0;
+                        let radTarget = p.baseRadius + (moodRadialForce * 5.0) + (scatterIntensity * 10.0); 
+                        if (targetStructure === 'GRID') radTarget += 8.0;
+                        p.radius = THREE.MathUtils.lerp(p.radius, radTarget, delta * 1.5);
+                        positions[i*3] = p.radius * Math.sin(p.phi) * Math.cos(p.theta); positions[i*3+1] = p.radius * Math.sin(p.phi) * Math.sin(p.theta); positions[i*3+2] = p.radius * Math.cos(p.phi);
+                        colors[i*3] = moodLerpValues.accentColor.r; colors[i*3+1] = moodLerpValues.accentColor.g; colors[i*3+2] = moodLerpValues.accentColor.b;
+                    }
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true; particleSystem.geometry.attributes.color.needsUpdate = true;
+                if(particleSystem.rotation) {
+                    particleSystem.rotation.y += (0.001 + audioData.mid * 0.01) * idleFactor;
+                }
+            }
+
+            // --- ENERGY LINES ---
+            energyLines.forEach((line) => {
+                if (line && line.userData && line.material && line.material.color) {
+                    if (audioData.high > 0.3 && Math.random() > 0.98) line.userData.intensity = 1.0;
+                    line.userData.intensity *= 0.95; 
+                    const pulse = (Math.sin(elapsed * line.userData.pulseSpeed) + 1) / 2;
+                    line.material.opacity = (0.01 + line.userData.intensity * 0.4 + pulse * 0.03) * idleFactor;
+                    line.material.color.copy(moodLerpValues.accentColor);
+                    if (line.userData.intensity > 0.1) line.material.color.lerp(new THREE.Color(0xffffff), line.userData.intensity);
+                }
+            });
+
+            // --- POST PROCESSING ---
+            if (bloomPass && holoPass && holoPass.uniforms) {
+                const currentBloom = moodLerpValues.bloomStrength * (0.8 + audioData.low * 2.5) * idleFactor;
+                bloomPass.strength = currentBloom + (metamorphosisFlash * 4.0);
+                if(holoPass.uniforms.amount) holoPass.uniforms.amount.value = 0.003 + Math.sin(elapsed * 0.5) * 0.002 + (metamorphosisFlash * 0.01);
+                if(holoPass.uniforms.angle) holoPass.uniforms.angle.value = Math.sin(elapsed * 0.2);
+                if(holoPass.uniforms.grainAmount) holoPass.uniforms.grainAmount.value = moodLerpValues.grain + (metamorphosisFlash * 0.05);
+                if(holoPass.uniforms.time) holoPass.uniforms.time.value = elapsed;
+            }
+            
+            if (starField && starField.rotation) starField.rotation.y += 0.0001;
+            if (composer) composer.render();
+        }
+
+        window.onload = init;
+    </script>
+
+<script>
+// === FRIDAY VIBE API ===
+// Wire window.fridayVibe to Gemini's actual scene functions
+window.fridayVibe = {
+    setMood: function(m) {
+        if (typeof setMood === 'function') setMood(m);
+    },
+    nextStructure: function() {
+        if (typeof setEvolution === 'function' && typeof currentEvolutionIdx !== 'undefined' && typeof EVOLUTION_PATH !== 'undefined') {
+            setEvolution((currentEvolutionIdx + 1) % EVOLUTION_PATH.length);
+        }
+    },
+    prevStructure: function() {
+        if (typeof setEvolution === 'function' && typeof currentEvolutionIdx !== 'undefined' && typeof EVOLUTION_PATH !== 'undefined') {
+            setEvolution((currentEvolutionIdx - 1 + EVOLUTION_PATH.length) % EVOLUTION_PATH.length);
+        }
+    },
+    setStructure: function(i) {
+        if (typeof setEvolution === 'function') setEvolution(i);
+    },
+    getStructure: function() {
+        return {
+            index: typeof currentEvolutionIdx !== 'undefined' ? currentEvolutionIdx : 0,
+            name: typeof EVOLUTION_PATH !== 'undefined' && typeof currentEvolutionIdx !== 'undefined'
+                ? EVOLUTION_PATH[currentEvolutionIdx].name
+                : 'Unknown'
+        };
+    },
+    getStructures: function() {
+        return typeof EVOLUTION_PATH !== 'undefined' ? EVOLUTION_PATH : [];
+    },
+    getMood: function() {
+        return typeof currentMood !== 'undefined' ? currentMood : 'LISTENING';
+    },
+    getMoods: function() {
+        return typeof MOODS !== 'undefined' ? Object.keys(MOODS) : ['LISTENING','REASONING','EXECUTING','EXCITED','CALM'];
+    },
+    toggleHologram: function() {
+        if (typeof toggleHologram === 'function') toggleHologram();
+    },
+    isHologramOn: function() {
+        return typeof isHologramMode !== 'undefined' ? isHologramMode : false;
+    },
+    toggleHands: function() {
+        if (typeof toggleHands === 'function') toggleHands();
+    },
+    isHandsOn: function() {
+        return typeof isHandTrackingMode !== 'undefined' ? isHandTrackingMode : false;
+    },
+    toggleTimeLapse: function() {
+        if (typeof toggleTimeLapse === 'function') toggleTimeLapse();
+    },
+    isTimeLapseOn: function() {
+        return typeof timeLapseActive !== 'undefined' ? timeLapseActive : false;
+    }
+};
+
+// === KEYBOARD CONTROLS ===
+document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === 'ArrowRight') { window.fridayVibe.nextStructure(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft')  { window.fridayVibe.prevStructure(); e.preventDefault(); }
+});
+</script>
+
+<script type="text/babel">
+const{useState,useEffect,useRef,useCallback}=React;
+const WS=[
+  {id:'home',ico:'🏠',label:'Home'},{id:'career',ico:'💼',label:'Career'},{id:'wiki',ico:'📚',label:'Wiki'},
+  {id:'coparent',ico:'👨‍👩‍👧',label:'Co-Parent'},{id:'futurespeak',ico:'🚀',label:'FutureSpeak'},{id:'family',ico:'👪',label:'Family'},
+  {id:'studio',ico:'🎨',label:'Studio'},{id:'trust',ico:'🔗',label:'Trust'},{id:'system',ico:'🖥️',label:'System'},
+  {id:'code',ico:'💻',label:'Code'},{id:'news',ico:'📰',label:'News'}
+];
+function getGreeting(){const h=new Date().getHours();if(h<5)return'Late night';if(h<12)return'Good morning';if(h<17)return'Good afternoon';if(h<21)return'Good evening';return'Late night'}
+
+function FWin({id,title,emoji,children,onClose,zIndex,onFocus}){
+  const[pos,setPos]=useState({x:60+Math.random()*300,y:40+Math.random()*80});
+  const[size,setSize]=useState({w:660,h:460});
+  const[dragging,setDragging]=useState(false);const[resizing,setResizing]=useState(false);
+  const dOff=useRef({x:0,y:0});const rStart=useRef({x:0,y:0,w:0,h:0});
+  useEffect(()=>{if(!dragging)return;const mv=e=>setPos({x:Math.max(0,e.clientX-dOff.current.x),y:Math.max(30,e.clientY-dOff.current.y)});const up=()=>setDragging(false);addEventListener('mousemove',mv);addEventListener('mouseup',up);return()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up)}},[dragging]);
+  useEffect(()=>{if(!resizing)return;const mv=e=>setSize({w:Math.max(400,rStart.current.w+e.clientX-rStart.current.x),h:Math.max(280,rStart.current.h+e.clientY-rStart.current.y)});const up=()=>setResizing(false);addEventListener('mousemove',mv);addEventListener('mouseup',up);return()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up)}},[resizing]);
+  return(<div className="fwin" style={{left:pos.x,top:pos.y,width:size.w,height:size.h,zIndex}} onClick={onFocus}>
+    <div className="fwin-bar" onMouseDown={e=>{if(e.target.closest('.fwin-btns'))return;setDragging(true);dOff.current={x:e.clientX-pos.x,y:e.clientY-pos.y};onFocus()}}>
+      <span className="fwin-title">{emoji} {title}</span><div className="fwin-btns"><button onClick={onClose}>×</button></div>
+    </div><div className="fwin-body">{children}</div>
+    <div className="resize-h" onMouseDown={e=>{e.stopPropagation();setResizing(true);rStart.current={x:e.clientX,y:e.clientY,w:size.w,h:size.h};onFocus()}}/>
+  </div>);
+}
+
+// ═══ ERROR WRAPPER ═══
+function Safe({children,name}){
+  const[err,setErr]=useState(false);
+  if(err)return(<div style={{padding:20,textAlign:'center'}}><div style={{color:'#ff0080',fontSize:13}}>⚠️ {name} encountered an error</div><button className="btn" style={{marginTop:8}} onClick={()=>setErr(false)}>Retry</button></div>);
+  try{return children}catch(e){setErr(true);return null}
+}
+
+// ═══ FRIDAY SAYS (proactive insight) ═══
+function FridaySays({text}){
+  if(!text)return null;
+  return(<div style={{background:'rgba(0,212,255,0.04)',border:'1px solid rgba(0,212,255,0.1)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#00d4ff',fontStyle:'italic'}}>💡 {text}</div>);
+}
+
+// ═══ WORKSPACES ═══
+function HomeWS(){
+  const[cd,setCd]=useState(null);const[trust,setTrust]=useState(null);const[pers,setPers]=useState(null);const[mem,setMem]=useState(null);const[epi,setEpi]=useState(null);const[todos,setTodos]=useState([]);const[loading,setLoading]=useState(true);
+  useEffect(()=>{
+    Promise.all([
+      fetch('/api/countdowns').then(r=>r.json()).then(setCd).catch(()=>null),
+      fetch('/api/trust').then(r=>r.json()).then(setTrust).catch(()=>null),
+      fetch('/api/personality').then(r=>r.json()).then(setPers).catch(()=>null),
+      fetch('/api/memory/stats').then(r=>r.json()).then(setMem).catch(()=>null),
+      fetch('/api/epistemic').then(r=>r.json()).then(setEpi).catch(()=>null),
+      fetch('/api/todos').then(r=>r.json()).then(d=>setTodos(d.todos||[])).catch(()=>[])
+    ]).then(()=>setLoading(false));
+  },[]);
+  const approveTodo=id=>fetch(`/api/todos/${id}/approve`,{method:'POST'}).then(()=>setTodos(t=>t.map(x=>x.id===id?{...x,status:'approved'}:x)));
+  const rejectTodo=id=>fetch(`/api/todos/${id}/reject`,{method:'POST'}).then(()=>setTodos(t=>t.filter(x=>x.id!==id)));
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Loading systems...</div>;
+  const pending=todos.filter(t=>t.status==='proposed').length;
+  const insight=cd?.countdowns?`${cd.countdowns.map(c=>`${c.label||c.name||'Event'} in ${c.days||c.days_until||'?'}d`).join(' · ')}${pending>0?` · ${pending} task${pending>1?'s':''} awaiting approval`:''}`:'Systems initializing...';
+  return(<div>
+    <FridaySays text={insight}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+      <div className="card"><div className="card-title">Upcoming Events</div>{cd?.countdowns?.map((c,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,0.03)'}}><span>{c.emoji||'📅'} {c.label||c.name}</span><span className="stat" style={{fontSize:16,color:'#00d4ff'}}>{c.days||c.days_until}d</span></div>)||<span style={{color:'#555'}}>No events</span>}</div>
+      <div className="card"><div className="card-title">Personality</div><div className="stat">{pers?.session_count||0}</div><div className="stat-label">sessions · {pers?.maturity_pct||'0%'} maturity</div><div style={{marginTop:6}}><span className="badge-green">ONLINE</span></div></div>
+      <div className="card"><div className="card-title">Trust Network</div><div className="stat">{trust?.people?(Array.isArray(trust.people)?trust.people.length:Object.keys(trust.people).length):0}</div><div className="stat-label">entities tracked</div></div>
+      <div className="card"><div className="card-title">Epistemic Score</div><div className="stat" style={{color:(epi?.overall||0.5)>0.6?'#00ff80':(epi?.overall||0.5)>0.4?'#f59e0b':'#ff0080'}}>{(epi?.overall||0.5).toFixed(2)}</div><div className="stat-label">independence index</div></div>
+      <div className="card"><div className="card-title">Memory Banks</div><div style={{fontSize:12}}>{[['🔵','Short-term',mem?.short||0],['🟣','Medium-term',mem?.medium||0],['🟠','Long-term',mem?.long||0]].map(([e,l,v],i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{e} {l}</span><span style={{fontFamily:'JetBrains Mono'}}>{v}</span></div>)}</div></div>
+      <div className="card"><div className="card-title">AI To-Do List</div>{todos.length===0?<div style={{color:'#555',fontSize:11}}>No tasks proposed yet</div>:todos.slice(0,5).map(t=><div key={t.id||Math.random()} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,0.03)',fontSize:11}}><span style={{flex:1,color:t.status==='approved'?'#00ff80':'#ccc'}}>{t.title||t.task||'Task'}</span>{t.status==='proposed'&&<><button className="btn" style={{padding:'2px 6px',fontSize:9,marginLeft:4}} onClick={()=>approveTodo(t.id)}>✓</button><button className="btn btn-magenta" style={{padding:'2px 6px',fontSize:9,marginLeft:2}} onClick={()=>rejectTodo(t.id)}>✗</button></>}</div>)}</div>
+    </div>
+  </div>);
+}
+function CareerWS(){
+  const[tracker,setTracker]=useState(null);const[reports,setReports]=useState([]);const[pipeline,setPipeline]=useState('');
+  const[jobs,setJobs]=useState('');const[loading,setLoading]=useState(true);const[view,setView]=useState('overview');
+  const[reportContent,setReportContent]=useState('');const[evalUrl,setEvalUrl]=useState('');const[storyBank,setStoryBank]=useState('');
+  useEffect(()=>{Promise.all([
+    fetch('/api/career-ops/tracker').then(r=>r.json()).then(setTracker).catch(()=>null),
+    fetch('/api/career-ops/reports').then(r=>r.json()).then(d=>setReports(d.reports||[])).catch(()=>[]),
+    fetch('/api/career-ops/pipeline').then(r=>r.json()).then(d=>setPipeline(d.content||'')).catch(()=>''),
+    fetch('/api/jobs').then(r=>r.json()).then(d=>setJobs(d.content||d.raw||'')).catch(()=>'')
+  ]).then(()=>setLoading(false))},[]);
+  const loadReport=name=>{fetch('/api/career-ops/report/'+name).then(r=>r.json()).then(d=>{setReportContent(d.content||'');setView('report')}).catch(()=>{})};
+  const launchEval=()=>{if(!evalUrl.trim())return;fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Evaluate this job: '+evalUrl],cwd:'C:\\Users\\swebs\\Projects\\career-ops'})}).then(()=>{setEvalUrl('');alert('Evaluation launched')}).catch(()=>{})};
+  const launchScan=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run portal scan'],cwd:'C:\\Users\\swebs\\Projects\\career-ops'})}).then(()=>alert('Scan launched')).catch(()=>{})};
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Loading career pipeline...</div>;
+  const entries=tracker?.entries||[];const applied=entries.filter(e=>(e.status||'').toLowerCase().includes('appli')).length;
+  const interviewing=entries.filter(e=>(e.status||'').toLowerCase().includes('interview')).length;
+  const offered=entries.filter(e=>(e.status||'').toLowerCase().includes('offer')).length;
+  const hasData=entries.length>0||reports.length>0||pipeline.length>10;
+  return(<div>
+    {hasData?<FridaySays text={entries.length+' evaluated, '+applied+' applied, '+interviewing+' interviewing, '+reports.length+' reports. Target: $500K'}/>:<FridaySays text="Career-ops ready. Paste a job URL below to evaluate, or scan portals for new opportunities."/>}
+    <div className="card" style={{marginBottom:12,padding:10}}>
+      <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:8}}><input className="input" style={{flex:1}} value={evalUrl} onChange={e=>setEvalUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&launchEval()} placeholder="Paste a job URL to evaluate..."/><button className="btn" onClick={launchEval}>Evaluate</button></div>
+      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className="btn" onClick={launchScan} style={{fontSize:10}}>Scan Portals</button><button className="btn" style={{fontSize:10}} onClick={()=>setView('interview')}>Interview Prep</button><button className="btn" style={{fontSize:10}} onClick={()=>setView('overview')}>Overview</button></div>
+    </div>
+    <div style={{display:'flex',gap:4,marginBottom:10}}>{['overview','tracker','reports','pipeline','curated','interview'].map(v=><button key={v} className={'btn '+(view===v?'':'btn-magenta')} style={{fontSize:9,padding:'3px 8px'}} onClick={()=>setView(v)}>{v}</button>)}</div>
+    {view==='overview'&&<div>
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        <div className="card" style={{flex:1,textAlign:'center'}}><div className="stat" style={{fontSize:20}}>{entries.length}</div><div className="stat-label">evaluated</div></div>
+        <div className="card" style={{flex:1,textAlign:'center'}}><div className="stat" style={{fontSize:20,color:'#00d4ff'}}>{applied}</div><div className="stat-label">applied</div></div>
+        <div className="card" style={{flex:1,textAlign:'center'}}><div className="stat" style={{fontSize:20,color:'#7c3aed'}}>{interviewing}</div><div className="stat-label">interviewing</div></div>
+        <div className="card" style={{flex:1,textAlign:'center'}}><div className="stat" style={{fontSize:20,color:'#00ff80'}}>{offered}</div><div className="stat-label">offers</div></div>
+      </div>
+      <div className="card" style={{marginBottom:12}}><div className="card-title">Pipeline Funnel</div>
+        {[{l:'Evaluated',c:entries.length,cl:'#f59e0b',p:100},{l:'Applied',c:applied,cl:'#00d4ff',p:entries.length?Math.round(applied/entries.length*100):0},{l:'Interviewing',c:interviewing,cl:'#7c3aed',p:entries.length?Math.round(interviewing/entries.length*100):0},{l:'Offers',c:offered,cl:'#00ff80',p:entries.length?Math.round(offered/entries.length*100):0}].map((s,i)=><div key={i} style={{marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:2}}><span style={{color:'#aaa'}}>{s.l}</span><span style={{fontFamily:'Orbitron',color:s.cl}}>{s.c} ({s.p}%)</span></div><div className="progress-bar"><div className="progress-fill" style={{width:Math.max(s.p,2)+'%',background:s.cl}}/></div></div>)}
+      </div>
+      {reports.length>0&&<div className="card"><div className="card-title">Recent Evaluations</div>{reports.slice(0,5).map((r,i)=><div key={i} style={{padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.03)',fontSize:11,cursor:'pointer',color:'#aaa'}} onClick={()=>loadReport(r.name)}>{r.name}</div>)}</div>}
+      {!hasData&&<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:16,marginBottom:8}}>Get Started</div><div style={{fontSize:12,color:'#888',marginBottom:12}}>Paste a job URL above to evaluate your first role.</div><div style={{fontSize:11,color:'#555'}}>Career-ops uses A-F scoring across 10 weighted dimensions. Generates tailored CVs and tracks applications.</div></div>}
+    </div>}
+    {view==='tracker'&&(entries.length>0?entries.map((e,i)=>{const score=parseFloat(e.score)||0;const color=score>=4?'#00ff80':score>=3?'#f59e0b':'#ff0080';return(<div key={i} className="card" style={{marginBottom:4}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,fontSize:12}}>{e.company}</span><span style={{fontFamily:'Orbitron',fontSize:13,color}}>{e.score}</span></div><div className="progress-bar" style={{marginTop:3}}><div className="progress-fill" style={{width:Math.min(score*20,100)+'%',background:color}}/></div>{e.status&&<span className="badge-cyan" style={{fontSize:9,marginTop:4,display:'inline-block'}}>{e.status}</span>}</div>)}):<div style={{color:'#555',fontSize:12,textAlign:'center',padding:20}}>No evaluated roles yet. Paste a job URL above.</div>)}
+    {view==='reports'&&(reports.length>0?reports.map((r,i)=><div key={i} className="card" style={{marginBottom:4,cursor:'pointer'}} onClick={()=>loadReport(r.name)}><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:12}}>{r.name}</span><span style={{fontSize:10,color:'#555'}}>{(r.size/1024).toFixed(1)}KB</span></div></div>):<div style={{color:'#555',fontSize:12,textAlign:'center',padding:20}}>No reports yet</div>)}
+    {view==='report'&&<div><button className="btn" style={{marginBottom:8,fontSize:10}} onClick={()=>setView('reports')}>Back</button><pre style={{whiteSpace:'pre-wrap',fontSize:11,color:'#bbb',fontFamily:'Inter',lineHeight:1.6}}>{reportContent}</pre></div>}
+    {view==='pipeline'&&<div>{pipeline?<pre style={{whiteSpace:'pre-wrap',fontSize:11,color:'#888',fontFamily:'JetBrains Mono'}}>{pipeline}</pre>:<div style={{color:'#555',fontSize:12,textAlign:'center',padding:20}}>Pipeline empty. Add job URLs to career-ops/data/pipeline.md</div>}</div>}
+    {view==='curated'&&<pre style={{whiteSpace:'pre-wrap',fontSize:11,color:'#888',fontFamily:'JetBrains Mono'}}>{jobs.substring(0,4000)||'No curated roles. Daily job intelligence runs at 8 AM.'}</pre>}
+    {view==='interview'&&<div><div className="card-title">Interview Prep</div><div style={{fontSize:11,color:'#888',marginBottom:8}}>STAR+R stories from evaluations. Your story bank builds as you evaluate more roles.</div><pre style={{whiteSpace:'pre-wrap',fontSize:11,color:'#bbb',fontFamily:'Inter',lineHeight:1.6}}>{storyBank||'Loading story bank...'}</pre></div>}
+  </div>);
+}
+function WikiWS(){
+  const[struct,setStruct]=useState(null);const[content,setContent]=useState('Select a file from the sidebar');const[path,setPath]=useState('');const[loading,setLoading]=useState(true);
+  useEffect(()=>{fetch('/api/wiki/structure').then(r=>r.json()).then(d=>{
+    // Convert API structure object to sections array
+    const raw=d.structure||d.sections||d;
+    if(raw&&!Array.isArray(raw)){const sections=Object.entries(raw).map(([name,files])=>({name,files:Array.isArray(files)?files.map(f=>typeof f==='string'?f:f.filename||f.name):Object.keys(files)}));d={sections}}
+    else if(!d.sections)d={sections:raw||[]};
+    setStruct(d);setLoading(false)
+  }).catch(()=>setLoading(false))},[]);
+  const load=(s,f)=>{setPath(`${s}/${f}`);fetch(`/api/wiki/${s}/${f}`).then(r=>r.json()).then(d=>setContent(d.content||d.error||'Empty')).catch(()=>setContent('Error loading file'))};
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Loading wiki...</div>;
+  const totalFiles=struct?.sections?.reduce((a,s)=>a+(s.files?.length||0),0)||0;
+  return(<div style={{display:'flex',gap:12,height:'100%'}}>
+    <div style={{width:170,borderRight:'1px solid rgba(255,255,255,0.04)',paddingRight:8,overflowY:'auto',flexShrink:0}}>
+      <div style={{fontSize:10,color:'#888',marginBottom:8,fontFamily:'JetBrains Mono'}}>{totalFiles} files · {struct?.sections?.length||0} sections</div>
+      {struct?.sections?.map(s=><div key={s.name}><div style={{fontSize:10,color:'#00d4ff',fontFamily:'Orbitron',margin:'8px 0 3px',letterSpacing:'.05em'}}>{s.name} <span style={{color:'#555'}}>({(s.files||[]).length})</span></div>{(s.files||[]).map(f=><div key={typeof f==='string'?f:f} onClick={()=>load(s.name,f)} style={{fontSize:11,color:path===`${s.name}/${f}`?'#00d4ff':'#666',cursor:'pointer',padding:'2px 0',transition:'color .15s'}} onMouseOver={e=>e.target.style.color='#00d4ff'} onMouseOut={e=>{if(path!==`${s.name}/${f}`)e.target.style.color='#666'}}>{f}</div>)}</div>)}
+    </div>
+    <div style={{flex:1,overflowY:'auto'}}>{path&&<div style={{fontSize:10,color:'#555',fontFamily:'JetBrains Mono',marginBottom:8}}>wiki/{path}</div>}<pre style={{whiteSpace:'pre-wrap',fontSize:12,color:'#bbb',fontFamily:'Inter',lineHeight:1.7}}>{content}</pre></div>
+  </div>);
+}
+function CoparentWS(){
+  const now=new Date();const month=now.getMonth();const year=now.getFullYear();const daysInMonth=new Date(year,month+1,0).getDate();
+  const firstDay=new Date(year,month,1).getDay();const days=[];for(let i=0;i<firstDay;i++)days.push(null);for(let i=1;i<=daysInMonth;i++)days.push(i);
+  const isThursday=d=>d&&new Date(year,month,d).getDay()===4;
+  const isCustodyWeekend=d=>{if(!d)return false;const dow=new Date(year,month,d).getDay();if(dow!==0&&dow!==6)return false;let sunCount=0;for(let i=1;i<=d;i++){if(new Date(year,month,i).getDay()===0)sunCount++}return sunCount===1||sunCount===3||sunCount===5};
+  const nextThursday=()=>{const d=new Date();while(d.getDay()!==4)d.setDate(d.getDate()+1);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
+  return(<div>
+    <FridaySays text={`Next custody day: Thursday ${nextThursday()}. 852 OFW messages analyzed. 89 unanswered threads documented.`}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+      <div className="card"><div className="card-title">OFW Communication</div><div className="stat">852</div><div className="stat-label">total messages · 4.5 years</div><div style={{marginTop:4,fontSize:11,color:'#888'}}>First-view asymmetry: <span style={{color:'#ff0080'}}>25h</span> vs <span style={{color:'#00ff80'}}>3.3h</span></div></div>
+      <div className="card"><div className="card-title">Unanswered</div><div className="stat" style={{color:'#ff0080'}}>89</div><div className="stat-label">threads awaiting response</div></div>
+    </div>
+    <div className="card" style={{marginBottom:12}}><div className="card-title">Custody Calendar — {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month]} {year}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,fontSize:11,textAlign:'center'}}>
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=><div key={d} style={{color:'#555',fontFamily:'Orbitron',fontSize:9,padding:4}}>{d}</div>)}
+        {days.map((d,i)=>{const custody=isCustodyWeekend(d);const thurs=isThursday(d);const today=d===now.getDate();return <div key={i} style={{padding:4,borderRadius:4,background:today?'rgba(255,0,128,0.2)':custody?'rgba(0,212,255,0.12)':thurs?'rgba(124,58,237,0.12)':'transparent',color:d?(today?'#ff0080':custody||thurs?'#00d4ff':'#888'):'transparent',fontFamily:'JetBrains Mono',fontWeight:today?700:400}}>{d||'·'}</div>})}
+      </div>
+      <div style={{fontSize:10,color:'#555',marginTop:6}}>🔵 Custody weekends · 🟣 Thursdays · 🔴 Today</div>
+    </div>
+    <div className="card"><div className="card-title">Libby's Weekly Schedule</div>
+      {['🥋 Kung Fu','💃 Dance','♟️ Chess (school)','🧠 Play Therapy — Rachel Hodgdon','🏫 Pflugerville Montessori · Pickup 4 PM'].map((a,i)=><div key={i} style={{padding:'3px 0',fontSize:12,color:'#aaa'}}>{a}</div>)}</div>
+  </div>);
+}
+function FuturespeakWS(){
+  return(<div>
+    <FridaySays text="Adtalem Phase 3 targeting $13.75M. SAGE in alpha. 49 repos under FutureSpeakAI."/>
+    <div className="card" style={{marginBottom:10}}><div className="card-title">FutureSpeak.AI</div><div style={{fontSize:13,color:'#bbb'}}>AI product studio & strategic consultancy. Enterprise AI transformation, agentic system design, AI governance for regulated industries.</div><div style={{marginTop:6}}><a href="https://futurespeak.ai" target="_blank" rel="noopener" style={{color:'#00d4ff',fontSize:11,textDecoration:'none'}}>futurespeak.ai →</a></div></div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+      <div className="card"><div className="card-title">Active Client</div><div style={{fontWeight:600}}>Adtalem / Covista (CommHub)</div><div style={{fontSize:11,color:'#888'}}>Phase 2 complete</div><div style={{fontSize:11,color:'#f59e0b',marginTop:4}}>$13.75M Phase 3 target</div><div style={{fontSize:10,color:'#666',marginTop:2}}>55-84M projected benefits · 4-6x ROI</div></div>
+      <div className="card"><div className="card-title">SAGE Platform</div><span className="badge-amber">Alpha</span><div style={{fontSize:11,color:'#888',marginTop:4}}>Multi-agent RAG marketing engine<br/>React + Express + PostgreSQL + Claude</div></div>
+      <div className="card"><div className="card-title">Agent Friday</div><div className="stat" style={{fontSize:16}}>49</div><div className="stat-label">repos · github.com/FutureSpeakAI</div><div style={{fontSize:10,color:'#666',marginTop:4}}>7 core systems · 369 tests · 40 MCP tools</div></div>
+      <div className="card"><div className="card-title">Research</div>{['📄 Reverse RLHF Hypothesis (5th ed)','📄 Non-Stationary Reward Sources','📄 Asimov\'s Claw series (LinkedIn)'].map((r,i)=><div key={i} style={{fontSize:11,color:'#aaa',padding:'2px 0'}}>{r}</div>)}</div>
+    </div>
+  </div>);
+}
+function FamilyWS(){
+  const[cd,setCd]=useState(null);
+  useEffect(()=>{fetch('/api/countdowns').then(r=>r.json()).then(setCd).catch(()=>{})},[]);
+  const libbyDays=cd?.countdowns?.find(c=>(c.label||c.name||'').toLowerCase().includes('libby'))?.days||(cd?.countdowns?.find(c=>(c.label||c.name||'').toLowerCase().includes('libby'))?.days_until);
+  return(<div>
+    <FridaySays text={libbyDays?`Libby turns 6 in ${libbyDays} days! (May 6)`:'Family dashboard loaded.'}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+      <div className="card"><div className="card-title">🎂 Liberty "Libby"</div><div style={{fontSize:13}}>Age 5, turning 6 on May 6</div><div style={{fontSize:11,color:'#888',marginTop:4}}>🥋 Kung fu · 💃 Dance · ♟️ Chess<br/>🏫 Pflugerville Montessori</div>{libbyDays&&<div style={{marginTop:6}}><span className="badge-cyan">{libbyDays} days until birthday</span></div>}</div>
+      <div className="card"><div className="card-title">❤️ Janet Jay</div><div style={{fontSize:13}}>Journalist · Access Jay · INvisible Project</div><div style={{fontSize:11,color:'#888',marginTop:4}}>🎂 Jan 4 · 💍 Anniversary Feb 13</div><div style={{fontSize:10,color:'#666',marginTop:2}}>Popular Science · VICE · MAKE · US Pain Foundation</div></div>
+      <div className="card"><div className="card-title">🐾 Dogs</div><div style={{fontSize:12,lineHeight:1.8}}><strong style={{color:'#f59e0b'}}>Link</strong> — 8yr chocolate lab, 120lbs <span className="badge-green" style={{fontSize:9}}>healthy</span><br/><strong style={{color:'#f59e0b'}}>Kismet</strong> — 15yr terrier <span className="badge-magenta" style={{fontSize:9}}>monitoring</span><br/><span style={{color:'#666',fontSize:10}}>Sight/hearing loss, arthritis, possible dementia</span></div></div>
+      <div className="card"><div className="card-title">👨‍👩‍👧 Jay Family</div>{['Jere Jay — INNEX Energy CEO','Bonnie Jay — INNEX Ops Director','Julia Jay — Seattle, hydrology, Peace Corps','Griff Jay'].map((p,i)=><div key={i} style={{fontSize:12,padding:'2px 0',color:'#aaa'}}>{p}</div>)}</div>
+      <div className="card"><div className="card-title">🚗 Vehicles</div>{['🔵 2015 Golf TSI SEL — Unitronic Stage 1, ~60K mi','🔴 2023 GLI — stock, ~20K mi','🚐 Transit 350 — camper (shower, kitchen, king bed)'].map((v,i)=><div key={i} style={{fontSize:11,padding:'2px 0',color:'#aaa'}}>{v}</div>)}</div>
+      <div className="card"><div className="card-title">📅 Upcoming</div>{cd?.countdowns?.map((c,i)=><div key={i} style={{fontSize:12,padding:'3px 0'}}>{c.emoji||'📅'} {c.label||c.name} — <span style={{color:'#00d4ff',fontFamily:'Orbitron',fontSize:11}}>{c.days||c.days_until}d</span></div>)||<span style={{color:'#555'}}>Loading...</span>}</div>
+    </div>
+  </div>);
+}
+function StudioWS(){
+  const[creations,setCreations]=useState([]);const[prompt,setPrompt]=useState('');const[gen,setGen]=useState(false);const[loading,setLoading]=useState(true);
+  useEffect(()=>{fetch('/api/creations').then(r=>r.json()).then(d=>{setCreations(d.files||[]);setLoading(false)}).catch(()=>setLoading(false))},[]);
+  const create=async t=>{if(!prompt)return;setGen(true);try{await fetch(`/api/create/${t}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const r=await fetch('/api/creations');const d=await r.json();setCreations(d.files||[])}catch(e){}setGen(false)};
+  return(<div>
+    <FridaySays text={`${creations.length} creations in the gallery. Daily creation runs at 2 PM.`}/>
+    <div className="card-title">Friday's Creative Studio</div>
+    <div style={{display:'flex',gap:6,marginBottom:10}}><input className="input" style={{flex:1}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Describe what to create..." onKeyDown={e=>e.key==='Enter'&&create('poem')}/></div>
+    <div style={{display:'flex',gap:4,marginBottom:14,flexWrap:'wrap'}}>{['image','poem','code-art','music','video'].map(t=><button key={t} className="btn" disabled={gen} onClick={()=>create(t)} style={{fontSize:10}}>{gen?'Creating...':t}</button>)}</div>
+    {loading?<div style={{color:'#555'}}>Loading gallery...</div>:
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>{creations.slice(0,12).map((f,i)=>{const name=typeof f==='string'?f:f.name||'creation';const ext=name.split('.').pop();const typeIcon={html:'💻',md:'📝',svg:'🎨',png:'🖼️',mp3:'🎵',wav:'🔊',mp4:'🎬'}[ext]||'📄';return <div key={i} className="card" style={{textAlign:'center',fontSize:10}}><div style={{fontSize:20}}>{typeIcon}</div><div style={{color:'#888',wordBreak:'break-all',marginTop:2}}>{name}</div></div>})}</div>}
+  </div>);
+}
+function TrustWS(){
+  const[trust,setTrust]=useState(null);const[expanded,setExpanded]=useState(null);const[loading,setLoading]=useState(true);const[error,setError]=useState(false);
+  useEffect(()=>{fetch('/api/trust').then(r=>r.json()).then(d=>{setTrust(d);setLoading(false)}).catch(()=>{setError(true);setLoading(false)})},[]);
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Loading trust graph...</div>;
+  if(error)return <div style={{color:'#ff0080',textAlign:'center',padding:40}}>⚠️ Unable to load trust data<br/><button className="btn" style={{marginTop:8}} onClick={()=>{setError(false);setLoading(true);fetch('/api/trust').then(r=>r.json()).then(d=>{setTrust(d);setLoading(false)}).catch(()=>{setError(true);setLoading(false)})}}>Retry</button></div>;
+  // API returns people as object keyed by name, convert to array
+  const rawPeople=trust?.people||{};
+  const people=(Array.isArray(rawPeople)?rawPeople:Object.values(rawPeople)).sort((a,b)=>((b.scores?.overall)||0)-((a.scores?.overall)||0));
+  const dims=['reliability','information_quality','emotional_trust','timeliness','domain_expertise'];
+  return(<div>
+    <FridaySays text={`${people.length} entities tracked. Click any person to see dimension breakdown.`}/>
+    <div className="card-title">Trust Graph — {people.length} Entities</div>
+    {people.map((p,i)=>{
+      const overall=p&&p.scores&&typeof p.scores.overall==='number'?p.scores.overall:0.5;
+      const pct=Math.round(overall*100);const col=pct>70?'#00ff80':pct>40?'#f59e0b':'#ff0080';
+      return(<div key={i} className="card" style={{marginBottom:6,cursor:'pointer'}} onClick={()=>setExpanded(expanded===i?null:i)}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div><span style={{fontWeight:600}}>{(p.name||p.Name||'unknown')||'Unknown'}</span>{p.aliases&&p.aliases.length>0&&<span style={{fontSize:10,color:'#555',marginLeft:6}}>({p.aliases.join(', ')})</span>}</div>
+          <span style={{fontFamily:'Orbitron',fontSize:14,color:col}}>{pct}%</span>
+        </div>
+        <div className="progress-bar" style={{marginTop:4}}><div className="progress-fill" style={{width:pct+'%',background:col}}/></div>
+        {expanded===i&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+          {dims.map(d=>{const val=p.scores&&typeof p.scores[d]==='number'?p.scores[d]:0.5;const v=Math.round(val*100);const dc=v>70?'#00ff80':v>40?'#f59e0b':'#ff0080';
+            return(<div key={d} style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+              <span style={{width:120,fontSize:10,color:'#666'}}>{d.replace(/_/g,' ')}</span>
+              <div className="progress-bar" style={{flex:1}}><div className="progress-fill" style={{width:v+'%',background:dc}}/></div>
+              <span style={{fontSize:10,fontFamily:'JetBrains Mono',color:dc,width:30,textAlign:'right'}}>{v}%</span>
+            </div>)})}
+          <div style={{fontSize:10,color:'#555',marginTop:4}}>Evidence: {(p.evidence&&Array.isArray(p.evidence))?p.evidence.length:0} records</div>
+        </div>}
+      </div>)})}
+  </div>);
+}
+function SystemWS(){
+  const[sys,setSys]=useState(null);const[loading,setLoading]=useState(true);
+  useEffect(()=>{fetch('/api/system').then(r=>r.json()).then(d=>{setSys(d);setLoading(false)}).catch(()=>setLoading(false))},[]);
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Scanning system...</div>;
+  return(<div>
+    <div className="card-title">Disk Space</div>
+    {((sys?.disk||sys?.disks||[])).map((d,i)=>{const used=(d.total_gb||d.TotalGB||1)>0?(1-(d.free_gb||d.FreeGB||0)/(d.total_gb||d.TotalGB||1))*100:0;return <div key={i} className="card" style={{marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',fontSize:12}}><span style={{fontFamily:'JetBrains Mono'}}>{(d.drive||d.Name||d.name||'?')}</span><span style={{color:'#00d4ff'}}>{(d.free_gb||d.FreeGB||0)?.toFixed(1)} GB free / {(d.total_gb||d.TotalGB||1)?.toFixed(1)} GB</span></div><div className="progress-bar" style={{marginTop:4}}><div className="progress-fill" style={{width:used+'%',background:used>90?'#ff0080':'#00d4ff'}}/></div></div>})}
+    <div className="card-title" style={{marginTop:10}}>Top Processes</div>
+    {((sys?.processes||[])).slice(0,10).map((p,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'2px 0',borderBottom:'1px solid rgba(255,255,255,0.02)',fontFamily:'JetBrains Mono'}}><span style={{color:'#aaa'}}>{(p.name||p.Name||'unknown')}</span><span style={{color:'#f59e0b'}}>{((p.memory_mb||p.MemMB||p.mem_mb||0)).toFixed(0)} MB</span></div>)}
+  </div>);
+}
+function CodeWS(){
+  const[tasks,setTasks]=useState('');const[cwd,setCwd]=useState('C:\\Users\\swebs\\Projects');const[terminals,setTerminals]=useState([]);const[loading,setLoading]=useState(false);
+  const[presets,setPresets]=useState([]);const[selectedTerminal,setSelectedTerminal]=useState(null);
+  useEffect(()=>{
+    fetch('/api/vibe-code/presets').then(r=>r.json()).then(d=>setPresets(d.presets||[])).catch(()=>{});
+    const iv=setInterval(()=>{fetch('/api/vibe-code/status').then(r=>r.json()).then(d=>setTerminals(d.terminals||[])).catch(()=>{})},3000);
+    return()=>clearInterval(iv);
+  },[]);
+  const launch=async(taskList)=>{const lines=(taskList||tasks).split('\n').filter(l=>l.trim());if(!lines.length)return;setLoading(true);
+    await fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:lines,cwd})});setLoading(false);setTasks('')};
+  const launchPreset=(p)=>{launch(p.tasks.join('\n'))};
+  const stopTerminal=(id)=>{fetch('/api/vibe-code/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})})};
+  const running=terminals.filter(t=>t.status==='running').length;
+  const colors=['#00d4ff','#00ff80','#f59e0b','#ff0080'];
+  return(<div>
+    <FridaySays text={running>0?running+' terminal'+(running>1?'s':'')+' active. Click to expand.':'Launch Claude Code terminals. Use presets or type custom tasks.'}/>
+    <div className="card" style={{marginBottom:10,padding:10}}>
+      <div style={{display:'flex',gap:6,marginBottom:6}}><input className="input" style={{flex:1}} value={cwd} onChange={e=>setCwd(e.target.value)} placeholder="Working directory"/></div>
+      <textarea className="input" style={{width:'100%',height:60,resize:'vertical',marginBottom:6}} value={tasks} onChange={e=>setTasks(e.target.value)} placeholder="One task per line... (e.g. 'Scan portals for AI director roles')"/>
+      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+        <button className="btn" onClick={()=>launch()} disabled={loading} style={{fontWeight:600}}>{loading?'Launching...':'Launch All'}</button>
+        <button className="btn" onClick={()=>launch(tasks||'Ready for instructions')} style={{fontSize:10}}>1 Terminal</button>
+        <button className="btn" onClick={()=>{const t=tasks||'Task 1\nTask 2';launch(t+'\n'+t)}} style={{fontSize:10}}>Quad Code (4x)</button>
+      </div>
+    </div>
+    {presets.length>0&&<div style={{marginBottom:10}}><div className="card-title">Presets</div><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+      {presets.map((p,i)=><button key={i} className="btn" style={{fontSize:10}} onClick={()=>launchPreset(p)}>{p.name}</button>)}
+    </div></div>}
+    {terminals.length>0&&<div><div className="card-title">Terminals ({running} active)</div>
+      <div style={{display:'grid',gridTemplateColumns:selectedTerminal?'1fr':'1fr 1fr',gap:6}}>
+        {terminals.map((t,i)=>{const color=colors[i%4];const isSelected=selectedTerminal===t.id;
+          return(<div key={t.id} className="card" style={{borderColor:t.status==='running'?color:'rgba(255,255,255,0.04)',cursor:'pointer',transition:'all .2s'}}
+            onClick={()=>setSelectedTerminal(isSelected?null:t.id)}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:t.status==='running'?color:'#555',boxShadow:t.status==='running'?'0 0 8px '+color:'none'}}/>
+                <span style={{fontFamily:'Orbitron',fontSize:10,color}}>Q{i+1}</span>
+              </div>
+              <div style={{display:'flex',gap:4}}>
+                <span style={{fontSize:9,color:t.status==='running'?'#00ff80':'#888',fontFamily:'JetBrains Mono'}}>{t.status||'unknown'}</span>
+                {t.status==='running'&&<button className="btn btn-magenta" style={{fontSize:8,padding:'1px 6px'}} onClick={e=>{e.stopPropagation();stopTerminal(t.id)}}>Stop</button>}
+              </div>
+            </div>
+            <div style={{fontSize:11,color:'#aaa',marginTop:4,wordBreak:'break-word'}}>{(t.task||'').substring(0,isSelected?500:80)}{!isSelected&&(t.task||'').length>80?'...':''}</div>
+            {isSelected&&<div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+              <div style={{fontSize:10,color:'#555',fontFamily:'JetBrains Mono'}}>PID: {t.pid||'N/A'} | CWD: {t.cwd||cwd}</div>
+              <div style={{fontSize:10,color:'#555',fontFamily:'JetBrains Mono'}}>Started: {t.started||'N/A'}</div>
+              <div style={{marginTop:6,padding:8,background:'rgba(0,0,0,0.3)',borderRadius:4,fontFamily:'JetBrains Mono',fontSize:10,color:'#888',minHeight:60}}>
+                Terminal output will appear here when log streaming is enabled.
+                For now, check the CMD window on your desktop.
+              </div>
+            </div>}
+          </div>)})}
+      </div>
+    </div>}
+    {terminals.length===0&&<div className="card" style={{textAlign:'center',padding:16}}>
+      <div style={{fontSize:13,marginBottom:6}}>No terminals running</div>
+      <div style={{fontSize:11,color:'#888'}}>Type tasks above or use a preset to launch parallel Claude Code instances.</div>
+    </div>}
+  </div>);
+}
+function NewsWS(){
+  const[briefings,setBriefings]=useState([]);const[selected,setSelected]=useState(null);const[htmlContent,setHtmlContent]=useState('');const[loading,setLoading]=useState(true);
+  const[chatOpen,setChatOpen]=useState(false);const[chatMsgs,setChatMsgs]=useState([]);const[chatIn,setChatIn]=useState('');const[chatLoad,setChatLoad]=useState(false);
+  useEffect(()=>{fetch('/api/briefings').then(r=>r.json()).then(d=>{setBriefings(d.briefings||[]);setLoading(false)}).catch(()=>setLoading(false))},[]);
+  const openBriefing=(b)=>{const file=b.html||b.md||b.name+'.md';fetch('/api/briefing/'+file).then(r=>r.json()).then(d=>{setHtmlContent(d.content||'');setSelected({...b,filename:file,isHtml:d.is_html})}).catch(()=>{})};
+  const openInTab=(b)=>{const file=b.html||b.name+'.html';window.open('/briefing/'+file,'_blank')};
+  const readAloud=()=>{if(!htmlContent)return;const text=htmlContent.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').substring(0,5000);const u=new SpeechSynthesisUtterance(text);u.rate=0.9;u.pitch=1;speechSynthesis.speak(u)};
+  const stopReading=()=>speechSynthesis.cancel();
+  const sendBriefingChat=async()=>{if(!chatIn.trim())return;const m=chatIn.trim();setChatIn('');setChatMsgs(p=>[...p,{role:'user',text:m}]);setChatLoad(true);
+    try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Context: The user is reading the daily briefing from '+selected?.date+'. Question: '+m})});const d=await r.json();setChatMsgs(p=>[...p,{role:'friday',text:d.response}])}catch(e){setChatMsgs(p=>[...p,{role:'friday',text:'[Error]'}])}setChatLoad(false)};
+  if(loading)return <div style={{color:'#555',textAlign:'center',padding:40}}>Loading briefing archive...</div>;
+  if(selected)return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+      <button className="btn" onClick={()=>{setSelected(null);setChatOpen(false);setChatMsgs([])}} style={{fontSize:10}}>Back to Archive</button>
+      <div style={{display:'flex',gap:4}}>
+        <button className="btn" onClick={readAloud} style={{fontSize:10}}>Read Aloud</button>
+        <button className="btn btn-magenta" onClick={stopReading} style={{fontSize:10}}>Stop</button>
+        <button className="btn" onClick={()=>setChatOpen(!chatOpen)} style={{fontSize:10}}>{chatOpen?'Hide Chat':'Discuss with Friday'}</button>
+        <button className="btn" onClick={()=>openInTab(selected)} style={{fontSize:10}}>Open in Tab</button>
+      </div>
+    </div>
+    <div style={{display:'flex',gap:12}}>
+      <div style={{flex:1,overflowY:'auto'}}>
+        {selected.isHtml?<iframe srcDoc={htmlContent} style={{width:'100%',height:'calc(100vh - 200px)',border:'none',borderRadius:8,background:'#0a0a0f'}}/>:
+        <pre style={{whiteSpace:'pre-wrap',fontSize:12,color:'#bbb',fontFamily:'Inter',lineHeight:1.7}}>{htmlContent}</pre>}
+      </div>
+      {chatOpen&&<div style={{width:280,borderLeft:'1px solid rgba(255,255,255,0.04)',paddingLeft:10,display:'flex',flexDirection:'column'}}>
+        <div style={{fontFamily:'Orbitron',fontSize:10,color:'#00d4ff',marginBottom:8}}>DISCUSS BRIEFING</div>
+        <div style={{flex:1,overflowY:'auto',marginBottom:8}}>{chatMsgs.map((m,i)=><div key={i} style={{marginBottom:6,textAlign:m.role==='user'?'right':'left'}}><div style={{display:'inline-block',maxWidth:'90%',padding:'5px 8px',borderRadius:6,fontSize:11,background:m.role==='user'?'rgba(124,58,237,0.12)':'rgba(255,255,255,0.03)',color:m.role==='user'?'#b794f6':'#bbb'}}>{m.text}</div></div>)}{chatLoad&&<div style={{fontSize:10,color:'#00d4ff'}}>Thinking...</div>}</div>
+        <div style={{display:'flex',gap:4}}><input className="input" style={{flex:1,fontSize:11}} value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendBriefingChat()} placeholder="Ask about this briefing..."/><button className="btn" style={{fontSize:10}} onClick={sendBriefingChat}>Send</button></div>
+      </div>}
+    </div>
+  </div>);
+  return(<div>
+    <FridaySays text={briefings.length+' briefings in archive. Click to read, or open in a new tab.'}/>
+    <div className="card-title">Briefing Archive</div>
+    {briefings.length===0?<div style={{color:'#555',fontSize:12,textAlign:'center',padding:20}}>No briefings yet. The daily briefing runs at 7:32 AM.</div>:
+    briefings.map((b,i)=><div key={i} className="card" style={{marginBottom:6,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}} onClick={()=>openBriefing(b)}>
+      <div><div style={{fontWeight:600,fontSize:13}}>{b.date}</div><div style={{fontSize:10,color:'#888'}}>{b.html?'HTML + MD':'MD only'} {b.size?(Math.round(b.size/1024)+'KB'):''}</div></div>
+      <div style={{display:'flex',gap:4}}><button className="btn" style={{fontSize:9,padding:'2px 6px'}} onClick={e=>{e.stopPropagation();openInTab(b)}}>New Tab</button></div>
+    </div>)}
+  </div>);
+}
+
+function App(){
+  const[openWins,setOpenWins]=useState(new Set());
+  const[focusWin,setFocusWin]=useState(null);
+  const[zMap,setZMap]=useState({});const[zC,setZC]=useState(42);
+  const[chatOpen,setChatOpen]=useState(false);const[chatMsgs,setChatMsgs]=useState([]);const[chatIn,setChatIn]=useState('');const[chatLoad,setChatLoad]=useState(false);
+  const[clock,setClock]=useState(new Date());const[structureName,setStructureName]=useState('Genesis Lattice');const[notifs,setNotifs]=useState([]);
+  const[countdowns,setCountdowns]=useState([]);const[promptText,setPromptText]=useState('');
+  const[settingsOpen,setSettingsOpen]=useState(false);
+  const[models]=useState([{name:'Claude Opus',active:true},{name:'Gemini',active:true}]);
+  const chatEnd=useRef(null);
+
+  // Poll scene state for settings panel
+  const[sceneState,setSceneState]=useState({structIdx:0,mood:'LISTENING',holo:false,hands:false,timelapse:false});
+
+  useEffect(()=>{const t=setInterval(()=>{setClock(new Date());if(window.fridayVibe){
+    setStructureName(window.fridayVibe.getStructure?.()?.name||'Genesis Lattice');
+    setSceneState({structIdx:window.fridayVibe.getStructure?.()?.index||0,mood:window.fridayVibe.getMood?.()??'LISTENING',holo:window.fridayVibe.isHologramOn?.()??false,hands:window.fridayVibe.isHandsOn?.()??false,timelapse:window.fridayVibe.isTimeLapseOn?.()??false});
+  }},1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{fetch('/api/chat/history').then(r=>r.json()).then(d=>{if(d.messages)setChatMsgs(d.messages)}).catch(()=>{})},[]);
+  useEffect(()=>{fetch('/api/notifications').then(r=>r.json()).then(d=>setNotifs(d.items||[])).catch(()=>{});const iv=setInterval(()=>{fetch('/api/notifications').then(r=>r.json()).then(d=>setNotifs(d.items||[])).catch(()=>{})},30000);return()=>clearInterval(iv)},[]);
+  useEffect(()=>{chatEnd.current?.scrollIntoView({behavior:'smooth'})},[chatMsgs]);
+  useEffect(()=>{fetch('/api/countdowns').then(r=>r.json()).then(d=>{setCountdowns(d.countdowns||[])}).catch(()=>{})},[]);
+
+  const[vibeMode,setVibeMode]=useState(false);
+  const toggleVibe=()=>{const entering=!vibeMode;setVibeMode(entering);if(entering){setOpenWins(new Set());document.documentElement.requestFullscreen?.().catch(()=>{});const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(SR){const r=new SR();r.continuous=false;r.onresult=e=>{const t=e.results[0][0].transcript;setChatOpen(true);sendChat(t)};r.start()}}else{document.exitFullscreen?.().catch(()=>{})}};
+  const toggle=id=>{if(id==='vibe'){toggleVibe();return}setOpenWins(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n});bringFront(id)};
+  const close=id=>setOpenWins(p=>{const n=new Set(p);n.delete(id);return n});
+  const bringFront=id=>{setFocusWin(id);setZC(c=>{setZMap(m=>({...m,[id]:c}));return c+1})};
+  const sendChat=async(overrideMsg)=>{const m=(overrideMsg||chatIn).trim();if(!m)return;setChatIn('');setChatMsgs(p=>[...p,{role:'user',text:m,time:new Date().toLocaleTimeString()}]);setChatLoad(true);
+    try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});const d=await r.json();setChatMsgs(p=>[...p,{role:'friday',text:d.response,time:new Date().toLocaleTimeString()}])}catch(e){setChatMsgs(p=>[...p,{role:'friday',text:'[Connection error]',time:new Date().toLocaleTimeString()}])}setChatLoad(false)};
+  const sendPrompt=()=>{if(!promptText.trim())return;setChatOpen(true);sendChat(promptText);setPromptText('')};
+
+  const wsMap={home:<HomeWS/>,career:<CareerWS/>,wiki:<WikiWS/>,coparent:<CoparentWS/>,futurespeak:<FuturespeakWS/>,family:<FamilyWS/>,studio:<StudioWS/>,trust:<TrustWS/>,system:<SystemWS/>,code:<CodeWS/>,news:<NewsWS/>};
+  const wsInfo=WS.reduce((a,w)=>{a[w.id]=w;return a},{});
+  const unread=notifs.filter(n=>!n.read).length;
+  const noWindows=openWins.size===0;
+
+  const structures=window.fridayVibe?.getStructures?.()??[];
+  const moods=window.fridayVibe?.getMoods?.()??['LISTENING','REASONING','EXECUTING','EXCITED','CALM'];
+
+  return(<>
+    {/* Top Bar */}
+    <div className="top-bar">
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontFamily:'Orbitron',fontWeight:900,fontSize:16,color:'#00d4ff'}}>FRIDAY</span>
+        <span style={{color:'rgba(255,255,255,0.08)'}}>|</span>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          {models.map((m,i)=><span key={i} className="model-pill"><span className={`dot ${m.active?'active':'idle'}`}/>{m.name}</span>)}
+        </div>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontFamily:'JetBrains Mono',fontSize:11,color:'#444'}}>{clock.toLocaleTimeString('en-US',{hour12:false})}</span>
+        <button onClick={()=>{}} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:14,position:'relative'}}>
+          <span style={{fontSize:13}}>&#x1F514;</span>{unread>0&&<span style={{position:'absolute',top:-4,right:-4,width:14,height:14,borderRadius:'50%',background:'#ff0080',fontSize:8,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700}}>{unread}</span>}
+        </button>
+        <button onClick={()=>{setChatOpen(!chatOpen);if(!chatOpen)setSettingsOpen(false)}} style={{background:'none',border:'none',color:chatOpen?'#00d4ff':'#555',cursor:'pointer',fontSize:14}}>
+          <span style={{fontSize:13}}>&#x1F4AC;</span>
+        </button>
+        <button onClick={()=>{setSettingsOpen(!settingsOpen);if(!settingsOpen)setChatOpen(false)}} style={{background:'none',border:'none',color:settingsOpen?'#00d4ff':'#555',cursor:'pointer',fontSize:15}} title="Settings">
+          <span>&#x2699;</span>
+        </button>
+        <div style={{width:7,height:7,borderRadius:'50%',background:'#00ff80'}} title="Connected"/>
+      </div>
+    </div>
+
+    {/* Calm Default State — greeting with ticker */}
+    {noWindows&&<div style={{position:'fixed',inset:0,zIndex:5,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
+      <div style={{fontFamily:'Orbitron',fontSize:24,color:'rgba(0,212,255,0.6)',marginBottom:12,animation:'fadeIn 1s ease'}}>{getGreeting()}, Stephen.</div>
+      {countdowns.length>0&&<div className="greeting-ticker" style={{marginBottom:28}}>
+        {countdowns.map((c,i)=><React.Fragment key={i}>
+          {i>0&&<span className="greeting-ticker-sep"/>}
+          <span className="greeting-ticker-item">
+            <span>{c.emoji||''} {c.label||c.name}</span>
+            <span className="days">{c.days||c.days_until}d</span>
+          </span>
+        </React.Fragment>)}
+      </div>}
+      {countdowns.length===0&&<div style={{fontFamily:'JetBrains Mono',fontSize:12,color:'rgba(255,255,255,0.2)',marginBottom:28}}>All systems nominal.</div>}
+      <div style={{pointerEvents:'auto',display:'flex',gap:8,alignItems:'center'}}>
+        <input value={promptText} onChange={e=>setPromptText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendPrompt()}
+          placeholder="Ask Friday anything..."
+          style={{width:360,background:'rgba(6,6,11,0.6)',backdropFilter:'blur(12px)',border:'1px solid rgba(0,212,255,0.12)',borderRadius:24,padding:'10px 20px',color:'#e0e0e8',fontSize:13,outline:'none',fontFamily:'Inter',transition:'border-color .2s'}}/>
+        <button onClick={sendPrompt} style={{width:40,height:40,borderRadius:'50%',background:'rgba(0,212,255,0.08)',border:'1px solid rgba(0,212,255,0.15)',color:'#00d4ff',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>&#x1F3A4;</button>
+      </div>
+    </div>}
+
+    {/* Floating Windows */}
+    {[...openWins].map(id=>{const w=wsInfo[id];if(!w)return null;return(<FWin key={id} id={id} title={w.label} emoji={w.ico} zIndex={zMap[id]||41} onClose={()=>close(id)} onFocus={()=>bringFront(id)}><Safe name={w.label}>{wsMap[id]||<div>Coming soon</div>}</Safe></FWin>)})}
+
+    {/* Chat Panel */}
+    <div className={`chat-panel ${chatOpen?'open':''}`}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+        <span style={{fontFamily:'Orbitron',fontSize:11,color:'#00d4ff'}}>FRIDAY CHAT</span>
+        <button onClick={()=>setChatOpen(false)} style={{background:'none',border:'none',color:'#555',cursor:'pointer'}}>&#x2715;</button>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:12}}>
+        {chatMsgs.length===0&&<div style={{textAlign:'center',color:'#444',fontSize:12,marginTop:30}}>Talk to Friday. Type, speak, or drop a file.</div>}
+        {chatMsgs.map((m,i)=><div key={i} style={{textAlign:m.role==='user'?'right':'left',marginBottom:8}}>
+          <div style={{display:'inline-block',maxWidth:'80%',padding:'7px 11px',borderRadius:8,fontSize:12,background:m.role==='user'?'rgba(124,58,237,0.12)':'rgba(255,255,255,0.03)',color:m.role==='user'?'#b794f6':'#bbb'}}>{m.text}</div>
+          <div style={{fontSize:9,color:'#444',marginTop:1}}>{m.role==='user'?'You':'Friday'} · {m.time||''}</div>
+        </div>)}
+        {chatLoad&&<div style={{fontSize:11,color:'#00d4ff',animation:'pulse 1s infinite'}}>Friday is thinking...</div>}
+        <div ref={chatEnd}/>
+      </div>
+      <div style={{padding:10,borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+        <div style={{display:'flex',gap:6}}>
+          <input className="input" style={{flex:1}} value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendChat()} placeholder="Talk to Friday..."/>
+          <button className="btn" onClick={()=>sendChat()}>Send</button>
+        </div>
+      </div>
+    </div>
+
+    {/* Settings Panel */}
+    <div className={`settings-panel ${settingsOpen?'open':''}`}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+        <span style={{fontFamily:'Orbitron',fontSize:11,color:'#00d4ff'}}>SETTINGS</span>
+        <button onClick={()=>setSettingsOpen(false)} style={{background:'none',border:'none',color:'#555',cursor:'pointer'}}>&#x2715;</button>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">Evolution Structure</div>
+        <div className="settings-grid">
+          {(structures.length>0?structures:Array.from({length:13},(_,i)=>({name:'DAY '+(i+1)}))).map((s,i)=>
+            <button key={i} className={`settings-btn ${sceneState.structIdx===i?'active':''}`}
+              onClick={()=>window.fridayVibe?.setStructure(i)}>
+              <span style={{opacity:0.5,marginRight:4}}>D{i+1}</span> {s.name}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">Mood</div>
+        <div className="settings-grid">
+          {moods.map(m=>
+            <button key={m} className={`settings-btn ${sceneState.mood===m?'active':''}`}
+              onClick={()=>window.fridayVibe?.setMood(m)}>{m}</button>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">Consciousness</div>
+        <div className="settings-toggle" onClick={()=>window.fridayVibe?.toggleHologram()}>
+          <span className="settings-toggle-label">Hologram Mode (face tracking)</span>
+          <div className={`settings-toggle-switch ${sceneState.holo?'on':''}`}/>
+        </div>
+        <div className="settings-toggle" onClick={()=>window.fridayVibe?.toggleHands()}>
+          <span className="settings-toggle-label">Hand Tracking (Minority Report)</span>
+          <div className={`settings-toggle-switch ${sceneState.hands?'on':''}`}/>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">Dev Mode</div>
+        <div className="settings-toggle" onClick={()=>window.fridayVibe?.toggleTimeLapse()}>
+          <span className="settings-toggle-label">Timelapse (auto-cycle structures)</span>
+          <div className={`settings-toggle-switch ${sceneState.timelapse?'on':''}`}/>
+        </div>
+      </div>
+    </div>
+
+    {/* Discord Footer */}
+    <div className="discord-footer">
+      <a href="https://discord.gg/f2VM6qNk" target="_blank" rel="noopener">discord.gg/f2VM6qNk</a>
+    </div>
+
+    {/* Dock */}
+    <div className="dock">
+      {WS.map(w=><button key={w.id} className={`dock-btn ${openWins.has(w.id)?'active':''}`} onClick={()=>toggle(w.id)}>
+        <span className="ico">{w.ico}</span><span>{w.label}</span><span className="dot"/>
+      </button>)}
+    </div>
+  </>);
+}
+ReactDOM.createRoot(document.getElementById('ui-inner')||document.getElementById('ui-root')).render(<App/>);
+</script>
+</body>
+</html>
+
