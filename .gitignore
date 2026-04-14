@@ -1,10 +1,16 @@
 # Dependencies
 node_modules/
+venv/
+package-lock.json
 
 # Python bytecode
 __pycache__/
 *.pyc
 *.pyo
+
+# Environment / Secrets (NEVER commit)
+.env
+*.env.local
 
 # Vault encrypted state (private — never commit)
 .asimovs-mind/vault/
@@ -12,6 +18,41 @@ __pycache__/
 # Session artifacts
 .asimovs-mind/session-ledger.jsonl
 .asimovs-mind/*.migrated
+
+# User data directory (created by setup script)
+# This is ~/.friday/ — kept outside the repo
+templates/friday-data/*.json
+
+# Career-ops user data (personal evaluations, CVs, reports)
+tools/career-ops/data/applications.md
+tools/career-ops/data/pipeline.md
+tools/career-ops/data/scan-history.tsv
+tools/career-ops/reports/*.md
+tools/career-ops/output/
+tools/career-ops/jds/*.md
+tools/career-ops/jds/*.txt
+tools/career-ops/cv.md
+tools/career-ops/article-digest.md
+tools/career-ops/portals.yml
+tools/career-ops/config/profile.yml
+tools/career-ops/modes/_profile.md
+tools/career-ops/interview-prep/story-bank.md
+tools/career-ops/interview-prep/*-*.md
+tools/career-ops/batch/logs/
+tools/career-ops/batch/tracker-additions/*.tsv
+
+# Desktop build artifacts
+interfaces/desktop/node_modules/
+interfaces/desktop/test-results/
+interfaces/desktop/*.log
+interfaces/desktop/chunks/
+interfaces/desktop/data/
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
 
 # OS files
 .DS_Store
@@ -26,3 +67,7 @@ Thumbs.db
 # Test artifacts
 /tmp/
 mcp/friday-core/.asimovs-mind/
+
+# Gemini MCP test outputs
+mcp-servers/gemini-mcp/*_output.txt
+mcp-servers/gemini-mcp/*_error.txt

@@ -1,0 +1,3 @@
+# Personality Evolution System — Phase 5
+# No external dependencies required.
+# Python 3.10+ (for X | Y union syntax in type hints)
