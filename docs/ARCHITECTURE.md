@@ -1,9 +1,11 @@
-# Agent Friday -- System Architecture
+# Asimov's Mind -- System Architecture
 
-**Version:** 2.3.0
-**Runtime:** friday-core MCP server -- 18 subsystems, 91 MCP tools, holographic dashboard
+**Version:** 3.0.0
+**Runtime:** friday-core MCP server (18 subsystems, 91 MCP tools) + core-mcp Python server (32 tools) + gemini-mcp (8 tools) + Friday Desktop OS + career-ops pipeline
 
-This document describes the full architecture of Asimov's Mind, the Claude Code plugin that implements Agent Friday. A developer unfamiliar with the codebase should be able to read this and understand how every component fits together.
+This document describes the full architecture of Asimov's Mind -- the AI agent ecosystem that implements Agent Friday. A developer unfamiliar with the codebase should be able to read this and understand how every component fits together.
+
+For standalone repos of individual components, see the [README](../README.md).
 
 ---
 
@@ -18,7 +20,7 @@ This document describes the full architecture of Asimov's Mind, the Claude Code 
                          +----------+   |   +----------+
                          |              |              |
                   plugin.json      hooks/*.py     skills/*/SKILL.md
-                  (entry point)    (9 Python        (19 slash
+                  (entry point)    (10 Python       (17 slash
                                     hooks)           commands)
                          |              |
                          v              |
@@ -45,6 +47,17 @@ This document describes the full architecture of Asimov's Mind, the Claude Code 
    18 subsystems              /unlock, /initialize
                               /tool/:name (generic)
                               / (dashboard.html)
+
+===== Parallel Python Stack =====
+
+   core/                        mcp-servers/
+   7 standalone systems         core-mcp/ (32 tools, FastMCP)
+   (vault, privacy, trust,     gemini-mcp/ (8 tools, FastMCP)
+    memory, personality,
+    epistemic, hmac)            interfaces/desktop/
+                                Flask + React + Three.js
+   tools/career-ops/            Holographic 3D OS
+   AI job search pipeline
 ```
 
 ### Subsystem Dependency Tiers
@@ -405,116 +418,50 @@ Consent scopes: `once` (single use, consumed on check), `session` (until restart
 
 ```
 asimovs-mind/
-+-- plugin.json                        # Claude Code manifest: MCP server + 9 hooks
-+-- .claude-plugin/                    # Marketplace wrapper
-|   +-- marketplace.json
-+-- governance/                        # Immutable cLaw governance files
-|   +-- laws.json                      # Three Laws + Meta-Law definitions
-|   +-- protected-zones.json           # File patterns agents cannot modify (hooks/** in custom_zones)
-|   +-- safety-floors.json             # Minimum thresholds (can be raised, never lowered)
-|   +-- discovery-rules.json           # Code import trust tiers and pipeline rules
-|   +-- conformance-report.md          # Specification conformance audit
-+-- personality/
-|   +-- friday.md                      # Agent Friday identity definition
-+-- agents/                            # 16 agent definition files (.md)
-+-- skills/                            # 19 slash command definitions
-|   +-- */SKILL.md                     # Each skill: YAML frontmatter + instructions
-+-- directives/                        # 8 autoresearch-style loop definitions
-+-- hooks/                             # 9 Python enforcement hooks + 1 utility
-|   +-- first-law.py                   # PreToolUse: protected zone enforcement (absolute-path bypass fixed)
-|   +-- safety-scanner-hook.py         # PreToolUse: AST scan (always runs on hooks/ and governance/ writes)
-|   +-- privacy-shield-scrub.py        # PreToolUse: PII scrubbing (WebFetch/WebSearch)
-|   +-- third-law.py                   # PostToolUse: session ledger (Write/Edit/Bash)
-|   +-- trust-tracker.py              # PostToolUse: agent performance (Agent)
-|   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore (WebFetch/WebSearch)
-|   +-- personality-loader.py          # SessionStart: personality + memory + context
-|   +-- integrity-check.py            # SessionStart: HMAC governance verification
-|   +-- session-learner.py            # Stop: extract metrics, update memory
-|   +-- vault_bridge.py               # Utility: Python HTTP client for vault (sends bearer token)
++-- plugin.json                        # Claude Code manifest: MCP server + 10 hooks
++-- setup.sh / setup.bat               # One-command installer
++-- requirements.txt                   # Unified Python dependencies
++-- core/                              # 7 standalone Python systems (350+ tests)
+|   +-- sovereign-vault/               # AES-256-GCM + Argon2id encryption
+|   +-- privacy-shield/                # PII detection across 9 categories
+|   +-- trust-graph/                   # 5-dimension person-level credibility
+|   +-- cognitive-memory/              # 3-tier memory with consolidation
+|   +-- personality-evolution/         # 30-trait evolution with anti-sycophancy
+|   +-- epistemic-score/               # 6-metric independence tracking
+|   +-- hmac-integrity/                # HMAC-SHA256 governance protection
 +-- mcp/
-|   +-- friday-core/                   # The MCP server (18 subsystems, 91 tools)
-|       +-- package.json               # npm dependencies (version 2.3.0)
+|   +-- friday-core/                   # Node.js MCP server (18 subsystems, 91 tools)
 |       +-- bootstrap.js               # Entry point: version check, npm install, import
 |       +-- index.js                   # Subsystem loader, HTTP bridge, dashboard server
 |       +-- dashboard.html             # Three.js holographic UI
-|       +-- eslint.config.js           # ESLint flat-config for the MCP server
 |       +-- core/                      # Shared infrastructure
-|       |   +-- vault.js               # SovereignVault class (re-exports OllamaMonitor)
+|       |   +-- vault.js               # SovereignVault class
 |       |   +-- crypto.js              # All cryptographic primitives (libsodium)
-|       |   +-- ollama-monitor.js      # OllamaMonitor -- shared instance via deps (extracted v2.2.0)
-|       |   +-- event-bus.js           # In-process pub/sub with ring buffer + #safeDispatch
-|       |   +-- subsystem.js           # Subsystem base class + SubsystemRegistry (parallel tier startup)
+|       |   +-- ollama-monitor.js      # OllamaMonitor (shared instance via deps)
+|       |   +-- event-bus.js           # Pub/sub with ring buffer + #safeDispatch
+|       |   +-- subsystem.js           # Base class + SubsystemRegistry
 |       |   +-- state-manager.js       # Namespaced vault key access (separator: ":")
-|       |   +-- logger.js              # Structured stderr logger
-|       |   +-- wiring.js              # Cross-subsystem event routes
-|       |   +-- session-conductor.js   # Session lifecycle orchestration
-|       |   +-- eis.js                 # Epistemic Independence Score tracker
-|       +-- subsystems/                # 18 subsystem directories
-|       |   +-- vault/index.js         # 10 tools: encrypted state CRUD (path traversal fixed)
-|       |   +-- identity/index.js      #  6 tools: Ed25519, attestation
-|       |   +-- privacy/index.js       #  4 tools: PII engine
-|       |   +-- ollama/index.js        #  1 tool:  health check (uses shared OllamaMonitor)
-|       |   +-- session/index.js       #  1 tool:  session_status (SessionSubsystem, Tier 3)
-|       |   +-- p2p/                   #  7 tools: WebSocket loopback-only, ECDH, pairing
-|       |   |   +-- index.js, protocol.js (complete handshake + sig-before-decrypt), transport.js (127.0.0.1)
-|       |   +-- llm/                   #  6 tools: completion, routing
-|       |   |   +-- index.js, client.js, router.js
-|       |   |   +-- providers/         # ollama.js, anthropic.js, openrouter.js
-|       |   +-- memory/                #  8 tools: 3-tier storage
-|       |   |   +-- index.js, tiers.js, embedding.js, search.js
-|       |   |   +-- episodic.js, consolidation.js
-|       |   +-- context/               #  4 tools: knowledge graph
-|       |   |   +-- index.js, graph.js, injector.js
-|       |   +-- trust/                 #  7 tools: person-level graph
-|       |   |   +-- index.js, graph.js
-|       |   +-- personality/           #  7 tools: identity + calibration
-|       |   |   +-- index.js, profile.js, calibration.js
-|       |   |   +-- sentiment.js, evolution.js
-|       |   +-- agents/                #  7 tools: delegation + teams
-|       |   |   +-- index.js, delegation.js, awareness.js, teams.js
-|       |   +-- tools/                 #  4 tools: dynamic registry
-|       |   |   +-- index.js, registry.js, delegate.js
-|       |   +-- connectors/            #  4 tools: 8 connector modules
-|       |   |   +-- index.js, registry.js
-|       |   |   +-- git-devops.js, coding-kit.js, terminal.js
-|       |   |   +-- system-mgmt.js, perplexity.js, firecrawl.js
-|       |   |   +-- comms.js, powershell.js
-|       |   +-- gateway/               #  5 tools: trust-gated messaging
-|       |   |   +-- index.js, trust-engine.js, sessions.js, audit.js
-|       |   +-- briefing/              #  3 tools: daily + meetings
-|       |   |   +-- index.js, daily.js, meeting.js
-|       |   +-- voice/                 #  3 tools: state machine
-|       |   |   +-- index.js, state-machine.js, fallback.js
-|       |   +-- enterprise/            #  5 tools: consent + commitments
-|       |       +-- index.js, consent.js, cloud-gate.js
-|       |       +-- confidence.js, commitments.js
-|       +-- test/                      # 442 tests across 9 test files
-|           +-- test-core.js           # Crypto, vault, event bus, state manager
-|           +-- test-security.js       # Security invariant tests
-|           +-- test-concurrency.js    # Parallel startup and race condition tests
-|           +-- test-session.js        # Session lifecycle tests
-|           +-- test-subsystems.js     # Per-subsystem unit tests
-|           +-- test-integration.js    # Cross-subsystem integration tests
-|           +-- test-wiring.js         # Event wiring tests
-|           +-- test-user-paths.js     # Common user workflow tests
-|           +-- test-plugin.js         # Plugin manifest tests
-+-- discovery/                         # Standalone Python tools
-|   +-- safety_scanner.py             # AST-based static analysis
-|   +-- provenance.py                 # Append-only attribution tracking
-|   +-- memory.py                     # Trust graph + knowledge graph + RAG
-+-- framework/                         # Portable governance spec
-|   +-- spec.json                     # cLaw specification
-|   +-- adapters/                     # LangChain, CrewAI, AutoGen adapters
-+-- docs/
-|   +-- API_REFERENCE.md              # Complete MCP tool reference
-|   +-- ARCHITECTURE.md               # This file
-|   +-- SUBSYSTEM_GUIDE.md            # Per-subsystem deep dive
-|   +-- HOOKS_GUIDE.md                # Python hook reference
-|   +-- SKILLS_GUIDE.md               # Slash command reference
-+-- GETTING_STARTED.md                 # Installation and first-run guide
-+-- CHANGELOG.md                       # Version history
-+-- ROADMAP.md                         # Product roadmap
-+-- CONTRIBUTING.md                    # Contribution guide
-+-- SECURITY.md                        # Security policy
-+-- README.md                          # Project overview
+|       |   +-- logger.js, wiring.js, session-conductor.js, eis.js
+|       +-- subsystems/                # 18 subsystem directories (91 tools total)
+|       +-- test/                      # 442 tests (0 failures)
++-- mcp-servers/
+|   +-- core-mcp/                      # FastMCP wrapping 7 Python systems (32 tools)
+|   +-- gemini-mcp/                    # Gemini creative: image, TTS, video, music (8 tools)
++-- interfaces/
+|   +-- desktop/                       # Friday Desktop OS
+|       +-- server.py                  # Flask backend
+|       +-- ui_parts/                  # Modular React components
+|       +-- vibe-mode/                 # Three.js 3D: 13 structures, mood, audio
+|       +-- build_ui.py                # Assembles UI into index.html
++-- tools/
+|   +-- career-ops/                    # AI job search pipeline
++-- hooks/                             # 10 Python governance hooks
++-- skills/                            # 17 slash commands
++-- agents/                            # 16 specialist agent definitions
++-- governance/                        # cLaws, protected zones, safety floors
++-- personality/                       # Agent Friday identity (friday.md)
++-- discovery/                         # Safety scanner, provenance, memory
++-- framework/                         # Portable governance spec + adapters
++-- templates/                         # .env.example + friday-data/ setup
++-- docs/                              # Architecture, API reference, guides
 ```

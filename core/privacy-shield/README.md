@@ -1,8 +1,8 @@
 # Privacy Shield
 
-**Phase 2 of Agent Friday's Core Systems**
+A Python module that detects and masks personally identifiable information (PII) before data leaves your machine. Runs as a filter on any text sent to external APIs (Gemini, web services, etc.). Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
 
-A Python module that detects and masks personally identifiable information (PII) before data leaves your machine. Runs as a filter on any text sent to external APIs (Gemini, web services, etc.).
+**Standalone repo:** [privacy-shield](https://github.com/FutureSpeakAI/privacy-shield)
 
 ## PII Categories
 

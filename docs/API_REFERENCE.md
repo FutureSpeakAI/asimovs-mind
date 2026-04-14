@@ -1,6 +1,9 @@
-# Agent Friday -- MCP Tool Reference
+# Asimov's Mind -- MCP Tool Reference
 
-Complete reference for all MCP tools exposed by friday-core. 91 tools across 18 subsystems.
+Complete reference for all MCP tools exposed by friday-core (Node.js). 91 tools across 18 subsystems.
+
+For the Python core systems MCP server (32 tools), see `mcp-servers/core-mcp/server.py`.
+For the Gemini creative MCP server (8 tools), see `mcp-servers/gemini-mcp/README.md`.
 
 ---
 

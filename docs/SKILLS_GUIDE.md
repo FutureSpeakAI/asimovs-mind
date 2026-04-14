@@ -1,6 +1,6 @@
-# Agent Friday -- Skills Guide
+# Asimov's Mind -- Skills Guide
 
-Reference for all 19 slash commands available in Asimov's Mind. Skills are user-invokable commands that instruct Claude Code how to behave when triggered. Each skill is defined as a `SKILL.md` file with YAML frontmatter and markdown instructions.
+Reference for all 17 slash commands available in Asimov's Mind. Skills are user-invokable commands that instruct Claude Code how to behave when triggered. Each skill is defined as a `SKILL.md` file with YAML frontmatter and markdown instructions.
 
 ---
 

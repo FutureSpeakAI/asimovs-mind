@@ -1,6 +1,8 @@
 # Sovereign Vault
 
-**Phase 1 of Agent Friday's Core Systems** — AES-256-GCM encrypted file storage with Argon2id key derivation.
+AES-256-GCM encrypted file storage with Argon2id key derivation. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
+
+**Standalone repo:** [sovereign-vault](https://github.com/FutureSpeakAI/sovereign-vault)
 
 ## What It Does
 

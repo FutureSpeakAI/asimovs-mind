@@ -1,10 +1,25 @@
 # Contributing to Asimov's Mind
 
+Contributions welcome. This is an open-source project built on the shoulders of giants -- see the [README](README.md) for full credits and attribution.
+
+Join us on [Discord](https://discord.gg/f2VM6qNk). Browse all 49 repos at [github.com/FutureSpeakAI](https://github.com/FutureSpeakAI).
+
 ## Code Style
+
+### Node.js (friday-core MCP server)
 
 - Plain JavaScript ESM (import/export). No TypeScript.
 - No external test framework. Tests use Node's built-in `node:test` and `node:assert`.
 - `npm test` must pass before any PR is submitted.
+
+### Python (core systems, MCP servers, desktop, hooks)
+
+- Python 3.10+. Type hints encouraged but not required.
+- Tests use `pytest`. Each core system has its own test suite.
+- `python -m pytest` in any `core/<system>/` directory must pass.
+
+### General
+
 - Review the security invariants in `CLAUDE.md` before touching vault, hooks, or governance files. Changes to any invariant listed there require explicit reviewer sign-off.
 
 ## How to Add a Connector

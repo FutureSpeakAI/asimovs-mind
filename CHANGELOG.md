@@ -7,6 +7,89 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.0.0] — 2026-04-14 — Full Python Ecosystem
+
+The complete Asimov's Mind ecosystem in a single repo. 7 standalone Python core systems, 2 Python MCP servers, a holographic 3D desktop OS, and an AI career pipeline -- all integrated alongside the existing 18-subsystem Node.js MCP server.
+
+### Added
+
+- **7 Core Python Systems** (`core/`) -- standalone modules, each with CLI, test suite, and README:
+  - **Sovereign Vault** (`core/sovereign-vault/`) -- AES-256-GCM encrypted file storage with Argon2id key derivation (time_cost=3, memory_cost=64 MiB, parallelism=4)
+  - **Privacy Shield** (`core/privacy-shield/`) -- PII detection and masking across 9 categories (SSN, credit card, bank account, phone, email, address, medical, gov ID, name) with FNV-1a hashing
+  - **Trust Graph** (`core/trust-graph/`) -- person-level credibility model with 5 trust dimensions (reliability, information quality, emotional trust, timeliness, domain expertise), hermeneutic re-evaluation, fuzzy name resolution, Levenshtein distance matching
+  - **Cognitive Memory** (`core/cognitive-memory/`) -- 3-tier memory architecture (short/medium/long-term) mimicking human cognition, with Jaccard deduplication, episodic memory, and sleep-like consolidation
+  - **Personality Evolution** (`core/personality-evolution/`) -- 30-trait engine with 50-session maturity ramp, visual dimension mapping (4 visual parameters), adaptive style, and anti-sycophancy calibration
+  - **Epistemic Score** (`core/epistemic-score/`) -- 6 cognitive metrics measuring whether AI interactions make the user smarter or more dependent (independence, question complexity, knowledge transfer, critical thinking, self-correction, delegation)
+  - **HMAC Integrity** (`core/hmac-integrity/`) -- HMAC-SHA256 signing and verification for governance files with 3 protection tiers (Core Laws, Identity, Memory)
+
+- **Core MCP Server** (`mcp-servers/core-mcp/`) -- FastMCP server wrapping all 7 Python core systems as 32 MCP tools; can be used independently of the Node.js friday-core server
+
+- **Gemini MCP Server** (`mcp-servers/gemini-mcp/`) -- 8 creative tools via Google's Gemini API:
+  - `gemini_generate_image` -- text-to-image (Imagen, Flash fallback)
+  - `gemini_generate_text` -- creative text generation
+  - `gemini_describe_image` -- vision analysis of image files
+  - `gemini_text_to_speech` -- TTS with 8 voice options (Gemini 2.5 Flash Preview TTS)
+  - `gemini_creative_remix` -- style transfer on existing images
+  - `gemini_generate_code_art` -- p5.js generative art from description
+  - `gemini_generate_video` -- Veo video generation (async)
+  - `gemini_generate_music` -- Lyria music generation (full tracks or clips)
+
+- **Friday Desktop** (`interfaces/desktop/`) -- holographic 3D desktop OS:
+  - Flask backend with REST API (`server.py`)
+  - React frontend with modular HTML components (`ui_parts/`)
+  - Three.js 3D scene with 13 evolution structures (`vibe-mode/`)
+  - 11 workspaces (Home, Career, Wiki, Co-Parent, FutureSpeak, Family, Studio, Trust, System, Code, News)
+  - Mood system (6 states: neutral, focused, creative, warm, alert, melancholy)
+  - Audio-reactive animation engine with emotional arc orchestration
+  - MediaPipe hand/face tracking for gesture interaction
+  - Personality-to-visual parameter mapping (30 traits to 4 visual dimensions)
+  - Build system (`build_ui.py`) assembles modular components into single-page app
+
+- **Career-Ops Pipeline** (`tools/career-ops/`) -- AI-powered job search:
+  - A-F scoring on 10 weighted dimensions with 4.0/5.0 apply threshold
+  - ATS-optimized CV generation with keyword injection (Space Grotesk + DM Sans)
+  - Portal scanning for 45+ company sites via Playwright
+  - Batch processing with parallel sub-agent evaluation
+  - Application tracking with merge, dedup, and status normalization
+  - Interview prep with STAR story framework
+  - Go TUI dashboard
+  - Multilingual documentation (EN, ES, DE, FR, PT-BR)
+
+- **Setup scripts** -- `setup.sh` (Mac/Linux) and `setup.bat` (Windows) for one-command installation of all components (Python venv, pip deps, Node deps, UI build)
+
+- **Templates** (`templates/`) -- `.env.example` with all configuration keys; `friday-data/` directory structure template for new users
+
+### Changed
+
+- **README.md** -- comprehensive rewrite: architecture diagram, all 7 core systems documented, standalone repo cross-references for every component, full attribution and credits section, Discord link, FutureSpeakAI org promotion
+- **CHANGELOG.md** -- v3.0.0 entry (this)
+- **GETTING_STARTED.md** -- updated for full ecosystem: Python core systems setup, MCP servers, Desktop OS, career-ops
+- **ROADMAP.md** -- v3.0.0 documented as shipped; version bumped throughout
+- **docs/ARCHITECTURE.md** -- updated to reflect full Python + Node.js dual-stack architecture
+- **CONTRIBUTING.md** -- updated with Python core system contribution patterns
+- **Core system READMEs** -- phase numbering removed; standalone repo links added; consistent structure
+- **requirements.txt** -- unified Python dependencies for all components
+
+### Stats
+
+| Metric | Count |
+|--------|-------|
+| Core Python Systems | 7 |
+| Core Python Tests | 350+ |
+| MCP Tools (friday-core, Node.js) | 91 + ~65 dynamic |
+| MCP Tools (core-mcp, Python) | 32 |
+| MCP Tools (gemini-mcp, Python) | 8 |
+| Subsystems (friday-core) | 18 |
+| Desktop Workspaces | 11 |
+| 3D Evolution Structures | 13 |
+| Node.js Tests | 442 (0 failures) |
+| Slash Commands | 17 |
+| Python Hooks | 10 |
+| Specialist Agents | 16 |
+| Standalone Repos | 49 |
+
+---
+
 ## [2.3.0] — 2026-04-02 — 50-Cycle Hardening Run
 
 50 autonomous improvement cycles on the running system. The swarm audited itself across persistence, P2P, dashboard, hooks, and testing. 159 tests at cycle 0; 442 at cycle 50, zero failures.
@@ -284,6 +367,7 @@ The subsystems learn to talk to each other. The system becomes one intelligence.
 
 ---
 
+[3.0.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.3.0...v3.0.0
 [2.3.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/FutureSpeakAI/asimovs-mind/compare/v2.0.0...v2.1.0

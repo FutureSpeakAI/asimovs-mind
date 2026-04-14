@@ -2,26 +2,74 @@
 
 ## Prerequisites
 
-- **Node.js 18+** -- required for the friday-core MCP server
-- **Python 3.7+** -- required for governance hooks
-- **Claude Code** -- installed and working
-- **Ollama** (optional) -- for local-only operation without cloud API dependency
+| Requirement | Minimum | What it's for |
+|------------|---------|---------------|
+| Python | 3.10+ | Core systems, MCP servers, Desktop OS, hooks |
+| Node.js | 18+ | Claude Code plugin (friday-core MCP server) |
+| Claude Code | Latest | Plugin host |
+| Anthropic API key | Required | Claude Code |
+| Gemini API key | Optional | Image gen, TTS, video, music (gemini-mcp) |
+| Ollama | Optional | Local-only operation (zero cloud dependency) |
 
 ## Installation
 
-```bash
-# Install directly from GitHub
-claude plugin add https://github.com/FutureSpeakAI/asimovs-mind
+### One-Command Setup (Recommended)
 
-# OR clone and install from source
+```bash
 git clone https://github.com/FutureSpeakAI/asimovs-mind.git
-claude plugin install ./asimovs-mind
+cd asimovs-mind
+
+# Mac/Linux
+./setup.sh
+
+# Windows
+setup.bat
 ```
 
-The friday-core server auto-installs its npm dependencies on first start. If this fails, run manually:
+The setup script:
+1. Creates a Python virtual environment
+2. Installs all Python dependencies (core systems, MCP servers, Desktop OS)
+3. Installs Node.js dependencies for friday-core
+4. Builds the Friday Desktop UI
+5. Creates `.env` from template if not present
+
+### Manual Installation
 
 ```bash
-cd path/to/asimovs-mind/mcp/friday-core && npm install
+# Clone
+git clone https://github.com/FutureSpeakAI/asimovs-mind.git
+cd asimovs-mind
+
+# Python dependencies
+python -m venv .venv
+source .venv/bin/activate    # Mac/Linux
+.venv\Scripts\activate       # Windows
+pip install -r requirements.txt
+
+# Node.js dependencies
+cd mcp/friday-core && npm install && cd ../..
+
+# Build Desktop UI
+cd interfaces/desktop && python build_ui.py && cd ../..
+
+# Configure
+cp templates/env.example .env
+# Edit .env with your API keys
+
+# Install as Claude Code plugin
+claude plugin add .
+```
+
+### MCP Servers (Optional)
+
+The Python MCP servers are independent of the Claude Code plugin and can be added separately:
+
+```bash
+# Core systems MCP (32 tools wrapping all 7 Python systems)
+claude mcp add friday-core-py -- python mcp-servers/core-mcp/server.py
+
+# Gemini creative capabilities (8 tools: image, TTS, video, music)
+claude mcp add friday-gemini -- python mcp-servers/gemini-mcp/server.py
 ```
 
 ## First Session
@@ -48,7 +96,7 @@ Run `/onboard` and answer 8 questions about how you work.
 
 Friday adapts to your preferences, communication style, and workflow patterns. Question 8 (the "mother question") calibrates anti-sycophancy and challenge level.
 
-### Step 4: You're Ready
+### You're Ready
 
 Try these commands to explore what's available:
 
@@ -65,21 +113,60 @@ Try these commands to explore what's available:
 
 ## Subsequent Sessions
 
-On each session start, open the browser URL shown on startup to enter your passphrase. This keeps it out of the API transcript entirely and is the recommended approach. The dashboard loads automatically after unlock -- it shows all 18 subsystem status indicators, memory stats, trust summary, and P2P peers.
+On each session start, open the browser URL shown on startup to enter your passphrase. This keeps it out of the API transcript entirely and is the recommended approach. The dashboard loads automatically after unlock.
 
 If you prefer the conversation-based flow, run `/friday unlock` in the chat instead.
 
-### Daily use
-
-These three commands cover most of what you need at the start of a session:
+### Daily Use
 
 | Command | What it does |
 |---------|-------------|
-| `/briefing` | What happened since your last session -- commits, discoveries, test results |
-| `/memory recall "topic"` | Search Friday's 3-tier memory for anything related |
-| `/trust "PersonName" reliability` | Check or update trust graph for a person or repo |
+| `/briefing` | What happened since your last session |
+| `/memory recall "topic"` | Search Friday's 3-tier memory |
+| `/trust "PersonName" reliability` | Check or update trust graph |
 | `/status` | Rich system health -- vault, memory, trust, all 18 subsystems |
 | `/help` | Categorized command reference for all skills |
+
+## Python Core Systems
+
+The 7 core Python systems in `core/` are standalone modules. You can use them independently of the Claude Code plugin:
+
+```bash
+# Run a specific system's tests
+cd core/sovereign-vault && python -m pytest test_vault.py
+cd core/trust-graph && python -m pytest test_trust_graph.py
+
+# Use a system's CLI
+cd core/trust-graph && python cli.py add "Alice" reliability 0.85
+cd core/cognitive-memory && python cli.py store "The auth uses JWT" --tier short
+cd core/epistemic-score && python cli.py log --independence 0.7
+```
+
+Each system also has a standalone repo under [FutureSpeakAI](https://github.com/FutureSpeakAI) -- see the [README](README.md) for links.
+
+## Friday Desktop
+
+The holographic desktop OS runs independently of Claude Code:
+
+```bash
+cd interfaces/desktop
+python build_ui.py     # Build the UI from modular components
+python server.py       # Start at http://localhost:3000
+```
+
+Features: 11 workspaces, Three.js 3D scene with 13 evolution structures, mood system, audio-reactive animation, MediaPipe hand/face tracking.
+
+## Career-Ops Pipeline
+
+The AI job search pipeline has its own setup:
+
+```bash
+cd tools/career-ops
+npm install            # Playwright for PDF generation
+node doctor.mjs        # Verify setup
+```
+
+See [tools/career-ops/README.md](tools/career-ops/README.md) for full documentation.
 
 ## Optional: Local-Only Mode
 
@@ -127,7 +214,10 @@ Ensure Python 3 is in your PATH. On Windows, try `python` instead of `python3`.
 Run `/friday unlock` to enter your passphrase.
 
 **Dependencies won't install**
-Verify Node.js 18+ (`node --version`) and Python 3.7+ (`python3 --version` or `python --version`).
+Verify Node.js 18+ (`node --version`) and Python 3.10+ (`python --version`).
+
+**Desktop UI build fails**
+Run `cd interfaces/desktop && python build_ui.py` manually.
 
 ## Next Steps
 
@@ -137,4 +227,6 @@ Verify Node.js 18+ (`node --version`) and Python 3.7+ (`python3 --version` or `p
 - `/govern verify` -- Audit governance integrity
 - `/diagnose` -- Get a full codebase health check
 
-See the [README](README.md) for architecture details, the research behind governance, and the full feature set.
+See the [README](README.md) for the full architecture, standalone repo links, and credits.
+
+Join us on [Discord](https://discord.gg/f2VM6qNk).

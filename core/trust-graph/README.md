@@ -1,6 +1,8 @@
-# Trust Graph — Phase 3
+# Trust Graph
 
-Person-level credibility model for Agent Friday. Tracks trust scores across 6 dimensions with hermeneutic re-evaluation, fuzzy name resolution, time-based decay, and JSON persistence.
+Person-level credibility model for Agent Friday. Tracks trust scores across 5 dimensions with hermeneutic re-evaluation, fuzzy name resolution, time-based decay, and JSON persistence. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
+
+**Standalone repo:** [trust-graph](https://github.com/FutureSpeakAI/trust-graph)
 
 ## Trust Dimensions
 

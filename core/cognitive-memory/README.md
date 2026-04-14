@@ -1,6 +1,6 @@
 # Cognitive Memory System
 
-A 3-tier memory architecture mimicking human cognition, designed for Agent Friday.
+A 3-tier memory architecture mimicking human cognition, designed for Agent Friday. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
 
 ## Architecture
 
@@ -89,4 +89,6 @@ pytest test_memory.py -v
 
 ## Project Status
 
-Phase 4 of 7 — Core implementation complete with comprehensive tests.
+Core implementation complete with comprehensive tests.
+
+**Standalone repo:** [agent-fridays-cognitive-memory](https://github.com/FutureSpeakAI/agent-fridays-cognitive-memory)

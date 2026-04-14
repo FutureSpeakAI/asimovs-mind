@@ -1,10 +1,10 @@
 # Asimov's Mind -- Product Roadmap
 
-### From Claude Code plugin to the Agent Friday kernel
+### From Claude Code plugin to the full AI agent ecosystem
 
-This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the portable intelligence and governance kernel that powers Agent Friday across every runtime. Current version: v2.3.0.
+This document describes the evolution of Asimov's Mind from a governed self-improvement plugin to the complete AI agent ecosystem: 7 core Python systems, 18-subsystem Node.js MCP server, holographic 3D desktop, AI career pipeline, and an encrypted P2P federation. Current version: v3.0.0.
 
-Built by [FutureSpeak.AI](https://github.com/FutureSpeakAI).
+Built by [Stephen C. Webster](https://github.com/FutureSpeakAI) / [FutureSpeak.AI](https://github.com/FutureSpeakAI). Browse all 49 repos at [github.com/FutureSpeakAI](https://github.com/FutureSpeakAI).
 
 ---
 
@@ -217,45 +217,32 @@ Everything from v1.0.0, plus the complete intelligence port from nexus-os:
 
 ---
 
-### v2.1.0 -- Multi-Platform Agent (next)
+### v2.1.0 -- Neural Binding (shipped)
 
-#### Slack Bridge
+The subsystems learn to talk to each other. The system becomes one intelligence.
 
-MCP server, same pattern as Telegram. Adds channel-aware context (the agent knows which Slack channel a message came from and adjusts trust tier accordingly: DM = owner tier, public channel = group tier).
-
-#### Discord Bridge
-
-MCP server. Same governance. Adds role-based trust mapping (Discord roles map to cLaw trust tiers).
-
-#### Signal Bridge
-
-MCP server via signal-cli. End-to-end encrypted by default (Signal handles this). The most sovereignty-aligned messaging platform.
-
-#### TTS Output
-
-Two paths:
-
-**Local (Chatterbox/Kokoro):** If Ollama or a local TTS model is available, the agent can speak responses. An MCP server wraps the TTS engine. Output is piped to system audio.
-
-**Cloud (Gemini Live):** An MCP server wraps Gemini's multimodal API. The agent can have voice conversations. This requires a Gemini API key and sends audio to Google's servers (governance must inform the user of this tradeoff).
-
-A `/speak` skill toggles TTS on/off. When on, every response is also spoken. Governed by a new cLaw floor: `tts_provider_consent: true` -- the user must explicitly consent to cloud TTS.
+- `core/wiring.js`: 10 cross-subsystem event subscriptions (the nervous system)
+- `core/session-conductor.js`: session lifecycle orchestration with personality-aware greeting
+- `core/eis.js`: Epistemic Independence Score (verification + complexity + correction)
+- `/help` and `/status` skills overhauled
+- Memory auto-extraction from trust/agent/connector/enterprise events
+- Dashboard: live particle data binding, connection indicator, memory search
+- GitHub CI, issue templates, PR template, CONTRIBUTING.md, SECURITY.md
 
 ---
 
-### v2.2.0 -- The Trust Web
+### v2.2.0 -- Security Hardening (shipped)
 
-#### Web Content Trust Layer
-
-PreToolUse hook on WebFetch/WebSearch that:
-1. Checks the URL against a known-unreliable-sources list
-2. Annotates results with a confidence flag
-3. Logs all web fetches to the session ledger
-4. Never blocks (informational, not enforcement) -- but the agent sees the annotations and can factor them into its reasoning
+Full security audit. 7 vulnerability classes closed. 160 KB dead code removed:
+- Path traversal blocked in vault keys
+- Governance bypass closed (absolute-path normalization)
+- HTTP bridge authenticated (bearer token)
+- P2P locked to loopback, signature-before-decrypt
+- Safety scanner hardened for hooks/ and governance/ writes
 
 ---
 
-### v2.3.0 -- Security Hardening (shipped)
+### v2.3.0 -- 50-Cycle Hardening Run (shipped)
 
 **18 subsystems, 91 MCP tools, 442 tests.** A 50-cycle automated hardening run that exercised the full runtime and resolved a class of persistence, namespace, and architectural inconsistencies.
 
@@ -285,7 +272,23 @@ The Personality subsystem was audited and confirmed to expose 6 tools (not 7 as 
 
 ---
 
-### v3.0.0 -- Financial Transactions (future)
+### v3.0.0 -- Full Python Ecosystem (shipped)
+
+The complete Asimov's Mind ecosystem in a single repo:
+
+- **7 Core Python Systems** (`core/`) -- Sovereign Vault, Privacy Shield, Trust Graph, Cognitive Memory, Personality Evolution, Epistemic Score, HMAC Integrity. Each standalone with CLI, tests, and README. 350+ tests total.
+- **Core MCP Server** (`mcp-servers/core-mcp/`) -- FastMCP wrapping all 7 systems as 32 MCP tools
+- **Gemini MCP Server** (`mcp-servers/gemini-mcp/`) -- 8 creative tools: image gen, TTS (Gemini 2.5 Flash Preview TTS), vision, music (Lyria), video (Veo), code art
+- **Friday Desktop** (`interfaces/desktop/`) -- holographic 3D desktop OS with Flask backend, React frontend, Three.js 3D visualization (13 evolution structures, mood system, audio-reactive animation, MediaPipe hand/face tracking), 11 workspaces
+- **Career-Ops Pipeline** (`tools/career-ops/`) -- AI job search with A-F scoring, ATS-optimized CV generation, 45+ portal scanning via Playwright, batch processing, interview prep
+- **Setup scripts** -- one-command installation for Mac/Linux/Windows
+- **Full documentation rewrite** -- README with attribution, standalone repo cross-references, credits
+
+Each major component also exists as a standalone repo under [github.com/FutureSpeakAI](https://github.com/FutureSpeakAI) (49 repos).
+
+---
+
+### v4.0.0 -- Financial Transactions (future)
 
 #### Transaction MCP Server
 
@@ -395,84 +398,57 @@ Agent Friday (Electron) remains the reference desktop implementation with real-t
 
 ---
 
-## File Manifest (v2.3.0)
+## File Manifest (v3.0.0)
 
 ```
 asimovs-mind/
-+-- plugin.json                        # Claude Code plugin manifest (v2.3.0)
-+-- README.md                          # Plugin documentation
++-- plugin.json                        # Claude Code plugin manifest
++-- README.md                          # Comprehensive project documentation
 +-- CHANGELOG.md                       # Version history (Keep a Changelog format)
 +-- ROADMAP.md                         # This file
 +-- GETTING_STARTED.md                 # Installation and first-run guide
-+-- governance/
-|   +-- laws.json                      # Three Laws + Meta-Law
-|   +-- protected-zones.json           # Immutable file patterns (hooks/** in custom_zones)
-|   +-- safety-floors.json             # Tunable minimums (encryption, privacy, etc.)
-|   +-- discovery-rules.json           # Code import governance
-|   +-- conformance-report.md          # cLaw Specification conformance audit
-+-- personality/
-|   +-- friday.md                      # Agent Friday identity
-+-- agents/                            # 16 agents (dynamic discovery + creation)
-+-- skills/                            # 19 user-invokable /commands
-+-- hooks/
-|   +-- first-law.py                   # PreToolUse: protected zone enforcement (absolute-path bypass fixed)
-|   +-- third-law.py                   # PostToolUse: session ledger
-|   +-- safety-scanner-hook.py         # PreToolUse: AST scan (always runs on hooks/ and governance/ writes)
-|   +-- personality-loader.py          # SessionStart: personality + memory
-|   +-- session-learner.py             # Stop: extract learnings
-|   +-- integrity-check.py            # SessionStart: HMAC governance verify
-|   +-- trust-tracker.py              # PostToolUse: agent performance
-|   +-- privacy-shield-scrub.py       # PreToolUse: PII scrub on WebFetch/WebSearch
-|   +-- privacy-shield-rehydrate.py   # PostToolUse: PII restore from responses
-|   +-- vault_bridge.py               # Python utility: hook-to-vault HTTP bridge (bearer token auth)
-+-- mcp/
-|   +-- friday-core/                   # Agent Friday MCP server (18 subsystems, 91 tools)
-|       +-- bootstrap.js               # Entry point: auto-installs deps, loads index
-|       +-- index.js                   # Subsystem loader + HTTP bridge + dashboard
-|       +-- dashboard.html             # Three.js holographic desktop UI
-|       +-- core/                      # Shared infrastructure
-|       |   +-- event-bus.js, subsystem.js, state-manager.js, logger.js
-|       |   +-- vault.js               # SovereignVault class
-|       |   +-- crypto.js              # All cryptographic primitives
-|       |   +-- ollama-monitor.js      # OllamaMonitor (shared instance via deps)
-|       |   +-- wiring.js              # 10 cross-subsystem event routes
-|       |   +-- session-conductor.js   # Session lifecycle orchestration
-|       |   +-- eis.js                 # Epistemic Independence Score tracker
-|       +-- subsystems/                # 18 subsystems (91 tools)
-|           +-- vault/                 # 10 tools  Encrypted state
-|           +-- identity/              #  6 tools  Ed25519, X25519, attestation
-|           +-- privacy/               #  4 tools  PII engine
-|           +-- p2p/                   #  7 tools  WebSocket loopback, ECDH channels
-|           +-- ollama/                #  1 tool   Health monitoring
-|           +-- session/               #  1 tool   session_status (SessionSubsystem)
-|           +-- llm/                   #  6 tools  3 providers, router
-|           +-- memory/                #  8 tools  3-tier, embeddings, search
-|           +-- context/               #  4 tools  Knowledge graph, injection
-|           +-- trust/                 #  7 tools  Person-level graph, decay
-|           +-- personality/           #  7 tools  Evolution, calibration
-|           +-- agents/                #  7 tools  Delegation, deadlock detection
-|           +-- tools/                 #  4 tools  Registry, execution
-|           +-- connectors/            # 4+72     9 connectors, dispatch
-|           +-- gateway/               #  5 tools  Trust tiers, audit
-|           +-- briefing/              #  3 tools  Daily briefing, meetings
-|           +-- voice/                 #  3 tools  State machine, fallback
-|           +-- enterprise/            #  5 tools  Consent, cloud, confidence
-+-- discovery/
-|   +-- safety_scanner.py             # AST analysis (standalone)
-|   +-- provenance.py                 # Attribution CLI
-|   +-- memory.py                     # Unified trust graph + knowledge graph + RAG
-+-- directives/                        # 8 autoresearch-style loops
-+-- framework/
-    +-- spec.json                      # Portable governance spec
-    +-- adapters/                      # LangChain, CrewAI, AutoGen
++-- CONTRIBUTING.md                    # Contribution guide
++-- SECURITY.md                        # Security model and vulnerability reporting
++-- setup.sh / setup.bat               # One-command installer (Mac/Linux, Windows)
++-- requirements.txt                   # Unified Python dependencies
++-- core/                              # 7 standalone Python systems (350+ tests)
+|   +-- sovereign-vault/               # AES-256-GCM + Argon2id encryption
+|   +-- privacy-shield/                # PII detection across 9 categories
+|   +-- trust-graph/                   # 5-dimension person-level credibility
+|   +-- cognitive-memory/              # 3-tier memory with consolidation
+|   +-- personality-evolution/         # 30-trait evolution with anti-sycophancy
+|   +-- epistemic-score/               # 6-metric independence tracking
+|   +-- hmac-integrity/                # HMAC-SHA256 governance protection
++-- mcp/friday-core/                   # Node.js MCP server (18 subsystems, 91 tools)
+|   +-- core/                          # Vault, crypto, event bus, wiring, EIS
+|   +-- subsystems/                    # 18 subsystem directories
+|   +-- test/                          # 442 tests (0 failures)
++-- mcp-servers/
+|   +-- core-mcp/                      # FastMCP wrapping 7 core systems (32 tools)
+|   +-- gemini-mcp/                    # Gemini creative: image, TTS, video, music (8 tools)
++-- interfaces/desktop/                # Friday Desktop OS
+|   +-- server.py                      # Flask backend
+|   +-- ui_parts/                      # React frontend components
+|   +-- vibe-mode/                     # Three.js 3D: 13 structures, mood, audio
++-- tools/career-ops/                  # AI job search pipeline
++-- hooks/                             # 10 Python governance hooks
++-- skills/                            # 17 slash commands
++-- agents/                            # 16 specialist agent definitions
++-- governance/                        # cLaws, protected zones, safety floors
++-- templates/                         # Setup templates + .env.example
++-- docs/                              # Architecture, API reference, guides
 ```
 
 ---
 
 ## Credits
 
-**[FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, the Sovereign Vault, and the Agent Friday ecosystem.
+**[Stephen C. Webster / FutureSpeak.AI](https://github.com/FutureSpeakAI)** -- Creator of Asimov's Mind, the cLaws governance framework, Agent Friday, the Sovereign Vault, and the 49-repo FutureSpeakAI ecosystem.
 
-**[Agent Friday](https://github.com/FutureSpeakAI/Agent-Friday)** -- The full AI assistant that this kernel powers. The nexus-os intelligence stack was ported into friday-core for v2.0.0. Agent Friday (Electron) remains the reference desktop implementation with voice and GUI; Asimov's Mind is the reference CLI/server implementation with the full 17-subsystem runtime.
+**[Andrej Karpathy](https://github.com/karpathy)** -- [autoresearch](https://github.com/karpathy/autoresearch) is the foundation. The modify-measure-keep/discard iteration pattern at the core of every directive.
 
-**[autoresearch](https://github.com/karpathy/autoresearch)** by Andrej Karpathy -- The iteration pattern at the core of every directive.
+**[Isaac Asimov](https://en.wikipedia.org/wiki/Isaac_Asimov)** -- The Three Laws of Robotics (1942) inspired the cLaws governance framework.
+
+**Claude Opus 4.6** by Anthropic -- Co-authored significant portions of the codebase and documentation.
+
+See the [README](README.md) for full attribution, technology credits, and standalone repo links.

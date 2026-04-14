@@ -1,6 +1,6 @@
-# Agent Friday -- Subsystem Guide
+# Asimov's Mind -- Subsystem Guide
 
-Reference for all 18 subsystems in the friday-core MCP server (v2.3.0). Each entry covers purpose, files, MCP tools, events, vault state, dependencies, and extension points.
+Reference for all 18 subsystems in the friday-core MCP server (v3.0.0). Each entry covers purpose, files, MCP tools, events, vault state, dependencies, and extension points.
 
 ---
 

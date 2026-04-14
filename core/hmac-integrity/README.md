@@ -1,8 +1,8 @@
 # HMAC Integrity System
 
-**Phase 7 of 7 — Agent Friday's Core Systems**
+HMAC-SHA256 governance file signing and verification. If someone tampers with Friday's core laws, personality, or memory files, this system detects it and degrades to safe mode rather than running compromised. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
 
-HMAC-SHA256 governance file signing and verification. If someone tampers with Friday's core laws, personality, or memory files, this system detects it and degrades to safe mode rather than running compromised.
+**Standalone repo:** [agent-fridays-hmac-integrity](https://github.com/FutureSpeakAI/agent-fridays-hmac-integrity)
 
 ## Architecture
 

@@ -1,6 +1,8 @@
 # Gemini MCP Server — Agent Friday's Creative Capabilities
 
-A FastMCP server that gives Agent Friday creative capabilities via the Gemini API.
+A [FastMCP](https://github.com/jlowin/fastmcp) server that gives Agent Friday creative capabilities via Google's Gemini API. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
+
+See also: [claude-gemini-bridge](https://github.com/FutureSpeakAI/claude-gemini-bridge) for bridging Gemini Live voice to Claude Code.
 
 ## Tools
 

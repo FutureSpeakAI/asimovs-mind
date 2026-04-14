@@ -1,6 +1,6 @@
-# Agent Friday -- Hooks Guide
+# Asimov's Mind -- Hooks Guide
 
-Reference for all 9 Python hooks and the vault bridge utility. Hooks are the structural enforcement layer of Asimov's cLaws -- they run automatically on every relevant tool call regardless of agent instructions or LLM behavior.
+Reference for all 10 Python hooks and the vault bridge utility. Hooks are the structural enforcement layer of Asimov's cLaws -- they run automatically on every relevant tool call regardless of agent instructions or LLM behavior.
 
 ---
 

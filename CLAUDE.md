@@ -1,7 +1,8 @@
 # Asimov's Mind — Developer Reference
 
-**Current version:** 2.3.0 (Security Hardening + Swarm Hardening Run)
-**MCP server:** `mcp/friday-core/` — 19 subsystems, 97 tools, HTTP bridge, holographic dashboard
+**Current version:** 3.0.0 (Full Python Ecosystem)
+**MCP server:** `mcp/friday-core/` — 18 subsystems, 91 tools, HTTP bridge, holographic dashboard
+**Python stack:** `core/` — 7 standalone systems | `mcp-servers/` — core-mcp (32 tools), gemini-mcp (8 tools) | `interfaces/desktop/` — Friday Desktop OS
 
 ---
 

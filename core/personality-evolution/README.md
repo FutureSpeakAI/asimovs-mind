@@ -1,6 +1,8 @@
-# Personality Evolution System — Phase 5
+# Personality Evolution System
 
-Agent Friday's personality trait engine with 50-session maturity ramp, visual dimension mapping, adaptive style, and anti-sycophancy calibration.
+Agent Friday's personality trait engine with 50-session maturity ramp, visual dimension mapping, adaptive style, and anti-sycophancy calibration. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
+
+**Standalone repo:** [agent-fridays-personality-evolution-engine](https://github.com/FutureSpeakAI/agent-fridays-personality-evolution-engine)
 
 ## Overview
 

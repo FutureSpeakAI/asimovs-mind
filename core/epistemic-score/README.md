@@ -1,8 +1,8 @@
 # Epistemic Score System
 
-**Phase 6 of 7 — Agent Friday Research Project**
+Measures whether AI interactions make the user smarter or more dependent. This is Stephen's Reverse RLHF research made operational. Part of the [Asimov's Mind](https://github.com/FutureSpeakAI/asimovs-mind) ecosystem.
 
-Measures whether AI interactions make the user smarter or more dependent. This is Stephen's Reverse RLHF research made operational.
+**Standalone repo:** [epistemic-score](https://github.com/FutureSpeakAI/epistemic-score)
 
 ## What It Does
 
