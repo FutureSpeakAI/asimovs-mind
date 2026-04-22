@@ -3,7 +3,8 @@ title FRIDAY Desktop — Live OS
 color 0B
 
 set GEMINI_API_KEY=AIzaSyCnAtHOMGadC6KLS93bdUT3ep34pKH27-w
-set FRIDAY_PASSWORD=changeme
+set FRIDAY_USERNAME=stephen@futurespeak.ai
+set FRIDAY_PASSWORD=ILoveLibbyLoo0506!!
 set FRIDAY_SECRET_KEY=friday-session-secret-changeme
 
 echo.
