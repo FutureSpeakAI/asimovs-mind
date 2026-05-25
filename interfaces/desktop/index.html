@@ -2181,7 +2181,7 @@ function HomeWS(){
   const runRoutine=async(id,label)=>{setRunningRoutine(id);try{const r=await fetch('/api/routines/'+id+'/run',{method:'POST'});const d=await r.json();setRoutineToast(d.status==='ok'?(label+' launched'):'Launch failed');loadRoutines()}catch(e){setRoutineToast('Launch failed')}setRunningRoutine(null);setTimeout(()=>setRoutineToast(''),2500)};
   const approveTodo=id=>fetch(`/api/todos/${id}/approve`,{method:'POST'}).then(()=>setTodos(t=>t.map(x=>x.id===id?{...x,status:'approved'}:x)));
   const rejectTodo=id=>fetch(`/api/todos/${id}/reject`,{method:'POST'}).then(()=>setTodos(t=>t.filter(x=>x.id!==id)));
-  const runMorningRoutines=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run daily news briefing','Run email scan']})}).then(()=>alert('Morning routines launched')).catch(()=>{})};
+  const runMorningRoutines=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run daily news briefing','Run email scan'],cwd:'C:\\Users\\swebs\\Projects\\friday-desktop'})}).then(()=>alert('Morning routines launched')).catch(()=>{})};
   if(loading)return <div style={{color:'#999',textAlign:'center',padding:40}}>Loading systems...</div>;
   const pending=todos.filter(t=>t.status==='proposed').length;
   const insight=cd?.countdowns?`${cd.countdowns.map(c=>`${c.label||c.name||'Event'} in ${c.days||c.days_until||'?'}d`).join(' · ')}${pending>0?` · ${pending} task${pending>1?'s':''} awaiting approval`:''}`:'Systems initializing...';
@@ -2228,8 +2228,8 @@ function CareerWS(){
     fetch('/api/jobs').then(r=>r.json()).then(d=>setJobs(d.content||d.raw||'')).catch(()=>'')
   ]).then(()=>setLoading(false))},[]);
   const loadReport=name=>{fetch('/api/career-ops/report/'+name).then(r=>r.json()).then(d=>{setReportContent(d.content||'');setView('report')}).catch(()=>{})};
-  const launchEval=()=>{if(!evalUrl.trim())return;fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Evaluate this job: '+evalUrl]})}).then(()=>{setEvalUrl('');alert('Evaluation launched')}).catch(()=>{})};
-  const launchScan=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run portal scan']})}).then(()=>alert('Scan launched')).catch(()=>{})};
+  const launchEval=()=>{if(!evalUrl.trim())return;fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Evaluate this job: '+evalUrl],cwd:'C:\\Users\\swebs\\Projects\\career-ops'})}).then(()=>{setEvalUrl('');alert('Evaluation launched')}).catch(()=>{})};
+  const launchScan=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run portal scan'],cwd:'C:\\Users\\swebs\\Projects\\career-ops'})}).then(()=>alert('Scan launched')).catch(()=>{})};
   if(loading)return <div style={{color:'#999',textAlign:'center',padding:40}}>Loading career pipeline...</div>;
   const entries=tracker?.entries||[];const applied=entries.filter(e=>(e.status||'').toLowerCase().includes('appli')).length;
   const interviewing=entries.filter(e=>(e.status||'').toLowerCase().includes('interview')).length;
@@ -2334,23 +2334,184 @@ function OutreachPanel(){
   </div>);
 }
 function WikiWS(){
-  const[struct,setStruct]=useState(null);const[content,setContent]=useState('Select a file from the sidebar');const[path,setPath]=useState('');const[loading,setLoading]=useState(true);
-  useEffect(()=>{fetch('/api/wiki/structure').then(r=>r.json()).then(d=>{
-    // Convert API structure object to sections array
-    const raw=d.structure||d.sections||d;
-    if(raw&&!Array.isArray(raw)){const sections=Object.entries(raw).map(([name,files])=>({name,files:Array.isArray(files)?files.map(f=>typeof f==='string'?f:f.filename||f.name):Object.keys(files)}));d={sections}}
-    else if(!d.sections)d={sections:raw||[]};
-    setStruct(d);setLoading(false)
-  }).catch(()=>setLoading(false))},[]);
-  const load=(s,f)=>{setPath(`${s}/${f}`);fetch(`/api/wiki/${s}/${f}`).then(r=>r.json()).then(d=>setContent(d.content||d.error||'Empty')).catch(()=>setContent('Error loading file'))};
+  const[struct,setStruct]=useState(null);
+  const[recent,setRecent]=useState([]);
+  const[pending,setPending]=useState([]);
+  const[pendingOpen,setPendingOpen]=useState(true);
+  const[content,setContent]=useState('Select a file from the sidebar');
+  const[path,setPath]=useState('');
+  const[loading,setLoading]=useState(true);
+  const[editing,setEditing]=useState(false);
+  const[draft,setDraft]=useState('');
+  const[saving,setSaving]=useState(false);
+  const[toast,setToast]=useState('');
+  const[query,setQuery]=useState('');
+  const[searchResults,setSearchResults]=useState(null);
+  const[searching,setSearching]=useState(false);
+  const[confirmDelete,setConfirmDelete]=useState(null);
+  const[confirmText,setConfirmText]=useState('');
+  const searchTimer=useRef(null);
+
+  const showToast=(m)=>{setToast(m);setTimeout(()=>setToast(''),2200)};
+
+  const refreshStructure=()=>fetch('/api/wiki/structure').then(r=>r.json()).then(d=>{
+    const raw=d.structure||{};
+    const sections=Object.entries(raw).map(([name,files])=>({name,files:Array.isArray(files)?files:[]}));
+    setStruct({sections});
+    setRecent(d.recent||[]);
+  }).catch(()=>{});
+
+  const refreshPending=()=>fetch('/api/wiki/pending').then(r=>r.json()).then(d=>setPending(d.pending||[])).catch(()=>setPending([]));
+
+  useEffect(()=>{Promise.all([refreshStructure(),refreshPending()]).finally(()=>setLoading(false))},[]);
+
+  const load=(s,f)=>{const fn=typeof f==='string'?f:(f.filename||f.name);
+    setPath(`${s}/${fn}`);setEditing(false);setDraft('');setContent('Loading...');
+    fetch(`/api/wiki/${s}/${fn}`).then(r=>r.json()).then(d=>setContent(d.content||d.error||'Empty')).catch(()=>setContent('Error loading file'));
+  };
+
+  const loadPath=(p)=>{const [s,...rest]=p.split('/');const fn=rest.join('/');load(s,fn)};
+
+  const beginEdit=()=>{setDraft(content||'');setEditing(true)};
+  const cancelEdit=()=>{setEditing(false);setDraft('')};
+  const saveEdit=async()=>{if(!path)return;setSaving(true);
+    try{const r=await fetch('/api/wiki/edit',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:path,content:draft})});
+      const d=await r.json();
+      if(d.status==='ok'){setContent(draft);setEditing(false);showToast('Saved · '+d.bytes+' bytes');refreshStructure()}
+      else showToast('Save failed: '+(d.message||'unknown'))}
+    catch(e){showToast('Save error')}
+    setSaving(false);
+  };
+
+  // Debounced search
+  useEffect(()=>{
+    if(searchTimer.current)clearTimeout(searchTimer.current);
+    if(!query.trim()){setSearchResults(null);return}
+    setSearching(true);
+    searchTimer.current=setTimeout(()=>{
+      fetch('/api/wiki/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:query.trim()})})
+        .then(r=>r.json()).then(d=>{setSearchResults(d.results||[]);setSearching(false)})
+        .catch(()=>{setSearchResults([]);setSearching(false)});
+    },300);
+    return()=>{if(searchTimer.current)clearTimeout(searchTimer.current)};
+  },[query]);
+
+  const approvePending=async(id)=>{
+    try{await fetch(`/api/wiki/pending/${id}/approve`,{method:'POST'});showToast('Approved');refreshPending();refreshStructure()}
+    catch{showToast('Approve failed')}
+  };
+  const rejectPending=async(id)=>{
+    try{await fetch(`/api/wiki/pending/${id}/reject`,{method:'POST'});showToast('Rejected');refreshPending()}
+    catch{showToast('Reject failed')}
+  };
+
+  const deleteFile=async()=>{
+    if(!confirmDelete||confirmText!=='DELETE'){showToast('Type DELETE to confirm');return}
+    try{const r=await fetch('/api/wiki/file',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:confirmDelete,confirm:'DELETE'})});
+      const d=await r.json();
+      if(d.deleted){showToast('Deleted '+confirmDelete);if(path===confirmDelete){setPath('');setContent('Select a file from the sidebar')}}
+      else showToast('Not deleted: '+(d.message||d.status));
+      setConfirmDelete(null);setConfirmText('');refreshStructure()}
+    catch{showToast('Delete failed')}
+  };
+
   if(loading)return <div style={{color:'#999',textAlign:'center',padding:40}}>Loading wiki...</div>;
   const totalFiles=struct?.sections?.reduce((a,s)=>a+(s.files?.length||0),0)||0;
-  return(<div style={{display:'flex',gap:12,height:'100%'}}>
-    <div style={{width:170,borderRight:'1px solid rgba(255,255,255,0.04)',paddingRight:8,overflowY:'auto',flexShrink:0}}>
-      <div style={{fontSize:11,color:'#888',marginBottom:8,fontFamily:'JetBrains Mono'}}>{totalFiles} files · {struct?.sections?.length||0} sections</div>
-      {struct?.sections?.map(s=><div key={s.name}><div style={{fontSize:11,color:'#00d4ff',fontFamily:'Orbitron',margin:'8px 0 3px',letterSpacing:'.05em'}}>{s.name} <span style={{color:'#999'}}>({(s.files||[]).length})</span></div>{(s.files||[]).map(f=><div key={typeof f==='string'?f:f} onClick={()=>load(s.name,f)} style={{fontSize:11,color:path===`${s.name}/${f}`?'#00d4ff':'#666',cursor:'pointer',padding:'2px 0',transition:'color .15s'}} onMouseOver={e=>e.target.style.color='#00d4ff'} onMouseOut={e=>{if(path!==`${s.name}/${f}`)e.target.style.color='#666'}}>{f}</div>)}</div>)}
+
+  const renderDiff=(p)=>{const oldV=p.old_value||'';const newV=p.new_value||'';
+    return(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginTop:4}}>
+      <div style={{background:'rgba(255,0,128,0.06)',border:'1px solid rgba(255,0,128,0.18)',borderRadius:4,padding:6,fontFamily:'JetBrains Mono',fontSize:11,color:'#ffb0c8',whiteSpace:'pre-wrap',maxHeight:160,overflowY:'auto'}}>{oldV||<em style={{color:'#666'}}>(empty — will append)</em>}</div>
+      <div style={{background:'rgba(0,255,128,0.06)',border:'1px solid rgba(0,255,128,0.18)',borderRadius:4,padding:6,fontFamily:'JetBrains Mono',fontSize:11,color:'#b0ffc8',whiteSpace:'pre-wrap',maxHeight:160,overflowY:'auto'}}>{newV}</div>
+    </div>);
+  };
+
+  return(<div style={{display:'flex',flexDirection:'column',height:'100%'}}>
+    {/* Search bar + toast */}
+    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+      <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="🔍 Search wiki..."
+        style={{flex:1,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(0,212,255,0.18)',borderRadius:6,padding:'6px 10px',color:'#ddd',fontSize:12,fontFamily:'Inter',outline:'none'}}/>
+      {pending.length>0&&<span style={{fontSize:11,color:'#f59e0b',fontFamily:'Orbitron',letterSpacing:'.05em'}}>{pending.length} pending</span>}
     </div>
-    <div style={{flex:1,overflowY:'auto'}}>{path&&<div style={{fontSize:11,color:'#999',fontFamily:'JetBrains Mono',marginBottom:8}}>wiki/{path}</div>}<pre style={{whiteSpace:'pre-wrap',fontSize:12,color:'#bbb',fontFamily:'Inter',lineHeight:1.7}}>{content}</pre></div>
+    {toast&&<div style={{fontSize:11,color:'#00d4ff',marginBottom:6,fontFamily:'JetBrains Mono'}}>✓ {toast}</div>}
+
+    {/* Pending updates panel */}
+    {pending.length>0&&<div style={{marginBottom:8,border:'1px solid rgba(245,158,11,0.25)',borderRadius:6,background:'rgba(245,158,11,0.04)'}}>
+      <div onClick={()=>setPendingOpen(!pendingOpen)} style={{padding:'6px 10px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontFamily:'Orbitron',fontSize:11,color:'#f59e0b',letterSpacing:'.05em'}}>📋 PENDING UPDATES ({pending.length})</span>
+        <span style={{color:'#888',fontSize:11}}>{pendingOpen?'▾':'▸'}</span>
+      </div>
+      {pendingOpen&&<div style={{padding:'4px 10px 10px',maxHeight:280,overflowY:'auto'}}>
+        {pending.map(p=>(<div key={p.id} style={{padding:8,borderTop:'1px solid rgba(245,158,11,0.12)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,color:'#00d4ff',fontFamily:'JetBrains Mono'}}>{p.file}{p.section?` · §${p.section}`:''}</div>
+              {p.reason&&<div style={{fontSize:11,color:'#a8a8b4',fontStyle:'italic',marginTop:2}}>{p.reason}</div>}
+            </div>
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              <button className="btn" style={{fontSize:11,padding:'2px 8px',color:'#00ff80',borderColor:'rgba(0,255,128,0.4)'}} onClick={()=>approvePending(p.id)}>Approve</button>
+              <button className="btn" style={{fontSize:11,padding:'2px 8px',color:'#ff0080',borderColor:'rgba(255,0,128,0.4)'}} onClick={()=>rejectPending(p.id)}>Reject</button>
+            </div>
+          </div>
+          {renderDiff(p)}
+        </div>))}
+      </div>}
+    </div>}
+
+    {/* Search results overlay */}
+    {searchResults!==null&&<div style={{marginBottom:8,border:'1px solid rgba(0,212,255,0.18)',borderRadius:6,background:'rgba(0,212,255,0.03)',padding:8,maxHeight:240,overflowY:'auto'}}>
+      <div style={{fontFamily:'Orbitron',fontSize:11,color:'#00d4ff',marginBottom:6,letterSpacing:'.05em'}}>{searching?'Searching...':`${searchResults.length} match${searchResults.length===1?'':'es'} for "${query}"`}</div>
+      {searchResults.map((r,i)=>(<div key={i} style={{padding:'6px 0',borderTop:i?'1px solid rgba(255,255,255,0.04)':'none',cursor:'pointer'}} onClick={()=>{loadPath(r.path);setQuery('');setSearchResults(null)}}>
+        <div style={{fontSize:11,color:'#00d4ff',fontFamily:'JetBrains Mono'}}>{r.path} <span style={{color:'#888'}}>· {r.matches}</span></div>
+        {(r.snippets||[]).map((s,j)=>(<div key={j} style={{fontSize:11,color:'#bbb',marginLeft:8,marginTop:2,fontFamily:'JetBrains Mono'}}>L{s.line}: {s.text}</div>))}
+      </div>))}
+    </div>}
+
+    {/* Main split: sidebar + content */}
+    <div style={{display:'flex',gap:12,flex:1,minHeight:0}}>
+      <div style={{width:200,borderRight:'1px solid rgba(255,255,255,0.04)',paddingRight:8,overflowY:'auto',flexShrink:0}}>
+        <div style={{fontSize:11,color:'#888',marginBottom:8,fontFamily:'JetBrains Mono'}}>{totalFiles} files · {struct?.sections?.length||0} sections</div>
+
+        {recent.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:11,color:'#7c3aed',fontFamily:'Orbitron',margin:'4px 0 3px',letterSpacing:'.05em'}}>RECENT</div>
+          {recent.map(r=>(<div key={r.path} onClick={()=>loadPath(r.path)} style={{fontSize:11,color:path===r.path?'#00d4ff':'#888',cursor:'pointer',padding:'2px 0'}} title={r.modified_iso||''} onMouseOver={e=>e.currentTarget.style.color='#00d4ff'} onMouseOut={e=>{if(path!==r.path)e.currentTarget.style.color='#888'}}>{r.section}/{r.filename}</div>))}
+        </div>}
+
+        {struct?.sections?.map(s=><div key={s.name}>
+          <div style={{fontSize:11,color:'#00d4ff',fontFamily:'Orbitron',margin:'8px 0 3px',letterSpacing:'.05em'}}>{s.name} <span style={{color:'#999'}}>({(s.files||[]).length})</span></div>
+          {(s.files||[]).map(f=>{const fn=typeof f==='string'?f:(f.filename||f.name);const p=`${s.name}/${fn}`;return(<div key={fn} onClick={()=>load(s.name,f)} style={{fontSize:11,color:path===p?'#00d4ff':'#666',cursor:'pointer',padding:'2px 0',transition:'color .15s'}} onMouseOver={e=>e.currentTarget.style.color='#00d4ff'} onMouseOut={e=>{if(path!==p)e.currentTarget.style.color='#666'}}>{fn}</div>)})}
+        </div>)}
+      </div>
+
+      <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
+        {path&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{fontSize:11,color:'#999',fontFamily:'JetBrains Mono'}}>wiki/{path}</div>
+          <div style={{display:'flex',gap:4}}>
+            {!editing&&<button className="btn" style={{fontSize:11,padding:'2px 8px'}} onClick={beginEdit}>✎ Edit</button>}
+            {editing&&<button className="btn" style={{fontSize:11,padding:'2px 8px',color:'#00ff80',borderColor:'rgba(0,255,128,0.4)'}} disabled={saving} onClick={saveEdit}>{saving?'Saving...':'💾 Save'}</button>}
+            {editing&&<button className="btn" style={{fontSize:11,padding:'2px 8px'}} onClick={cancelEdit}>Cancel</button>}
+            {!editing&&path&&<button className="btn" style={{fontSize:11,padding:'2px 8px',color:'#ff0080',borderColor:'rgba(255,0,128,0.4)'}} onClick={()=>{setConfirmDelete(path);setConfirmText('')}}>🗑 Delete</button>}
+          </div>
+        </div>}
+        {editing
+          ?<textarea value={draft} onChange={e=>setDraft(e.target.value)} spellCheck={false}
+            style={{flex:1,minHeight:300,width:'100%',background:'rgba(0,0,0,0.35)',color:'#ddd',border:'1px solid rgba(0,212,255,0.22)',borderRadius:6,padding:10,fontFamily:'JetBrains Mono',fontSize:12,lineHeight:1.6,resize:'vertical',outline:'none'}}/>
+          :<pre style={{whiteSpace:'pre-wrap',fontSize:12,color:'#bbb',fontFamily:'Inter',lineHeight:1.7,margin:0}}>{content}</pre>}
+      </div>
+    </div>
+
+    {/* Delete confirmation modal */}
+    {confirmDelete&&<div onClick={()=>{setConfirmDelete(null);setConfirmText('')}} style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'min(440px,90vw)',background:'rgba(15,5,15,0.97)',border:'1px solid rgba(255,0,128,0.45)',borderRadius:10,padding:18,boxShadow:'0 12px 40px rgba(0,0,0,0.85)'}}>
+        <div style={{fontFamily:'Orbitron',fontSize:12,color:'#ff0080',letterSpacing:'.1em',marginBottom:8}}>⚠ DELETE WIKI FILE</div>
+        <div style={{fontSize:12,color:'#ddd',marginBottom:10,lineHeight:1.5}}>This will permanently delete <strong style={{color:'#ff0080'}}>{confirmDelete}</strong>. Type <strong>DELETE</strong> to confirm.</div>
+        <input value={confirmText} onChange={e=>setConfirmText(e.target.value)} placeholder="DELETE" autoFocus
+          style={{width:'100%',background:'rgba(0,0,0,0.4)',color:'#fff',border:'1px solid rgba(255,0,128,0.4)',borderRadius:6,padding:'8px 10px',fontFamily:'JetBrains Mono',fontSize:13,outline:'none',marginBottom:10}}/>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button className="btn" style={{fontSize:11}} onClick={()=>{setConfirmDelete(null);setConfirmText('')}}>Cancel</button>
+          <button className="btn" style={{fontSize:11,color:'#ff0080',borderColor:'rgba(255,0,128,0.5)'}} disabled={confirmText!=='DELETE'} onClick={deleteFile}>Delete Permanently</button>
+        </div>
+      </div>
+    </div>}
   </div>);
 }
 function CoparentWS(){
@@ -2359,20 +2520,23 @@ function CoparentWS(){
   const isThursday=d=>d&&new Date(year,month,d).getDay()===4;
   const isCustodyWeekend=d=>{if(!d)return false;const dow=new Date(year,month,d).getDay();if(dow!==0&&dow!==6)return false;let sunCount=0;for(let i=1;i<=d;i++){if(new Date(year,month,i).getDay()===0)sunCount++}return sunCount===1||sunCount===3||sunCount===5};
   const nextThursday=()=>{const d=new Date();while(d.getDay()!==4)d.setDate(d.getDate()+1);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
-  const generateWeeklySummary=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Generate co-parent weekly summary']})}).then(()=>alert('Weekly summary generation launched')).catch(()=>{})};
+  const generateWeeklySummary=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Generate co-parent weekly summary'],cwd:'C:\\Users\\swebs\\Projects\\friday-desktop'})}).then(()=>alert('Weekly summary generation launched')).catch(()=>{})};
   return(<div>
-    <FridaySays text={`Next scheduled day: Thursday ${nextThursday()}. Configure your custody pattern in profile.json.`}/>
+    <FridaySays text={`Next custody day: Thursday ${nextThursday()}. 852 OFW messages analyzed. 89 unanswered threads documented.`}/>
     <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><button className="btn" style={{fontSize:11}} onClick={generateWeeklySummary}>Generate Weekly Summary</button></div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+      <div className="card"><div className="card-title">OFW Communication</div><div className="stat">852</div><div className="stat-label">total messages · 4.5 years</div><div style={{marginTop:4,fontSize:11,color:'#888'}}>First-view asymmetry: <span style={{color:'#ff0080'}}>25h</span> vs <span style={{color:'#00ff80'}}>3.3h</span></div></div>
+      <div className="card"><div className="card-title">Unanswered</div><div className="stat" style={{color:'#ff0080'}}>89</div><div className="stat-label">threads awaiting response</div></div>
+    </div>
     <div className="card" style={{marginBottom:12}}><div className="card-title">Custody Calendar — {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month]} {year}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,fontSize:11,textAlign:'center'}}>
         {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=><div key={d} style={{color:'#999',fontFamily:'Orbitron',fontSize:11,padding:4}}>{d}</div>)}
         {days.map((d,i)=>{const custody=isCustodyWeekend(d);const thurs=isThursday(d);const today=d===now.getDate();return <div key={i} style={{padding:4,borderRadius:4,background:today?'rgba(255,0,128,0.2)':custody?'rgba(0,212,255,0.12)':thurs?'rgba(124,58,237,0.12)':'transparent',color:d?(today?'#ff0080':custody||thurs?'#00d4ff':'#888'):'transparent',fontFamily:'JetBrains Mono',fontWeight:today?700:400}}>{d||'·'}</div>})}
       </div>
-      <div style={{fontSize:11,color:'#999',marginTop:6}}>🔵 Custody weekends · 🟣 Thursdays · 🔴 Today (pattern shown is illustrative — customize per your agreement)</div>
+      <div style={{fontSize:11,color:'#999',marginTop:6}}>🔵 Custody weekends · 🟣 Thursdays · 🔴 Today</div>
     </div>
-    <div className="card"><div className="card-title">Weekly Schedule</div>
-      <div style={{fontSize:12,color:'#999'}}>Configure recurring weekly events in <code>~/.friday/profile.json</code> to populate this view.</div>
-    </div>
+    <div className="card"><div className="card-title">Libby's Weekly Schedule</div>
+      {['🥋 Kung Fu','💃 Dance','♟️ Chess (school)','🧠 Play Therapy — Rachel Hodgdon','🏫 Pflugerville Montessori · Pickup 4 PM'].map((a,i)=><div key={i} style={{padding:'3px 0',fontSize:12,color:'#aaa'}}>{a}</div>)}</div>
   </div>);
 }
 function FuturespeakWS(){
@@ -2390,7 +2554,7 @@ function FuturespeakWS(){
     try{const r=await fetch('/api/outreach/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:opp.name,angle:'proposal',channel:'email',context:`Opportunity: ${opp.name}. Status: ${opp.status}. Value: $${opp.value_usd}. Next: ${opp.next_action}. ${opp.notes||''}`})});
       const d=await r.json();setDraft(d.draft||'')}catch(e){setDraft('[Error] '+e.message)}setDrafting(null)};
   const copyText=async(text,label)=>{try{await navigator.clipboard.writeText(text);showToast((label||'Text')+' copied')}catch(e){showToast('Copy failed')}};
-  const launchVibeCode=async(task,cwd)=>{try{await fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cwd?{tasks:[task],cwd}:{tasks:[task]})});showToast('Claude Code launched')}catch(e){showToast('Launch failed')}};
+  const launchVibeCode=async(task,cwd)=>{try{await fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:[task],cwd:cwd||'C:\\Users\\swebs\\Projects'})});showToast('Claude Code launched')}catch(e){showToast('Launch failed')}};
   const draftBlog=()=>{fetch('/api/content/idea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'FutureSpeak.AI — Post Draft',type:'post',channel:'linkedin',notes:'Brand post from Creative Studio.',tags:['futurespeak','brand']})}).then(()=>showToast('Idea captured in Content pipeline')).catch(()=>showToast('Failed'))};
   if(loading)return <div style={{color:'#999',textAlign:'center',padding:40}}>Loading FutureSpeak workspace...</div>;
 
@@ -2494,7 +2658,7 @@ function FuturespeakWS(){
         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
           <a className="btn" style={{fontSize:11,textDecoration:'none'}} href="https://futurespeak.ai" target="_blank" rel="noopener">🌐 Visit</a>
           <a className="btn" style={{fontSize:11,textDecoration:'none'}} href="https://replit.com/@FutureSpeakAI" target="_blank" rel="noopener">⚡ Open in Replit</a>
-          <button className="btn" style={{fontSize:11}} onClick={()=>launchVibeCode('Update futurespeak.ai website')}>💻 Open in Claude Code</button>
+          <button className="btn" style={{fontSize:11}} onClick={()=>launchVibeCode('Update futurespeak.ai website','C:\\Users\\swebs\\Projects\\futurespeak-site')}>💻 Open in Claude Code</button>
         </div>
       </div>
       <div className="card" style={{marginBottom:8}}>
@@ -2505,7 +2669,7 @@ function FuturespeakWS(){
         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
           <a className="btn" style={{fontSize:11,textDecoration:'none'}} href="https://innexenergy.com" target="_blank" rel="noopener">🌐 Visit</a>
           <a className="btn" style={{fontSize:11,textDecoration:'none'}} href="https://replit.com/@FutureSpeakAI" target="_blank" rel="noopener">⚡ Open in Replit</a>
-          <button className="btn" style={{fontSize:11}} onClick={()=>launchVibeCode('Update innexenergy.com website')}>💻 Open in Claude Code</button>
+          <button className="btn" style={{fontSize:11}} onClick={()=>launchVibeCode('Update innexenergy.com website','C:\\Users\\swebs\\Projects\\innex-site')}>💻 Open in Claude Code</button>
         </div>
       </div>
       <div className="card"><div className="card-title">Site Health</div><div style={{fontSize:11,color:'#a8a8b4'}}>Last check: manual · use Claude Code for deploy actions.</div></div>
@@ -2550,13 +2714,13 @@ function FuturespeakWS(){
         <div className="card-title">Creative Studio — Brand Assets</div>
         <div style={{fontSize:11,color:'#888',marginBottom:10}}>On-brand FutureSpeak.AI asset creation hub. Outputs route to Studio + Content pipelines.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
-          <button className="btn" style={{fontSize:11,padding:'8px',height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>{showToast('Canva / Gemini integration pending');launchVibeCode('Generate on-brand FutureSpeak social graphic')}}>
+          <button className="btn" style={{fontSize:11,padding:'8px',height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>{showToast('Canva / Gemini integration pending');launchVibeCode('Generate on-brand FutureSpeak social graphic','C:\\Users\\swebs\\Projects\\friday-desktop')}}>
             <span style={{fontSize:20}}>🎨</span><span>Generate Social Graphic</span>
           </button>
           <button className="btn" style={{fontSize:11,padding:'8px',height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}} onClick={draftBlog}>
             <span style={{fontSize:20}}>📝</span><span>Draft Blog Post</span>
           </button>
-          <button className="btn" style={{fontSize:11,padding:'8px',height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>launchVibeCode('Create a FutureSpeak.AI one-pager for the current top opportunity')}>
+          <button className="btn" style={{fontSize:11,padding:'8px',height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}} onClick={()=>launchVibeCode('Create a FutureSpeak.AI one-pager for the current top opportunity','C:\\Users\\swebs\\Projects\\friday-desktop')}>
             <span style={{fontSize:20}}>📄</span><span>Create One-Pager</span>
           </button>
         </div>
@@ -2574,35 +2738,17 @@ function FuturespeakWS(){
 }
 function FamilyWS(){
   const[cd,setCd]=useState(null);
-  const[profile,setProfile]=useState(null);
-  useEffect(()=>{
-    fetch('/api/countdowns').then(r=>r.json()).then(setCd).catch(()=>{});
-    fetch('/api/profile').then(r=>r.json()).then(setProfile).catch(()=>{});
-  },[]);
-  const family=profile?.family||[];
-  const pets=profile?.pets||[];
-  const next=cd?.countdowns?.[0];
-  const greet=next?`${next.label||next.name} in ${next.days||next.days_until} day${(next.days||next.days_until)===1?'':'s'}.`:'Family dashboard loaded.';
+  useEffect(()=>{fetch('/api/countdowns').then(r=>r.json()).then(setCd).catch(()=>{})},[]);
+  const libbyDays=cd?.countdowns?.find(c=>(c.label||c.name||'').toLowerCase().includes('libby'))?.days||(cd?.countdowns?.find(c=>(c.label||c.name||'').toLowerCase().includes('libby'))?.days_until);
   return(<div>
-    <FridaySays text={greet}/>
+    <FridaySays text={libbyDays?`Libby turns 6 in ${libbyDays} days! (May 6)`:'Family dashboard loaded.'}/>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-      {family.length===0&&pets.length===0&&
-        <div className="card" style={{gridColumn:'1 / -1'}}><div className="card-title">No family configured</div>
-          <div style={{fontSize:12,color:'#999'}}>Edit <code>~/.friday/profile.json</code> to populate this dashboard. See <code>profile.example.json</code> in the repo for the schema.</div>
-        </div>}
-      {family.map((m,i)=>(
-        <div key={i} className="card"><div className="card-title">{m.relation==='partner'?'❤️':'👤'} {m.name||'(unnamed)'}</div>
-          {m.relation&&<div style={{fontSize:13}}>{m.relation}</div>}
-          {m.notes&&<div style={{fontSize:11,color:'#888',marginTop:4}}>{m.notes}</div>}
-          {m.birthday&&<div style={{fontSize:11,color:'#a8a8b4',marginTop:2}}>🎂 {m.birthday}</div>}
-        </div>
-      ))}
-      {pets.length>0&&<div className="card"><div className="card-title">🐾 Pets</div>
-        <div style={{fontSize:12,lineHeight:1.8}}>
-          {pets.map((p,i)=>(<div key={i}><strong style={{color:'#f59e0b'}}>{p.name}</strong>{p.species?` — ${p.species}`:''}{p.notes?` (${p.notes})`:''}</div>))}
-        </div>
-      </div>}
-      <div className="card"><div className="card-title">📅 Upcoming</div>{cd?.countdowns?.length?cd.countdowns.map((c,i)=><div key={i} style={{fontSize:12,padding:'3px 0'}}>{c.emoji||'📅'} {c.label||c.name} — <span style={{color:'#00d4ff',fontFamily:'Orbitron',fontSize:11}}>{c.days||c.days_until}d</span></div>):<span style={{color:'#999'}}>No upcoming events. Add anniversaries to ~/.friday/profile.json.</span>}</div>
+      <div className="card"><div className="card-title">🎂 Liberty "Libby"</div><div style={{fontSize:13}}>Age 5, turning 6 on May 6</div><div style={{fontSize:11,color:'#888',marginTop:4}}>🥋 Kung fu · 💃 Dance · ♟️ Chess<br/>🏫 Pflugerville Montessori</div>{libbyDays&&<div style={{marginTop:6}}><span className="badge-cyan">{libbyDays} days until birthday</span></div>}</div>
+      <div className="card"><div className="card-title">❤️ Janet Jay</div><div style={{fontSize:13}}>Journalist · Access Jay · INvisible Project</div><div style={{fontSize:11,color:'#888',marginTop:4}}>🎂 Jan 4 · 💍 Anniversary Feb 13</div><div style={{fontSize:11,color:'#a8a8b4',marginTop:2}}>Popular Science · VICE · MAKE · US Pain Foundation</div></div>
+      <div className="card"><div className="card-title">🐾 Dogs</div><div style={{fontSize:12,lineHeight:1.8}}><strong style={{color:'#f59e0b'}}>Link</strong> — 8yr chocolate lab, 120lbs <span className="badge-green" style={{fontSize:11}}>healthy</span><br/><strong style={{color:'#f59e0b'}}>Kismet</strong> — 15yr terrier <span className="badge-magenta" style={{fontSize:11}}>monitoring</span><br/><span style={{color:'#a8a8b4',fontSize:11}}>Sight/hearing loss, arthritis, possible dementia</span></div></div>
+      <div className="card"><div className="card-title">👨‍👩‍👧 Jay Family</div>{['Jere Jay — INNEX Energy CEO','Bonnie Jay — INNEX Ops Director','Julia Jay — Seattle, hydrology, Peace Corps','Griff Jay'].map((p,i)=><div key={i} style={{fontSize:12,padding:'2px 0',color:'#aaa'}}>{p}</div>)}</div>
+      <div className="card"><div className="card-title">🚗 Vehicles</div>{['🔵 2015 Golf TSI SEL — Unitronic Stage 1, ~60K mi','🔴 2023 GLI — stock, ~20K mi','🚐 Transit 350 — camper (shower, kitchen, king bed)'].map((v,i)=><div key={i} style={{fontSize:11,padding:'2px 0',color:'#aaa'}}>{v}</div>)}</div>
+      <div className="card"><div className="card-title">📅 Upcoming</div>{cd?.countdowns?.map((c,i)=><div key={i} style={{fontSize:12,padding:'3px 0'}}>{c.emoji||'📅'} {c.label||c.name} — <span style={{color:'#00d4ff',fontFamily:'Orbitron',fontSize:11}}>{c.days||c.days_until}d</span></div>)||<span style={{color:'#999'}}>Loading...</span>}</div>
     </div>
   </div>);
 }
@@ -2614,7 +2760,7 @@ function StudioWS(){
   const loadCreations=()=>{fetch('/api/creations').then(r=>r.json()).then(d=>{setCreations(d.files||[]);setLoading(false)}).catch(()=>setLoading(false))};
   useEffect(()=>{loadCreations();fetch('/api/creations/creation-log.md').then(r=>r.ok?r.text():null).then(t=>{if(t)setCreationLog(t)}).catch(()=>{})},[]);
   const create=async t=>{if(!prompt)return;setGen(true);try{await fetch(`/api/create/${t}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});loadCreations()}catch(e){}setGen(false)};
-  const createNow=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run friday daily creation']})}).then(()=>alert('Daily creation launched')).catch(()=>{})};
+  const createNow=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run friday daily creation'],cwd:'C:\\Users\\swebs\\Projects\\friday-desktop'})}).then(()=>alert('Daily creation launched')).catch(()=>{})};
   const openCreation=async f=>{setSelected(f);const ext=(f.name||'').split('.').pop().toLowerCase();if(ext==='md'){try{const r=await fetch('/api/creations/'+f.name);setPreview(await r.text())}catch(e){setPreview('')}}else{setPreview('')}};
   const filtered=filter==='all'?creations:creations.filter(f=>f.type===filter);
   if(selected){
@@ -2709,7 +2855,7 @@ function SystemWS(){
   </div>);
 }
 function CodeWS(){
-  const[tasks,setTasks]=useState('');const[cwd,setCwd]=useState('');const[terminals,setTerminals]=useState([]);const[loading,setLoading]=useState(false);
+  const[tasks,setTasks]=useState('');const[cwd,setCwd]=useState('C:\\Users\\swebs\\Projects');const[terminals,setTerminals]=useState([]);const[loading,setLoading]=useState(false);
   const[presets,setPresets]=useState([]);const[selectedTerminal,setSelectedTerminal]=useState(null);
   useEffect(()=>{
     fetch('/api/vibe-code/presets').then(r=>r.json()).then(d=>setPresets(d.presets||[])).catch(()=>{});
@@ -2778,7 +2924,7 @@ function NewsWS(){
   const openInTab=(b)=>{const file=b.html||b.name+'.html';window.open('/briefing/'+file,'_blank')};
   const readAloud=async()=>{if(!htmlContent||ttsLoading)return;stopReading();setTtsLoading(true);if(!window._fridayMoodSignals)window._fridayMoodSignals={};window._fridayMoodSignals.ttsActive=true;try{const text=htmlContent.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,' ').replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().substring(0,8000);const r=await fetch('/api/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,style:'briefing'})});if(!r.ok)throw new Error('TTS request failed');const blob=await r.blob();const url=URL.createObjectURL(blob);const a=new Audio(url);ttsAudio.current=a;a.onended=()=>{URL.revokeObjectURL(url);ttsAudio.current=null;if(window._fridayMoodSignals)window._fridayMoodSignals.ttsActive=false;};a.play().catch(e=>console.error('Audio play error:',e))}catch(e){console.error('TTS error:',e);if(window._fridayMoodSignals)window._fridayMoodSignals.ttsActive=false;}finally{setTtsLoading(false)}};
   const stopReading=()=>{if(ttsAudio.current){ttsAudio.current.pause();if(ttsAudio.current.src&&ttsAudio.current.src.startsWith('blob:'))URL.revokeObjectURL(ttsAudio.current.src);ttsAudio.current.currentTime=0;ttsAudio.current=null}};
-  const launchBriefing=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run daily news briefing']})}).then(()=>alert('Briefing generation launched')).catch(()=>{})};
+  const launchBriefing=()=>{fetch('/api/vibe-code/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:['Run daily news briefing'],cwd:'C:\\Users\\swebs\\Projects\\friday-desktop'})}).then(()=>alert('Briefing generation launched')).catch(()=>{})};
   const sendBriefingChat=async()=>{if(!chatIn.trim())return;const m=chatIn.trim();setChatIn('');setChatMsgs(p=>[...p,{role:'user',text:m}]);setChatLoad(true);
     try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Context: The user is reading the daily briefing from '+selected?.date+'. Question: '+m})});const d=await r.json();setChatMsgs(p=>[...p,{role:'friday',text:d.response}])}catch(e){setChatMsgs(p=>[...p,{role:'friday',text:'[Error]'}])}setChatLoad(false)};
   if(loading)return <div style={{color:'#999',textAlign:'center',padding:40}}>Loading briefing archive...</div>;
@@ -2975,7 +3121,7 @@ function FinanceWS(){
     </div>}
     {view==='quickref'&&<div>
       <div className="card-title">Quick Reference</div>
-      {[{name:'Bank',type:'Banking',ico:'🏦'},{name:'Health Insurance',type:'Insurance',ico:'🏥'},{name:'Primary Card',type:'Credit Card',ico:'💳'},{name:'Secondary Card',type:'Credit Card',ico:'💳'}].map((a,i)=><div key={i} className="card" style={{marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div><span style={{marginRight:6}}>{a.ico}</span><span style={{fontWeight:600}}>{a.name}</span><span style={{fontSize:11,color:'#a8a8b4',marginLeft:8}}>{a.type}</span></div><button className="btn" style={{fontSize:11}} onClick={()=>copyText(a.name)}>Copy</button></div></div>)}
+      {[{name:'Capital One',type:'Banking',ico:'🏦'},{name:'Cigna Healthcare',type:'Insurance',ico:'🏥'},{name:'Amex Platinum — Stephen',type:'Credit Card',ico:'💳'},{name:'Amex Platinum — Janet',type:'Credit Card',ico:'💳'}].map((a,i)=><div key={i} className="card" style={{marginBottom:6}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div><span style={{marginRight:6}}>{a.ico}</span><span style={{fontWeight:600}}>{a.name}</span><span style={{fontSize:11,color:'#a8a8b4',marginLeft:8}}>{a.type}</span></div><button className="btn" style={{fontSize:11}} onClick={()=>copyText(a.name)}>Copy</button></div></div>)}
     </div>}
   </div>);
 }
@@ -3373,8 +3519,8 @@ function App(){
   const[zMap,setZMap]=useState({});const[zC,setZC]=useState(42);
   const[chatOpen,setChatOpen]=useState(false);const[chatMsgs,setChatMsgs]=useState([]);const[chatIn,setChatIn]=useState('');const[chatLoad,setChatLoad]=useState(false);
   const[clock,setClock]=useState(new Date());const[structureName,setStructureName]=useState('Genesis Lattice');const[notifs,setNotifs]=useState([]);
+  const[wikiPending,setWikiPending]=useState(0);
   const[countdowns,setCountdowns]=useState([]);const[promptText,setPromptText]=useState('');
-  const[userProfile,setUserProfile]=useState(null);
   const[settingsOpen,setSettingsOpen]=useState(false);
   const[topBarHidden,setTopBarHidden]=useState(false);
   const[dockHidden,setDockHidden]=useState(false);
@@ -3382,7 +3528,7 @@ function App(){
   const dockTimer=useRef(null);
   const[stPers,setStPers]=useState(null);const[stEpi,setStEpi]=useState(null);const[stEvo,setStEvo]=useState(null);const[stHealth,setStHealth]=useState(null);const[stSycoMsg,setStSycoMsg]=useState('');
   // Agent configuration (temperature, response prefs, personality, cLaws)
-  const NEWS_TOPICS=['AI/Tech','Politics','Media','Local','Business'];
+  const NEWS_TOPICS=['AI/Tech','Politics','Media','Austin Local','Business'];
   const DEFAULT_AGENT_SETTINGS={temperature:0.7,response_length:'standard',include_sources:true,news_priorities:[...NEWS_TOPICS],communication_style:'professional',camera_interval_sec:3,camera_auto_describe:false,tts_voice:'Aoede'};
   const[agentSettings,setAgentSettings]=useState(DEFAULT_AGENT_SETTINGS);
   const[agentPersonality,setAgentPersonality]=useState('');
@@ -3401,7 +3547,7 @@ function App(){
   const previewVoice=async(voiceId)=>{
     if(ttsPreviewBusy)return;setTtsPreviewBusy(true);
     try{
-      const r=await fetch('/api/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:"Hi there, this is what I sound like.",voice:voiceId,style:'chat'})});
+      const r=await fetch('/api/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:"Hi Stephen, this is what I sound like.",voice:voiceId,style:'chat'})});
       if(r.ok){const b=await r.blob();const u=URL.createObjectURL(b);const a=new Audio(u);a.onended=()=>URL.revokeObjectURL(u);a.play()}
     }catch(e){console.error('Voice preview failed',e)}
     setTtsPreviewBusy(false);
@@ -3476,11 +3622,9 @@ function App(){
   }},1000);return()=>clearInterval(t)},[]);
   useEffect(()=>{fetch('/api/chat/history').then(r=>r.json()).then(d=>{if(d.messages)setChatMsgs(d.messages)}).catch(()=>{})},[]);
   useEffect(()=>{fetch('/api/notifications').then(r=>r.json()).then(d=>setNotifs(d.items||[])).catch(()=>{});const iv=setInterval(()=>{fetch('/api/notifications').then(r=>r.json()).then(d=>setNotifs(d.items||[])).catch(()=>{})},30000);return()=>clearInterval(iv)},[]);
+  useEffect(()=>{const pull=()=>fetch('/api/wiki/pending').then(r=>r.json()).then(d=>setWikiPending((d.pending||[]).length)).catch(()=>{});pull();const iv=setInterval(pull,15000);return()=>clearInterval(iv)},[]);
   useEffect(()=>{chatEnd.current?.scrollIntoView({behavior:'smooth'})},[chatMsgs]);
-  useEffect(()=>{
-    fetch('/api/countdowns').then(r=>r.json()).then(d=>{setCountdowns(d.countdowns||[])}).catch(()=>{});
-    fetch('/api/profile').then(r=>r.json()).then(setUserProfile).catch(()=>{});
-  },[]);
+  useEffect(()=>{fetch('/api/countdowns').then(r=>r.json()).then(d=>{setCountdowns(d.countdowns||[])}).catch(()=>{})},[]);
   useEffect(()=>{fetch('/api/evolution').then(r=>r.json()).then(d=>{if(typeof d.structure_index==='number')setTimeout(()=>window.fridayVibe?.setStructure(d.structure_index),600)}).catch(()=>{})},[]);
   useEffect(()=>{if(!window._fridayMoodSignals)window._fridayMoodSignals={};window._fridayMoodSignals.chatLoad=chatLoad||qdLoading;},[chatLoad,qdLoading]);
 
@@ -3640,7 +3784,7 @@ function App(){
     {noWindows&&<div style={{position:'fixed',inset:0,zIndex:5,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
       {/* Radial dark backdrop so greeting reads against any scene state */}
       <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-55%)',width:560,height:240,borderRadius:'50%',background:'radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 45%, transparent 75%)',pointerEvents:'none',zIndex:0}}/>
-      <div style={{position:'relative',zIndex:1,fontFamily:'Orbitron',fontSize:26,color:'rgba(0,212,255,0.98)',marginBottom:12,animation:'fadeIn 1s ease',letterSpacing:'0.06em',textShadow:'0 0 12px rgba(0,0,0,0.95), 0 0 32px rgba(0,212,255,0.35), 0 2px 4px rgba(0,0,0,0.85)'}}>{getGreeting()}{userProfile?.user_first_name?', '+userProfile.user_first_name:''}.</div>
+      <div style={{position:'relative',zIndex:1,fontFamily:'Orbitron',fontSize:26,color:'rgba(0,212,255,0.98)',marginBottom:12,animation:'fadeIn 1s ease',letterSpacing:'0.06em',textShadow:'0 0 12px rgba(0,0,0,0.95), 0 0 32px rgba(0,212,255,0.35), 0 2px 4px rgba(0,0,0,0.85)'}}>{getGreeting()}, Stephen.</div>
       {countdowns.length>0&&<div className="greeting-ticker" style={{marginBottom:28,position:'relative',zIndex:1}}>
         {countdowns.map((c,i)=><React.Fragment key={i}>
           {i>0&&<span className="greeting-ticker-sep"/>}
@@ -4048,8 +4192,9 @@ function App(){
         {gi>0&&<div className="dock-sep"/>}
         <div className="dock-group">
           <div className="dock-group-btns">
-            {g.items.map(w=><button key={w.id} className={`dock-btn ${openWins.has(w.id)?'active':''}`} onClick={()=>toggle(w.id)}>
+            {g.items.map(w=><button key={w.id} className={`dock-btn ${openWins.has(w.id)?'active':''}`} onClick={()=>toggle(w.id)} style={{position:'relative'}}>
               <span className="ico"><img src={`assets/icons/${w.id}.svg`} alt={w.label} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='inline'}}/><span style={{display:'none'}}>{w.ico}</span></span><span>{w.label}</span><span className="dot"/>
+              {w.id==='wiki'&&wikiPending>0&&<span style={{position:'absolute',top:2,right:2,minWidth:14,height:14,padding:'0 4px',borderRadius:7,background:'#f59e0b',color:'#0a0a0f',fontSize:9,fontWeight:700,fontFamily:'Orbitron',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 8px rgba(245,158,11,0.7)'}}>{wikiPending}</span>}
             </button>)}
           </div>
           <div className="dock-group-label">{g.name}</div>

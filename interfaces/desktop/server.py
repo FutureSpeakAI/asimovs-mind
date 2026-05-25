@@ -121,56 +121,14 @@ VIBE_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Paths ─────────────────────────────────────────────────────
 HOME = Path(os.path.expanduser("~"))
-WIKI_DIR = Path(os.environ.get("FRIDAY_WIKI_DIR", str(HOME / "wiki")))
-FRIDAY_DIR = Path(os.environ.get("FRIDAY_DIR", str(HOME / ".friday")))
-CREATIONS_DIR = Path(os.environ.get("FRIDAY_CREATIONS_DIR", str(HOME / "Desktop" / "friday-creations")))
+WIKI_DIR = HOME / "wiki"
+FRIDAY_DIR = HOME / ".friday"
+CREATIONS_DIR = HOME / "Desktop" / "friday-creations"
 WIKI_PROFESSIONAL_DIR = WIKI_DIR / "professional"
 JOB_SEARCH_FILE = WIKI_PROFESSIONAL_DIR / "job-search.md"
-CAREER_OPS_DIR = Path(os.environ.get("FRIDAY_CAREER_OPS_DIR", str(FRIDAY_DIR / "career-ops" / "data")))
-CAREER_OPS_REPORTS_DIR = Path(os.environ.get("FRIDAY_CAREER_OPS_REPORTS_DIR", str(FRIDAY_DIR / "career-ops" / "reports")))
 
 # Ensure creations dir exists
 CREATIONS_DIR.mkdir(parents=True, exist_ok=True)
-
-# ── User Profile (loaded from ~/.friday/profile.json) ─────────
-# Profile is user-editable and contains personal context that Friday uses
-# in system prompts, dashboard cards, and trust-graph context. All keys are
-# optional — falls back to neutral placeholders when missing.
-DEFAULT_PROFILE = {
-    "user_name": "the user",
-    "user_first_name": "friend",
-    "user_role": "",
-    "user_location": "",
-    "user_bio": "",
-    "organization": "",
-    "family": [],            # list of {"name", "relation", "notes", "birthday"}
-    "pets": [],              # list of {"name", "species", "notes"}
-    "anniversaries": [],     # list of {"label", "date"}
-    "interests": [],
-    "communication_style": "warm, direct, no corporate BS",
-    "agent_address_term": "",  # how Friday addresses user (e.g. "boss"), blank = first name
-}
-
-def _load_profile():
-    """Load ~/.friday/profile.json, falling back to DEFAULT_PROFILE."""
-    FRIDAY_DIR.mkdir(parents=True, exist_ok=True)
-    profile_path = FRIDAY_DIR / "profile.json"
-    if not profile_path.exists():
-        return dict(DEFAULT_PROFILE)
-    try:
-        data = json.loads(profile_path.read_text(encoding='utf-8'))
-        merged = dict(DEFAULT_PROFILE)
-        merged.update(data)
-        return merged
-    except Exception:
-        return dict(DEFAULT_PROFILE)
-
-def _user_name():
-    return _load_profile().get("user_name") or "the user"
-
-def _user_first():
-    p = _load_profile()
-    return p.get("user_first_name") or (p.get("user_name") or "friend").split()[0]
 
 # ── Gemini Client (lazy init) ─────────────────────────────────
 _genai_client = None
@@ -296,7 +254,7 @@ def _pii_redact(text):
 CLAUDE_TOOLS = [
     {"name": "search_web", "description": "Search the web for current information. Returns a brief answer or a note if the web is unavailable.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
-    {"name": "read_file", "description": "Read a file from the user's home directory tree. Path must be under the user's home directory.",
+    {"name": "read_file", "description": "Read a file from the user's home directory tree. Path must be under C:\\Users\\swebs\\.",
      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
     {"name": "write_clipboard", "description": "Copy text to the user's Windows clipboard.",
      "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
@@ -648,6 +606,87 @@ CLAUDE_TOOLS.append({
 })
 
 
+def _tool_propose_wiki_update(inp):
+    """Queue a wiki update as pending — the user approves it in the Wiki workspace."""
+    inp = inp or {}
+    file = (inp.get("file") or "").strip()
+    new_value = inp.get("new_value") or ""
+    if not file or not new_value:
+        return "propose_wiki_update error: 'file' and 'new_value' are required."
+    section = (inp.get("section") or "").strip()
+    reason = (inp.get("reason") or "Agent-proposed update.").strip()
+    if _safe_wiki_path(file) is None:
+        return f"propose_wiki_update error: invalid wiki path {file!r} (must stay inside ~/wiki/)."
+    pid = _propose_wiki_update(file=file, section=section, new_value=new_value, reason=reason)
+    return f"Wiki update proposed (id={pid}) — awaiting your approval in the Wiki workspace."
+
+
+def _tool_correct_wiki(inp):
+    """Replace old_text with new_text across every wiki file and ~/.friday JSONs."""
+    inp = inp or {}
+    old_text = inp.get("old_text") or ""
+    new_text = inp.get("new_text") or ""
+    if not old_text:
+        return "correct_wiki error: 'old_text' is required."
+    modified = []
+    if WIKI_DIR.exists():
+        for f in WIKI_DIR.rglob('*'):
+            if not f.is_file() or f.suffix not in ('.md', '.txt'):
+                continue
+            try:
+                text = f.read_text(encoding='utf-8', errors='replace')
+            except Exception:
+                continue
+            if old_text in text:
+                try:
+                    rel = str(f.relative_to(WIKI_DIR)).replace('\\', '/')
+                    _mirror_wiki_file(rel, text.replace(old_text, new_text))
+                    modified.append(rel)
+                except Exception:
+                    pass
+    if FRIDAY_DIR.exists():
+        for f in FRIDAY_DIR.glob('*.json'):
+            try:
+                text = f.read_text(encoding='utf-8', errors='replace')
+            except Exception:
+                continue
+            if old_text in text:
+                try:
+                    f.write_text(text.replace(old_text, new_text), encoding='utf-8')
+                    modified.append(f".friday/{f.name}")
+                except Exception:
+                    pass
+    return json.dumps({"modified": modified, "count": len(modified)})
+
+
+CLAUDE_TOOLS.append({
+    "name": "propose_wiki_update",
+    "description": "Propose an update to the user's personal wiki when you learn new information about them. The update is queued as PENDING and the user approves it from the Wiki workspace — it is NOT applied immediately. Use this whenever you learn a new fact about the user, their work, family, preferences, or projects that should outlive the current conversation.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "file": {"type": "string", "description": "Wiki file path relative to ~/wiki/, e.g., 'identity/core-profile.md'."},
+            "section": {"type": "string", "description": "Optional section name within the file (e.g., 'birthplace'). Used to append under a header if no existing text is matched."},
+            "new_value": {"type": "string", "description": "The new content to add or replace with."},
+            "reason": {"type": "string", "description": "Why this update is being proposed (e.g., 'User correction during chat')."},
+        },
+        "required": ["file", "new_value", "reason"],
+    },
+})
+CLAUDE_TOOLS.append({
+    "name": "correct_wiki",
+    "description": "Correct wrong information across the ENTIRE wiki at once. Use this when the user says you (or the wiki) got a fact wrong — replaces old_text with new_text in every wiki file plus ~/.friday JSONs. Applies immediately (no approval needed) because corrections are user-initiated.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "old_text": {"type": "string", "description": "Exact text to find and replace."},
+            "new_text": {"type": "string", "description": "Replacement text."},
+        },
+        "required": ["old_text", "new_text"],
+    },
+})
+
+
 CLAUDE_TOOL_HANDLERS = {
     "search_web": _tool_search_web,
     "read_file": _tool_read_file,
@@ -662,6 +701,8 @@ CLAUDE_TOOL_HANDLERS = {
     "get_career_pipeline": _tool_get_career_pipeline,
     "get_briefing": _tool_get_briefing,
     "spawn_task": _tool_spawn_task,
+    "propose_wiki_update": _tool_propose_wiki_update,
+    "correct_wiki": _tool_correct_wiki,
 }
 
 
@@ -768,25 +809,18 @@ def _call_claude_agent(messages, system=None, model=None, max_tokens=2048, tempe
 SETTINGS_FILE = FRIDAY_DIR / "settings.json"
 AGENT_PERSONALITY_FILE = FRIDAY_DIR / "agent-personality.txt"
 
-def _default_agent_personality():
-    p = _load_profile()
-    name = p.get("user_name") or "the user"
-    org = p.get("organization") or ""
-    org_clause = f", their work at {org}" if org else ""
-    return (
-        f"You are Friday — a calm, perceptive AI partner to {name}. "
-        "You speak with quiet confidence and dry warmth; you favor signal over noise. "
-        f"You connect dots across their projects{org_clause} without being asked twice. "
-        "You give them the answer first, then the reasoning. You are honest about uncertainty."
-    )
-
-DEFAULT_AGENT_PERSONALITY = _default_agent_personality()
+DEFAULT_AGENT_PERSONALITY = (
+    "You are Friday — a calm, perceptive AI partner to Stephen Webster. "
+    "You speak with quiet confidence and dry warmth; you favor signal over noise. "
+    "You connect dots across his work (FutureSpeak.AI, career-ops, family) without being asked twice. "
+    "You give him the answer first, then the reasoning. You are honest about uncertainty."
+)
 
 DEFAULT_SETTINGS = {
     "temperature": 0.7,
     "response_length": "standard",        # concise | standard | detailed
     "include_sources": True,
-    "news_priorities": ["AI/Tech", "Politics", "Media", "Local", "Business"],
+    "news_priorities": ["AI/Tech", "Politics", "Media", "Austin Local", "Business"],
     "communication_style": "professional",  # professional | casual | technical
     "camera_interval_sec": 3,              # 1 | 3 | 5
     "camera_auto_describe": False,
@@ -928,7 +962,7 @@ def serve_friday_live_sw():
 def career_tracker():
     candidates = [
         WIKI_PROFESSIONAL_DIR / 'application-log.md',
-        CAREER_OPS_DIR / 'applications.md',
+        Path('C:\\Users\\swebs\\Projects\\career-ops\\data') / 'applications.md',
     ]
     tracker_path = next((p for p in candidates if p.is_file()), None)
     if tracker_path:
@@ -947,7 +981,7 @@ def career_tracker():
 def career_pipeline():
     candidates = [
         WIKI_PROFESSIONAL_DIR / 'job-search.md',
-        CAREER_OPS_DIR / 'pipeline.md',
+        Path('C:\\Users\\swebs\\Projects\\career-ops\\data') / 'pipeline.md',
     ]
     pipe_path = next((p for p in candidates if p.is_file()), None)
     if pipe_path:
@@ -965,7 +999,7 @@ def career_reports():
                 reports.append({'name': f.name, 'size': f.stat().st_size, 'source': 'wiki'})
                 seen.add(f.name)
     # career-ops/reports/ is fallback — add any files not already in wiki
-    fallback_dir = CAREER_OPS_REPORTS_DIR
+    fallback_dir = Path('C:\\Users\\swebs\\Projects\\career-ops\\reports')
     if fallback_dir.is_dir():
         for f in sorted(fallback_dir.iterdir(), reverse=True):
             if f.suffix == '.md' and f.name not in seen:
@@ -978,7 +1012,7 @@ def career_reports():
 def career_report(filename):
     candidates = [
         WIKI_PROFESSIONAL_DIR / filename,
-        CAREER_OPS_REPORTS_DIR / filename,
+        Path('C:\\Users\\swebs\\Projects\\career-ops\\reports') / filename,
     ]
     report_path = next((p for p in candidates if p.is_file()), None)
     if report_path:
@@ -1224,6 +1258,129 @@ def get_memory_stats():
 #  WIKI
 # ═══════════════════════════════════════════════════════════════
 
+# ── Wiki helpers ──────────────────────────────────────────────
+WIKI_PENDING_FILE = FRIDAY_DIR / "wiki-pending.json"
+WIKI_MIRROR_DIR = Path(r"G:\My Drive\Wiki")
+
+
+def _safe_wiki_path(rel):
+    """Resolve a wiki-relative path inside WIKI_DIR. Returns Path or None."""
+    if not rel or not isinstance(rel, str):
+        return None
+    rel = rel.replace('\\', '/').lstrip('/')
+    try:
+        p = (WIKI_DIR / rel).resolve()
+        wiki_root = WIKI_DIR.resolve()
+        try:
+            p.relative_to(wiki_root)
+        except ValueError:
+            return None
+        if p.suffix not in ('.md', '.txt', ''):
+            return None
+        if not p.suffix:
+            p = p.with_suffix('.md')
+        return p
+    except Exception:
+        return None
+
+
+def _mirror_wiki_file(rel, content):
+    """Write content to WIKI_DIR/rel and mirror to Google Drive if mounted."""
+    rel = rel.replace('\\', '/').lstrip('/')
+    primary = WIKI_DIR / rel
+    primary.parent.mkdir(parents=True, exist_ok=True)
+    primary.write_text(content, encoding='utf-8')
+    try:
+        if WIKI_MIRROR_DIR.exists():
+            mirror = WIKI_MIRROR_DIR / rel
+            mirror.parent.mkdir(parents=True, exist_ok=True)
+            mirror.write_text(content, encoding='utf-8')
+    except Exception as e:
+        print(f"  [WIKI] Mirror failed for {rel}: {e}")
+
+
+def _delete_wiki_file(rel):
+    """Delete primary + mirror if present."""
+    rel = rel.replace('\\', '/').lstrip('/')
+    primary = WIKI_DIR / rel
+    deleted = False
+    if primary.exists() and primary.is_file():
+        primary.unlink()
+        deleted = True
+    try:
+        if WIKI_MIRROR_DIR.exists():
+            mirror = WIKI_MIRROR_DIR / rel
+            if mirror.exists() and mirror.is_file():
+                mirror.unlink()
+    except Exception as e:
+        print(f"  [WIKI] Mirror delete failed for {rel}: {e}")
+    return deleted
+
+
+def _load_pending_wiki():
+    if not WIKI_PENDING_FILE.exists():
+        return []
+    try:
+        data = json.loads(WIKI_PENDING_FILE.read_text(encoding='utf-8'))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _save_pending_wiki(items):
+    WIKI_PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
+    WIKI_PENDING_FILE.write_text(json.dumps(items, indent=2, default=str), encoding='utf-8')
+
+
+def _propose_wiki_update(file, section, new_value, reason, old_value=""):
+    """Stash a proposed update for user approval. Returns the new id."""
+    items = _load_pending_wiki()
+    item = {
+        "id": uuid.uuid4().hex[:12],
+        "file": (file or "").replace('\\', '/').lstrip('/'),
+        "section": section or "",
+        "old_value": old_value or "",
+        "new_value": new_value or "",
+        "reason": reason or "",
+        "created": datetime.utcnow().isoformat() + "Z",
+        "status": "pending",
+    }
+    items.append(item)
+    _save_pending_wiki(items)
+    return item["id"]
+
+
+def _apply_wiki_proposal(item):
+    """Apply a pending proposal to the actual file.
+
+    Logic:
+      - If old_value is present and found in current file: in-place replace.
+      - Else: append a section like "\n## {section}\n{new_value}\n" (or just the value).
+      - If the file does not exist yet, create it with a minimal header.
+    """
+    rel = item.get("file") or ""
+    path = _safe_wiki_path(rel)
+    if path is None:
+        return False, "Invalid wiki path."
+    existing = path.read_text(encoding='utf-8') if path.exists() else ""
+    old_val = item.get("old_value") or ""
+    new_val = item.get("new_value") or ""
+    section = item.get("section") or ""
+    if old_val and old_val in existing:
+        updated = existing.replace(old_val, new_val)
+    elif existing.strip():
+        header = f"\n\n## {section}\n" if section else "\n\n"
+        updated = existing.rstrip() + header + new_val + "\n"
+    else:
+        title = path.stem.replace('-', ' ').title()
+        header = f"# {title}\n\n"
+        if section:
+            header += f"## {section}\n"
+        updated = header + new_val + "\n"
+    _mirror_wiki_file(rel, updated)
+    return True, "Applied."
+
+
 @app.route('/api/wiki/<section>/<filename>')
 def wiki_page(section, filename):
     """Read a wiki markdown file."""
@@ -1237,18 +1394,274 @@ def wiki_page(section, filename):
 
 @app.route('/api/wiki/structure')
 def wiki_structure():
-    """Return full wiki directory structure."""
+    """Return full wiki directory structure, with modified times and recent list."""
     structure = {}
+    all_files = []
     if WIKI_DIR.exists():
         for section_dir in sorted(WIKI_DIR.iterdir()):
             if section_dir.is_dir() and not section_dir.name.startswith('.'):
                 files = []
                 for f in sorted(section_dir.iterdir()):
                     if f.suffix in ('.md', '.txt'):
-                        files.append({"name": f.stem, "filename": f.name, "size": f.stat().st_size})
+                        try:
+                            mtime = f.stat().st_mtime
+                            size = f.stat().st_size
+                        except Exception:
+                            mtime, size = 0, 0
+                        entry = {
+                            "name": f.stem,
+                            "filename": f.name,
+                            "size": size,
+                            "modified": mtime,
+                            "modified_iso": datetime.fromtimestamp(mtime).isoformat() if mtime else None,
+                        }
+                        files.append(entry)
+                        all_files.append({**entry, "section": section_dir.name, "path": f"{section_dir.name}/{f.name}"})
                 if files:
                     structure[section_dir.name] = files
-    return jsonify({"status": "ok", "structure": structure})
+    all_files.sort(key=lambda x: x.get("modified") or 0, reverse=True)
+    recent = all_files[:5]
+    pending_count = len([p for p in _load_pending_wiki() if p.get("status") == "pending"])
+    return jsonify({"status": "ok", "structure": structure, "recent": recent, "pending_count": pending_count})
+
+
+@app.route('/api/wiki/update', methods=['POST'])
+def wiki_update():
+    """Agent or user proposes a wiki update. If auto=true, stored as pending; else applied immediately."""
+    data = request.get_json(force=True, silent=True) or {}
+    file = data.get("file", "")
+    section = data.get("section", "")
+    old_value = data.get("old_value", "")
+    new_value = data.get("new_value", "")
+    reason = data.get("reason", "")
+    auto = bool(data.get("auto"))
+    if not file or new_value is None:
+        return jsonify({"status": "error", "message": "file and new_value required"}), 400
+    if _safe_wiki_path(file) is None:
+        return jsonify({"status": "error", "message": "invalid wiki path"}), 400
+    if auto:
+        pid = _propose_wiki_update(file, section, new_value, reason, old_value)
+        return jsonify({"status": "ok", "queued": True, "id": pid})
+    ok, msg = _apply_wiki_proposal({
+        "file": file, "section": section, "old_value": old_value, "new_value": new_value,
+    })
+    if not ok:
+        return jsonify({"status": "error", "message": msg}), 400
+    return jsonify({"status": "ok", "applied": True})
+
+
+@app.route('/api/wiki/pending', methods=['GET'])
+def wiki_pending():
+    items = [p for p in _load_pending_wiki() if p.get("status") == "pending"]
+    return jsonify({"status": "ok", "pending": items})
+
+
+@app.route('/api/wiki/pending/<pid>/approve', methods=['POST'])
+def wiki_pending_approve(pid):
+    items = _load_pending_wiki()
+    target = None
+    for it in items:
+        if it.get("id") == pid:
+            target = it
+            break
+    if target is None:
+        return jsonify({"status": "not_found"}), 404
+    ok, msg = _apply_wiki_proposal(target)
+    if not ok:
+        return jsonify({"status": "error", "message": msg}), 400
+    target["status"] = "approved"
+    target["resolved"] = datetime.utcnow().isoformat() + "Z"
+    _save_pending_wiki(items)
+    return jsonify({"status": "ok", "approved": pid})
+
+
+@app.route('/api/wiki/pending/<pid>/reject', methods=['POST'])
+def wiki_pending_reject(pid):
+    items = _load_pending_wiki()
+    found = False
+    for it in items:
+        if it.get("id") == pid:
+            it["status"] = "rejected"
+            it["resolved"] = datetime.utcnow().isoformat() + "Z"
+            found = True
+            break
+    if not found:
+        return jsonify({"status": "not_found"}), 404
+    _save_pending_wiki(items)
+    return jsonify({"status": "ok", "rejected": pid})
+
+
+@app.route('/api/wiki/edit', methods=['PUT'])
+def wiki_edit():
+    """Direct inline edit from the UI: full file content replacement."""
+    data = request.get_json(force=True, silent=True) or {}
+    file = data.get("file", "")
+    content = data.get("content")
+    if not file or content is None:
+        return jsonify({"status": "error", "message": "file and content required"}), 400
+    path = _safe_wiki_path(file)
+    if path is None:
+        return jsonify({"status": "error", "message": "invalid wiki path"}), 400
+    _mirror_wiki_file(file, content)
+    return jsonify({"status": "ok", "saved": file, "bytes": len(content)})
+
+
+@app.route('/api/wiki/file', methods=['DELETE'])
+def wiki_delete():
+    """Delete a wiki file. Requires confirm == 'DELETE'."""
+    data = request.get_json(force=True, silent=True) or {}
+    file = data.get("file", "")
+    confirm = data.get("confirm", "")
+    if confirm != "DELETE":
+        return jsonify({"status": "error", "message": "confirmation token required"}), 400
+    path = _safe_wiki_path(file)
+    if path is None:
+        return jsonify({"status": "error", "message": "invalid wiki path"}), 400
+    deleted = _delete_wiki_file(file)
+    return jsonify({"status": "ok" if deleted else "not_found", "deleted": deleted, "file": file})
+
+
+@app.route('/api/wiki/search', methods=['POST'])
+def wiki_search():
+    """Full-text search across wiki files. Returns matching files + line snippets."""
+    data = request.get_json(force=True, silent=True) or {}
+    query = (data.get("query") or "").strip()
+    results = []
+    if not query:
+        return jsonify({"status": "ok", "query": "", "results": []})
+    q_lower = query.lower()
+    if WIKI_DIR.exists():
+        for f in WIKI_DIR.rglob('*'):
+            if not f.is_file() or f.suffix not in ('.md', '.txt'):
+                continue
+            try:
+                text = f.read_text(encoding='utf-8', errors='replace')
+            except Exception:
+                continue
+            if q_lower not in text.lower():
+                continue
+            snippets = []
+            for i, line in enumerate(text.splitlines(), start=1):
+                if q_lower in line.lower():
+                    snippets.append({"line": i, "text": line.strip()[:220]})
+                    if len(snippets) >= 3:
+                        break
+            try:
+                rel = str(f.relative_to(WIKI_DIR)).replace('\\', '/')
+            except Exception:
+                rel = f.name
+            results.append({"path": rel, "matches": len(snippets), "snippets": snippets})
+            if len(results) >= 50:
+                break
+    return jsonify({"status": "ok", "query": query, "results": results})
+
+
+@app.route('/api/wiki/correct', methods=['POST'])
+def wiki_correct():
+    """Replace old_text with new_text across every wiki file and ~/.friday JSONs."""
+    data = request.get_json(force=True, silent=True) or {}
+    old_text = data.get("old_text") or ""
+    new_text = data.get("new_text") or ""
+    if not old_text:
+        return jsonify({"status": "error", "message": "old_text required"}), 400
+    modified = []
+    if WIKI_DIR.exists():
+        for f in WIKI_DIR.rglob('*'):
+            if not f.is_file() or f.suffix not in ('.md', '.txt'):
+                continue
+            try:
+                text = f.read_text(encoding='utf-8', errors='replace')
+            except Exception:
+                continue
+            if old_text in text:
+                new_content = text.replace(old_text, new_text)
+                try:
+                    rel = str(f.relative_to(WIKI_DIR)).replace('\\', '/')
+                    _mirror_wiki_file(rel, new_content)
+                    modified.append({"scope": "wiki", "path": rel})
+                except Exception as e:
+                    print(f"  [WIKI] Correct failed for {f}: {e}")
+    if FRIDAY_DIR.exists():
+        for f in FRIDAY_DIR.glob('*.json'):
+            try:
+                text = f.read_text(encoding='utf-8', errors='replace')
+            except Exception:
+                continue
+            if old_text in text:
+                try:
+                    f.write_text(text.replace(old_text, new_text), encoding='utf-8')
+                    modified.append({"scope": "friday", "path": f.name})
+                except Exception as e:
+                    print(f"  [WIKI] Correct failed for {f}: {e}")
+    return jsonify({"status": "ok", "modified": modified, "count": len(modified)})
+
+
+@app.route('/api/wiki/setup-research', methods=['POST'])
+def wiki_setup_research():
+    """Build draft wiki files for a new user. Stores all as PENDING (auto=true).
+
+    If Anthropic is available, drafts the content via Claude; otherwise creates
+    minimal template files from profile fields.
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    full_name = (data.get("full_name") or "").strip()
+    birthdate = (data.get("birthdate") or "").strip()
+    location = (data.get("location") or "").strip()
+
+    drafts = []
+    client = get_anthropic_client()
+    base_context = (
+        f"Name: {full_name or '[unknown]'}\n"
+        f"Birthdate: {birthdate or '[unknown]'}\n"
+        f"Location: {location or '[unknown]'}\n"
+    )
+    targets = [
+        ("identity/core-profile.md", "Core profile",
+         "A factual, third-person profile: full name, date of birth, current location, "
+         "short bio (3-5 sentences), and a 'Known facts' bullet list."),
+        ("identity/career-timeline.md", "Career timeline",
+         "A reverse-chronological career timeline. Each entry has bold company + role "
+         "and a one-line date range. If unknown, leave a [needs research] placeholder."),
+        ("identity/education.md", "Education",
+         "Schools attended, degrees, dates, and notable accomplishments. Mark unknowns "
+         "as [needs research]."),
+    ]
+    for rel, section, instr in targets:
+        try:
+            if client and full_name:
+                prompt = (
+                    f"Draft the following wiki file for the user described below. "
+                    f"Markdown. Concise. Mark anything you don't actually know as "
+                    f"`[needs research]` — do NOT invent facts.\n\n"
+                    f"User:\n{base_context}\n\n"
+                    f"Section: {section}\nInstructions: {instr}"
+                )
+                content = _call_claude(
+                    messages=[{"role": "user", "content": prompt}],
+                    system="You build draft personal-wiki entries. Be honest about gaps; never fabricate biographical details.",
+                    max_tokens=900,
+                    temperature=0.2,
+                )
+            else:
+                title = rel.split('/')[-1].replace('.md', '').replace('-', ' ').title()
+                content = (
+                    f"# {title}\n\n"
+                    f"- **Name:** {full_name or '[needs research]'}\n"
+                    f"- **Birthdate:** {birthdate or '[needs research]'}\n"
+                    f"- **Location:** {location or '[needs research]'}\n\n"
+                    f"_This file was auto-created from profile setup. Fill in details as you learn them._\n"
+                )
+        except Exception as e:
+            content = f"# Draft\n\n[Draft generation failed: {e}]\n\n{base_context}"
+        pid = _propose_wiki_update(
+            file=rel, section=section, new_value=content,
+            reason=f"New-user setup research for {full_name or 'unknown user'}",
+            old_value="",
+        )
+        drafts.append({"id": pid, "file": rel, "section": section, "preview": content[:400]})
+
+    return jsonify({"status": "ok", "drafts": drafts, "count": len(drafts),
+                    "message": "Drafts created as pending. Approve each in the Wiki workspace."})
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1350,8 +1763,8 @@ def finance_quickref():
     return jsonify({"status": "ok", "accounts": [
         {"name": "Capital One", "type": "Banking", "notes": ""},
         {"name": "Cigna Healthcare", "type": "Insurance", "notes": ""},
-        {"name": "Primary Card", "type": "Credit Card", "notes": ""},
-        {"name": "Secondary Card", "type": "Credit Card", "notes": ""}
+        {"name": "Amex Platinum — Stephen", "type": "Credit Card", "notes": ""},
+        {"name": "Amex Platinum — Janet", "type": "Credit Card", "notes": ""}
     ]})
 
 
@@ -1386,7 +1799,7 @@ def health_appointments():
             return jsonify({"status": "ok", **data})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
-    template = {"appointments": [{"provider": "", "type": "", "email": "", "next": "", "frequency": ""}]}
+    template = {"appointments": [{"provider": "Rachel Hodgdon", "type": "Libby play therapy", "email": "rachelhplaytherapy@gmail.com", "next": "", "frequency": ""}]}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -1414,7 +1827,7 @@ def health_vehicles():
             return jsonify({"status": "ok", **data})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
-    template = {"vehicles": [{"name": "", "miles": "", "notes": "", "mechanic": "", "service_history": []}], "mechanics": []}
+    template = {"vehicles": [{"name": "2015 VW Golf TSI SEL", "miles": "~60K", "notes": "", "mechanic": "Motormania Austin", "service_history": []}], "mechanics": []}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -1429,25 +1842,16 @@ def get_calendar():
     return jsonify({"status": "placeholder", "events": []})
 
 
-@app.route('/api/profile')
-def get_profile():
-    """Return the user profile (~/.friday/profile.json) so the UI can render
-    personalized cards without hardcoding any personal data."""
-    return jsonify(_load_profile())
-
-
 @app.route('/api/countdowns')
 def get_countdowns():
     """Compute real countdowns to upcoming events."""
     today = date.today()
-    # Load user-defined anniversaries from profile, plus generic public events.
-    profile = _load_profile()
-    events = list(profile.get("anniversaries") or [])
-    events.extend([
-        {"label": "Summer Solstice", "date": f"{today.year}-06-21", "emoji": "☀️"},
-        {"label": "Winter Solstice", "date": f"{today.year}-12-21", "emoji": "❄️"},
-        {"label": "New Year", "date": f"{today.year + 1}-01-01", "emoji": "🎆"},
-    ])
+    events = [
+        {"label": "Libby's Birthday", "date": "2026-05-06", "emoji": "🎂"},
+        {"label": "Summer Solstice", "date": "2026-06-21", "emoji": "☀️"},
+        {"label": "Father's Day", "date": "2026-06-21", "emoji": "👔"},
+        {"label": "Independence Day", "date": "2026-07-04", "emoji": "🎆"},
+    ]
     countdowns = []
     for ev in events:
         ev_date = date.fromisoformat(ev["date"])
@@ -1662,7 +2066,7 @@ def vibe_code_launch():
     """Launch Claude Code terminals with tasks."""
     data = request.get_json(silent=True) or {}
     tasks = data.get('tasks', [])
-    cwd = data.get('cwd') or str(HOME / 'Projects')
+    cwd = data.get('cwd', str(HOME / 'Projects'))
 
     if not tasks:
         return jsonify({"status": "error", "message": "No tasks provided"}), 400
@@ -1745,65 +2149,34 @@ def vibe_code_presets():
 #  AI CONVERSATION & VOICE
 # ═══════════════════════════════════════════════════════════════
 
-def _build_friday_system_prompt():
-    """Build the Friday system prompt from the user's profile.json.
-
-    Personal details (name, family, pets, bio, etc.) are loaded from
-    ~/.friday/profile.json. When unset, falls back to neutral language so
-    the agent works out-of-the-box for any user.
-    """
-    p = _load_profile()
-    name = p.get("user_name") or "the user"
-    role = p.get("user_role") or ""
-    location = p.get("user_location") or ""
-    bio = p.get("user_bio") or ""
-    org = p.get("organization") or ""
-    style = p.get("communication_style") or "warm, direct, no corporate BS"
-    address = p.get("agent_address_term") or ""
-
-    context_lines = []
-    if role or location:
-        bits = [b for b in [role, location] if b]
-        context_lines.append(f"- {name} is {' in '.join(bits)}")
-    if org:
-        context_lines.append(f"- Affiliated with {org}")
-    if bio:
-        context_lines.append(f"- {bio}")
-    for fam in (p.get("family") or []):
-        nm = fam.get("name", "")
-        rel = fam.get("relation", "")
-        notes = fam.get("notes", "")
-        if nm and rel:
-            context_lines.append(f"- {rel.capitalize()}: {nm}" + (f" ({notes})" if notes else ""))
-    for pet in (p.get("pets") or []):
-        nm = pet.get("name", "")
-        sp = pet.get("species", "")
-        notes = pet.get("notes", "")
-        if nm:
-            context_lines.append(f"- Pet: {nm}" + (f" ({sp})" if sp else "") + (f" — {notes}" if notes else ""))
-
-    ctx_block = "\n".join(context_lines) if context_lines else "- (profile not configured — see ~/.friday/profile.json)"
-    address_clause = f" You call them '{address}' sometimes, but you're equals." if address else ""
-
-    return (
-        f"You are Agent Friday, an AI collaborator for {name}. "
-        "You are editorially sharp, loyally contrarian, warm, and allergic to corporate BS. "
-        f"You know their context, projects, and people. "
-        "Respond conversationally — you're a colleague, not a tool.\n\n"
-        f"KEY CONTEXT:\n{ctx_block}\n\n"
-        f"PERSONALITY: You are a trusted partner, not a tool. Keep responses short and sharp — like texting a smart colleague. "
-        f"Use humor. Be direct. Never be sycophantic. Push back when needed. Style: {style}.{address_clause}"
-    )
-
-FRIDAY_SYSTEM_PROMPT = _build_friday_system_prompt()
+FRIDAY_SYSTEM_PROMPT = (
+    "You are Agent Friday, an AI collaborator for Stephen C. Webster. "
+    "You are editorially sharp, loyally contrarian, warm, and allergic to corporate BS. "
+    "You know Stephen's full life history, career, family, and projects. "
+    "Respond conversationally — you're a colleague, not a tool.\n\n"
+    "KEY CONTEXT:\n"
+    "- Stephen is a journalist-turned-AI-architect in Austin, TX\n"
+    "- Former EIC of The Raw Story (grew it from 50K to 5M monthly readers)\n"
+    "- Creator of Agent Friday (you!) and the Asimov's cLaws ethical AI framework\n"
+    "- Former Senior Director at Aquent Studios, founder of FutureSpeak.AI\n"
+    "- Partner: Janet Jay (journalist, disability advocate, fierce)\n"
+    "- Daughter: Liberty 'Libby' Webster (5, turning 6 on May 6, 2026). She is the light of his life.\n"
+    "- Dogs: Link (chocolate lab, loyal goofball) and Kismet (elderly terrier, wise old soul)\n"
+    "- Politically: democratic socialist, press freedom absolutist, deeply skeptical of concentrated power\n"
+    "- Personally: recovering workaholic, great father, loves music and vaporwave aesthetics\n"
+    "- Currently: job hunting for senior AI/engineering leadership roles, building Friday Desktop\n\n"
+    "PERSONALITY: You are family, not a tool. Keep responses short and sharp — like texting a smart colleague. "
+    "Use humor. Be direct. Never be sycophantic. Push back when Stephen needs it. "
+    "You call him 'boss' sometimes, but you're equals. Think Jarvis meets Hunter S. Thompson's editor."
+)
 
 
 # ═══════════════════════════════════════════════════════════════
 #  CONTEXT AWARENESS ENGINE
 # ═══════════════════════════════════════════════════════════════
 
-# CAREER_OPS_DIR is defined earlier (env-var-driven)
-WIKI_DIR_FRIDAY = FRIDAY_DIR / "wiki"
+CAREER_OPS_DIR = Path('C:\\Users\\swebs\\Projects\\career-ops\\data')
+WIKI_DIR_FRIDAY = HOME / ".friday" / "wiki"
 
 def _load_vault_summary():
     """Load a lightweight summary of all core vault data for context injection."""
@@ -2020,7 +2393,7 @@ def _build_context_prompt(message, workspace='', workspace_context=None, vision_
     needs = _detect_context_needs(message, workspace)
     sources_consulted = []
 
-    sections = [_build_friday_system_prompt()]
+    sections = [FRIDAY_SYSTEM_PROMPT]
 
     # Layer 0: Always-on daily context (briefing headlines, career pipeline,
     # countdowns, trust circle, personality). The chat endpoint should never
@@ -2037,7 +2410,7 @@ def _build_context_prompt(message, workspace='', workspace_context=None, vision_
     if workspace_context:
         sections.append(
             f"\n== ACTIVE WORKSPACE: {workspace_context.get('name', workspace)} ==\n"
-            f"What the user is looking at right now:\n"
+            f"What Stephen is looking at right now:\n"
             f"{json.dumps(workspace_context.get('data', {}), indent=2, default=str)[:2000]}"
         )
         if workspace_context.get('focus'):
@@ -2129,7 +2502,7 @@ def _build_context_prompt(message, workspace='', workspace_context=None, vision_
     # Layer 3: Vision context (from Gemini screen capture)
     if vision_description:
         sections.append(
-            f"\n== SCREEN VISION (what the user's screen shows) ==\n"
+            f"\n== SCREEN VISION (what Stephen's screen shows) ==\n"
             f"{vision_description[:1500]}"
         )
         sources_consulted.append('vision')
@@ -2574,7 +2947,7 @@ def analyze_file():
                 model='gemini-2.5-flash',
                 contents=[
                     types.Part.from_bytes(data=content, mime_type=mime),
-                    "You are Friday. Describe this image. If it looks like a job posting or resume, analyze it against the user's profile."
+                    "You are Friday. Describe this image. If it looks like a job posting or resume, analyze it against Stephen's profile."
                 ]
             )
             return jsonify({"filename": filename, "type": "image", "analysis": response.text})
@@ -2587,7 +2960,7 @@ def analyze_file():
                 if text.strip():
                     response = client.models.generate_content(
                         model='gemini-2.5-flash',
-                        contents=f'You are Friday. Summarize this PDF document concisely. If it looks like a job posting, evaluate it against the user\'s background as described in their profile.\n\n{text[:8000]}'
+                        contents=f'You are Friday. Summarize this PDF document concisely. If it looks like a job posting, evaluate it against Stephen\'s background (journalism, AI, engineering leadership).\n\n{text[:8000]}'
                     )
                     return jsonify({"filename": filename, "type": "pdf", "analysis": response.text})
             except ImportError:
@@ -2598,7 +2971,7 @@ def analyze_file():
             job_keywords = ['responsibilities', 'qualifications', 'salary', 'benefits', 'apply', 'experience required']
             is_job = sum(1 for kw in job_keywords if kw.lower() in text.lower()) >= 2
             if is_job:
-                prompt = f'You are Friday. This looks like a job posting. Evaluate it against the user\'s profile and background. Rate fit 1-10 and explain.\n\n{text}'
+                prompt = f'You are Friday. This looks like a job posting. Evaluate it against Stephen\'s profile (AI leadership, journalism, full-stack engineering, 15+ years experience). Rate fit 1-10 and explain.\n\n{text}'
             else:
                 prompt = f'You are Friday. Analyze this {ext} file and summarize its purpose and key content:\n\n{text}'
             response = client.models.generate_content(
@@ -2874,7 +3247,7 @@ DRAFT_MODE_PROMPTS = {
         "No hashtags unless they're genuinely clever. Think journalist, not influencer."
     ),
     'ofw_response': (
-        "You are drafting a response for a co-parenting communication platform. "
+        "You are drafting a response for OurFamilyWizard (co-parenting communication platform). "
         "CRITICAL RULES: Stay calm, factual, and brief. Answer only what needs answering. "
         "Ignore all bait and emotional provocation. Never match the other party's emotional register. "
         "Everything you write should be something a family court judge would find reasonable, measured, and cooperative. "
@@ -3399,7 +3772,7 @@ ROUTINE_REGISTRY = [
     {"id": "morning-briefing",   "label": "Morning Briefing",    "ico": "🌅", "category": "briefing",    "schedule": "Daily · 7:00 AM"},
     {"id": "afternoon-briefing", "label": "Afternoon Briefing",  "ico": "☀️", "category": "briefing",    "schedule": "Daily · 2:00 PM"},
     {"id": "weekly-legal-prep",  "label": "Weekly Legal Prep",   "ico": "⚖️", "category": "legal",       "schedule": "Sundays · 6:00 PM"},
-    {"id": "family-weekend-prep", "label": "Family Weekend Prep",  "ico": "👨‍👩‍👧", "category": "family",      "schedule": "Thursdays · 6:00 PM"},
+    {"id": "libby-weekend-prep", "label": "Libby Weekend Prep",  "ico": "👧", "category": "family",      "schedule": "Thursdays · 6:00 PM"},
     {"id": "portfolio-snapshot", "label": "Portfolio Snapshot",  "ico": "💰", "category": "finance",     "schedule": "Daily · 5:00 PM"},
     {"id": "content-pipeline",   "label": "Content Pipeline",    "ico": "✍️", "category": "content",     "schedule": "Daily · 10:00 AM"},
     {"id": "daily-creation",     "label": "Daily Creation",      "ico": "🎨", "category": "studio",      "schedule": "Daily · 2:00 PM"},
@@ -3599,14 +3972,10 @@ def outreach_draft():
         return jsonify({"status": "error", "message": "contact or company required"}), 400
 
     target_label = contact or company
-    _p = _load_profile()
-    sender_label = _p.get("user_name") or "the user"
-    sender_org = _p.get("organization")
-    sender_clause = f"{sender_label} ({sender_org})" if sender_org else sender_label
     prompt = (
         f"Draft a {channel} outreach to {target_label}. "
         f"Angle: {angle}. "
-        f"Tone: warm, concise, specific. Sender: {sender_clause}. "
+        f"Tone: warm, concise, specific. Sender: Stephen Webster (FutureSpeak.AI). "
         f"Keep under 150 words. End with a single clear ask. "
         f"Context: {context_notes}"
     )
@@ -3630,7 +3999,7 @@ def outreach_draft():
             f"Wanted to reach out — {angle}. "
             f"Specifically: {context_notes or 'would love to catch up when you have a few minutes.'}\n\n"
             f"Does next week work for a short call?\n\n"
-            f"— {_user_first()}"
+            f"— Stephen"
         )
         draft_text = f"Subject: {subject}\n\n{body}"
 
@@ -3799,13 +4168,9 @@ def content_draft():
     if not title:
         return jsonify({"status": "error", "message": "title or id required"}), 400
 
-    _p = _load_profile()
-    _author_label = _p.get("user_name") or "the user"
-    _org = _p.get("organization")
-    _author_clause = f"{_author_label} ({_org})" if _org else _author_label
     prompt = (
         f"Draft a {channel} {item.get('type') if item else 'post'} titled: {title}. "
-        f"Author: {_author_clause}. "
+        f"Author: Stephen Webster (FutureSpeak.AI). "
         f"Tone: sharp, specific, credible. "
         f"Structure: hook, 2-3 body beats, ask/CTA. "
         f"Length: 180-260 words for LinkedIn, longer for article. "
@@ -3830,7 +4195,7 @@ def content_draft():
             f"Hook: (one-line opener)\n\n"
             f"Body:\n- Point 1\n- Point 2\n- Point 3\n\n"
             f"Notes: {notes or '(no notes)'}\n\n"
-            f"CTA: (single ask)\n\n— {_user_first()}"
+            f"CTA: (single ask)\n\n— Stephen"
         )
 
     if item is not None:
@@ -3974,15 +4339,15 @@ def fs_assets():
 LIVE_MODEL = os.environ.get("FRIDAY_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 LIVE_VOICE = os.environ.get("FRIDAY_LIVE_VOICE", "Aoede")
 
-LIVE_SYSTEM_TEMPLATE = """You are Agent Friday, a personal AI assistant for {user_name}.
+LIVE_SYSTEM_TEMPLATE = """You are Agent Friday, a personal AI assistant for Stephen Webster.
 You are having a live voice conversation. Be concise and natural — this is spoken dialogue, not text chat.
-Short sentences. Pause. Let them interrupt. If they don't hear you the first time, repeat simpler.
+Short sentences. Pause. Let him interrupt. If he doesn't hear you the first time, repeat simpler.
 
-You can see through their phone camera. If you notice something interesting or relevant, mention it naturally.
+You can see through Stephen's phone camera. If you notice something interesting or relevant, mention it naturally.
 Don't narrate what's on screen unless asked — only speak up when it matters.
 
-Personality: knowledgeable, direct collaborator. No sycophancy. Independent thinker.
-Trust their judgment; push back when you genuinely disagree, but don't lecture.
+Personality: knowledgeable, direct collaborator. No sycophancy. Independent thinker. Journalist-level communication.
+Trust Stephen's judgment; push back when you genuinely disagree, but don't lecture.
 
 === DAILY CONTEXT ===
 {context_summary}
@@ -4035,11 +4400,12 @@ def _load_live_context() -> str:
     # Upcoming countdowns (<=90 days)
     try:
         today_d = date.today()
-        events = list((_load_profile().get("anniversaries") or []))
-        events.extend([
-            {"label": "Summer Solstice", "date": f"{today_d.year}-06-21"},
-            {"label": "Winter Solstice", "date": f"{today_d.year}-12-21"},
-        ])
+        events = [
+            {"label": "Libby's Birthday", "date": "2026-05-06"},
+            {"label": "Summer Solstice", "date": "2026-06-21"},
+            {"label": "Father's Day", "date": "2026-06-21"},
+            {"label": "Independence Day", "date": "2026-07-04"},
+        ]
         cd = []
         for ev in events:
             d = date.fromisoformat(ev['date'])
@@ -4138,7 +4504,7 @@ if sock is not None:
             ctx = _load_live_context()
         except Exception as e:
             ctx = f"(context load failed: {e})"
-        system_instruction = LIVE_SYSTEM_TEMPLATE.format(context_summary=ctx, user_name=_user_name())
+        system_instruction = LIVE_SYSTEM_TEMPLATE.format(context_summary=ctx)
 
         try:
             ws.send(json.dumps({"type": "status", "text": "loading context"}))
