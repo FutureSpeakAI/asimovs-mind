@@ -1,0 +1,54 @@
+# Friday Desktop — Python dependencies
+# Install: pip install -r requirements.txt
+
+# Core
+Flask==3.1.3
+flask-sock==0.7.0
+Werkzeug==3.1.8
+
+# AI SDKs (required for chat + voice + images)
+anthropic==0.104.1
+google-genai==1.72.0
+
+# Document handling (optional but recommended for PDF analysis)
+pdfplumber==0.11.4
+pillow==12.2.0
+
+# HTTP / async
+httpx==0.28.1
+requests==2.33.1
+websockets==16.0
+simple-websocket==1.1.0
+
+# Crypto (for any auth-related features)
+cryptography==46.0.7
+
+# Transitive (pinned to keep installs reproducible)
+annotated-types==0.7.0
+anyio==4.13.0
+blinker==1.9.0
+certifi==2026.2.25
+charset-normalizer==3.4.7
+click==8.3.2
+colorama==0.4.6
+distro==1.9.0
+docstring_parser==0.18.0
+google-auth==2.49.2
+h11==0.16.0
+httpcore==1.0.9
+idna==3.11
+itsdangerous==2.2.0
+Jinja2==3.1.6
+jiter==0.15.0
+MarkupSafe==3.0.3
+pyasn1==0.6.3
+pyasn1_modules==0.4.2
+pycparser==3.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+sniffio==1.3.1
+tenacity==9.1.4
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.6.3
+wsproto==1.3.2

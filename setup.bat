@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 REM ──────────────────────────────────────────────────────────────
 REM Asimov's Mind — Setup Script (Windows)
 REM One command to install the full Agent Friday ecosystem.
@@ -8,17 +9,18 @@ title Asimov's Mind Setup
 color 0B
 
 echo.
-echo   ╔══════════════════════════════════════════════════╗
-echo   ║         ASIMOV'S MIND — SETUP                   ║
-echo   ║         Agent Friday Ecosystem Installer         ║
-echo   ╚══════════════════════════════════════════════════╝
+echo   ============================================================
+echo            ASIMOV'S MIND - SETUP
+echo            Agent Friday Ecosystem Installer
+echo   ============================================================
 echo.
 
 set "REPO_DIR=%~dp0"
 set "FRIDAY_DATA=%USERPROFILE%\.friday"
+set "DESKTOP_DIR=%REPO_DIR%interfaces\desktop"
 
-REM ── Check prerequisites ──────────────────────────────────────
-echo [1/7] Checking prerequisites...
+REM ── [1/8] Check prerequisites ─────────────────────────────────
+echo [1/8] Checking prerequisites...
 
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -26,7 +28,6 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-
 python -c "import sys; print(f'  Python {sys.version_info.major}.{sys.version_info.minor} found')"
 
 node --version >nul 2>&1
@@ -37,18 +38,23 @@ if errorlevel 1 (
     for /f %%v in ('node --version') do echo   Node.js %%v found
 )
 
-REM ── Create .friday data directory ──────────────────────────────
-echo [2/7] Creating data directory at %FRIDAY_DATA%...
+REM ── [2/8] Create ~/.friday data dirs ──────────────────────────
+echo [2/8] Creating data directory at %FRIDAY_DATA%...
 
-if not exist "%FRIDAY_DATA%" mkdir "%FRIDAY_DATA%"
-if not exist "%FRIDAY_DATA%\vault" mkdir "%FRIDAY_DATA%\vault"
-if not exist "%FRIDAY_DATA%\integrity" mkdir "%FRIDAY_DATA%\integrity"
-if not exist "%FRIDAY_DATA%\audio-cache" mkdir "%FRIDAY_DATA%\audio-cache"
-if not exist "%FRIDAY_DATA%\vibe-code-logs" mkdir "%FRIDAY_DATA%\vibe-code-logs"
+for %%D in (vault integrity audio-cache vibe-code-logs finance health career-ops career-ops\data career-ops\reports flow-queue outreach content futurespeak wiki) do (
+    if not exist "%FRIDAY_DATA%\%%D" mkdir "%FRIDAY_DATA%\%%D" 2>nul
+)
+
+if not exist "%FRIDAY_DATA%\profile.json" (
+    if exist "%DESKTOP_DIR%\profile.example.json" (
+        copy "%DESKTOP_DIR%\profile.example.json" "%FRIDAY_DATA%\profile.json" >nul
+        echo   Seeded %FRIDAY_DATA%\profile.json (edit to personalize Friday^)
+    )
+)
 echo   Created %FRIDAY_DATA%\
 
-REM ── Create Python virtual environment ──────────────────────────
-echo [3/7] Creating Python virtual environment...
+REM ── [3/8] Python venv ─────────────────────────────────────────
+echo [3/8] Creating Python virtual environment...
 
 if not exist "%REPO_DIR%venv" (
     python -m venv "%REPO_DIR%venv"
@@ -59,14 +65,20 @@ if not exist "%REPO_DIR%venv" (
 
 call "%REPO_DIR%venv\Scripts\activate.bat"
 
-REM ── Install Python dependencies ────────────────────────────────
-echo [4/7] Installing Python dependencies...
+REM ── [4/8] Install Python deps ─────────────────────────────────
+echo [4/8] Installing Python dependencies...
 
-pip install -q -r "%REPO_DIR%requirements.txt"
-echo   All Python packages installed
+if exist "%DESKTOP_DIR%\requirements.txt" (
+    pip install -q --upgrade pip
+    pip install -q -r "%DESKTOP_DIR%\requirements.txt"
+    echo   Installed desktop requirements
+)
+if exist "%REPO_DIR%requirements.txt" (
+    pip install -q -r "%REPO_DIR%requirements.txt"
+)
 
-REM ── Install Node.js dependencies ───────────────────────────────
-echo [5/7] Installing Node.js dependencies...
+REM ── [5/8] Install Node deps ───────────────────────────────────
+echo [5/8] Installing Node.js dependencies...
 
 node --version >nul 2>&1
 if not errorlevel 1 (
@@ -75,70 +87,81 @@ if not errorlevel 1 (
         npm install --silent 2>nul
         popd
     )
-    if exist "%REPO_DIR%interfaces\desktop\package.json" (
-        pushd "%REPO_DIR%interfaces\desktop"
-        npm install --silent 2>nul
-        popd
-    )
     echo   Node packages installed
 ) else (
-    echo   Skipped ^(Node.js not installed^)
+    echo   Skipped (Node.js not installed^)
 )
 
-REM ── Create .env from template ──────────────────────────────────
-echo [6/7] Setting up environment...
-
-if not exist "%REPO_DIR%.env" (
-    copy "%REPO_DIR%templates\env.example" "%REPO_DIR%.env" >nul
-    echo   Created .env from template — edit it with your API keys
-) else (
-    echo   .env already exists, skipping
+REM ── [6/8] Prompt for API keys ─────────────────────────────────
+echo [6/8] API keys...
+echo.
+echo   Anthropic API key (REQUIRED) - All reasoning and chat uses Claude.
+echo   Get one at: https://console.anthropic.com
+:askanthropic
+set "ANTHROPIC_API_KEY="
+set /p "ANTHROPIC_API_KEY=  ANTHROPIC_API_KEY: "
+if "%ANTHROPIC_API_KEY%"=="" (
+    echo   Required.
+    goto askanthropic
 )
 
-REM ── Build Desktop UI ───────────────────────────────────────────
-echo [7/7] Building Desktop UI...
+echo.
+echo   Gemini API key (REQUIRED) - Voice mode and image creation use Gemini.
+echo   Get one at: https://aistudio.google.com/app/apikey
+:askgemini
+set "GEMINI_API_KEY="
+set /p "GEMINI_API_KEY=  GEMINI_API_KEY: "
+if "%GEMINI_API_KEY%"=="" (
+    echo   Required.
+    goto askgemini
+)
 
-if exist "%REPO_DIR%interfaces\desktop\build_ui.py" (
-    pushd "%REPO_DIR%interfaces\desktop"
+REM ── [7/8] Write gitignored start.bat ──────────────────────────
+echo [7/8] Writing start.bat (gitignored^)...
+
+> "%REPO_DIR%start.bat" echo @echo off
+>> "%REPO_DIR%start.bat" echo REM Friday Desktop launcher - generated by setup.bat
+>> "%REPO_DIR%start.bat" echo REM DO NOT COMMIT - contains API keys
+>> "%REPO_DIR%start.bat" echo set "ANTHROPIC_API_KEY=%ANTHROPIC_API_KEY%"
+>> "%REPO_DIR%start.bat" echo set "GEMINI_API_KEY=%GEMINI_API_KEY%"
+>> "%REPO_DIR%start.bat" echo call "%%~dp0venv\Scripts\activate.bat"
+>> "%REPO_DIR%start.bat" echo cd /d "%%~dp0interfaces\desktop"
+>> "%REPO_DIR%start.bat" echo python server.py
+echo   Wrote start.bat
+
+REM ── [8/8] Build Desktop UI ────────────────────────────────────
+echo [8/8] Building Desktop UI...
+
+if exist "%DESKTOP_DIR%\build_ui.py" (
+    pushd "%DESKTOP_DIR%"
     python build_ui.py
     popd
     echo   Desktop UI assembled
-) else (
-    echo   Skipped
 )
 
-REM ── Done ───────────────────────────────────────────────────────
+REM ── Done ──────────────────────────────────────────────────────
 echo.
-echo   ╔══════════════════════════════════════════════════╗
-echo   ║         SETUP COMPLETE                          ║
-echo   ╚══════════════════════════════════════════════════╝
+echo   ============================================================
+echo            SETUP COMPLETE
+echo   ============================================================
 echo.
 echo   Next steps:
 echo.
-echo   1. Edit .env with your API keys:
-echo      - GEMINI_API_KEY (for image/video/music generation)
-echo      - ANTHROPIC_API_KEY (for Claude Code)
+echo   1. (Optional^) Personalize Friday by editing your profile:
+echo      notepad %FRIDAY_DATA%\profile.json
+echo      Template: %DESKTOP_DIR%\profile.example.json
 echo.
-echo   2. Install the Claude Code plugin:
-echo      claude plugin install .
+echo   2. Start Friday Desktop:
+echo      start.bat
+echo      Open http://localhost:5000
 echo.
-echo   3. Start a Claude Code session and try:
-echo      /friday          — talk to Agent Friday
-echo      /status          — system health dashboard
-echo      /onboard         — first-time personality setup
-echo      /unlock          — initialize the encrypted vault
+echo   3. (Optional^) Install Claude Code for development:
+echo      https://claude.com/claude-code
+echo      Then: claude plugin add .
 echo.
-echo   4. Launch Friday Desktop (optional):
-echo      call venv\Scripts\activate
-echo      cd interfaces\desktop ^&^& python server.py
-echo      Open http://localhost:3000
-echo.
-echo   5. Add Python MCP servers to Claude Code (optional):
-echo      claude mcp add friday-core -- python mcp-servers\core-mcp\server.py
-echo      claude mcp add friday-gemini -- python mcp-servers\gemini-mcp\server.py
-echo.
-echo   Data directory: %FRIDAY_DATA%
-echo   Documentation: README.md, docs\, GETTING_STARTED.md
+echo   Data: %FRIDAY_DATA%
+echo   Docs: README.md, docs\, GETTING_STARTED.md
 echo.
 
 pause
+endlocal

@@ -2,7 +2,7 @@
 
 **Phase 6 of 7 — Agent Friday Research Project**
 
-Measures whether AI interactions make the user smarter or more dependent. This is Stephen's Reverse RLHF research made operational.
+Measures whether AI interactions make the user smarter or more dependent. Reverse-RLHF research from FutureSpeak.AI, made operational.
 
 ## What It Does
 

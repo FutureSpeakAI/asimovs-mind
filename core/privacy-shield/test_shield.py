@@ -433,7 +433,7 @@ class TestNameWatchlist:
         names = watchlist_show()
         assert "Alex Rivera" in names
         assert "Jamie Chen" in names
-        assert "Libby" in names
+        assert "Casey" in names
 
     def test_name_detected_in_text(self):
         """Names on the watchlist should be detected."""
@@ -441,35 +441,35 @@ class TestNameWatchlist:
         matches = scan_text(text, allowlist=set())
         assert has_category(matches, PIICategory.NAME)
         name_match = get_by_category(matches, PIICategory.NAME)[0]
-        assert name_match.original.lower() == "stephen webster"
+        assert name_match.original.lower() == "alex rivera"
 
     def test_full_name_with_middle(self):
-        """Stephen C. Webster should be detected."""
-        text = "The author is Stephen C. Webster."
+        """Alex J. Rivera should be detected."""
+        text = "The author is Alex J. Rivera."
         matches = scan_text(text, allowlist=set())
         name_matches = get_by_category(matches, PIICategory.NAME)
         originals = [m.original.lower() for m in name_matches]
-        assert any("stephen c. webster" in o for o in originals)
+        assert any("alex j. rivera" in o for o in originals)
 
     def test_case_insensitive(self):
         """Name matching should be case-insensitive."""
-        text = "Email STEPHEN WEBSTER about the issue."
+        text = "Email ALEX RIVERA about the issue."
         matches = scan_text(text, allowlist=set())
         assert has_category(matches, PIICategory.NAME)
 
-    def test_single_name_libby(self):
-        """Single-word watchlist name 'Libby' should be caught."""
-        text = "Tell Libby about the meeting."
+    def test_single_name_casey(self):
+        """Single-word watchlist name 'Casey' should be caught."""
+        text = "Tell Casey about the meeting."
         matches = scan_text(text, allowlist=set())
         assert has_category(matches, PIICategory.NAME)
 
-    def test_janet_jay(self):
+    def test_jamie_chen(self):
         """Jamie Chen should be caught."""
         text = "Jamie Chen will be attending."
         matches = scan_text(text, allowlist=set())
         assert has_category(matches, PIICategory.NAME)
 
-    def test_elisabeth_donoghue_webster(self):
+    def test_hyphenated_name(self):
         """Taylor Nguyen-Park should be caught."""
         text = "Taylor Nguyen-Park was there."
         matches = scan_text(text, allowlist=set())
@@ -484,8 +484,8 @@ class TestNameWatchlist:
 
     def test_watchlist_remove(self):
         """Removing a name from watchlist should stop detection."""
-        watchlist_remove("Libby")
-        text = "Tell Libby about the meeting."
+        watchlist_remove("Casey")
+        text = "Tell Casey about the meeting."
         matches = scan_text(text, categories=[PIICategory.NAME], allowlist=set())
         assert not has_category(matches, PIICategory.NAME)
 

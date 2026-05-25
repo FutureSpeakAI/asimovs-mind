@@ -3,6 +3,9 @@ node_modules/
 venv/
 package-lock.json
 
+# Claude Code local session/worktree state
+.claude/
+
 # Python bytecode
 __pycache__/
 *.pyc
@@ -10,7 +13,17 @@ __pycache__/
 
 # Environment / Secrets (NEVER commit)
 .env
+.env.*
 *.env.local
+
+# Generated launcher scripts — hold API keys, NEVER commit
+/start.sh
+/start.bat
+interfaces/desktop/start.sh
+interfaces/desktop/start.bat
+
+# User data — never commit user-specific profile or runtime data
+.friday/
 
 # Vault encrypted state (private — never commit)
 .asimovs-mind/vault/
