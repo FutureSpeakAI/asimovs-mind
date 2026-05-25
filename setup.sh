@@ -13,6 +13,7 @@ NC='\033[0m'
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRIDAY_DATA="${FRIDAY_DATA_DIR:-$HOME/.friday}"
+DESKTOP_DIR="$REPO_DIR/interfaces/desktop"
 
 echo ""
 echo -e "${CYAN}  ╔══════════════════════════════════════════════════╗${NC}"
@@ -21,36 +22,47 @@ echo -e "${CYAN}  ║         Agent Friday Ecosystem Installer         ║${NC}"
 echo -e "${CYAN}  ╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# ── Check prerequisites ──────────────────────────────────────────
-echo -e "${YELLOW}[1/7] Checking prerequisites...${NC}"
+# ── [1/8] Check prerequisites ────────────────────────────────────
+echo -e "${YELLOW}[1/8] Checking prerequisites...${NC}"
 
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}ERROR: Python 3 not found. Install Python 3.10+ first.${NC}"
     exit 1
 fi
-
-PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-echo "  Python $PYTHON_VERSION found"
+echo "  Python $(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")') found"
 
 if ! command -v node &> /dev/null; then
     echo -e "${YELLOW}  WARNING: Node.js not found. The Claude Code plugin requires Node 18+.${NC}"
-    echo -e "${YELLOW}  You can install it later: https://nodejs.org/${NC}"
 else
-    NODE_VERSION=$(node --version)
-    echo "  Node.js $NODE_VERSION found"
+    echo "  Node.js $(node --version) found"
 fi
 
-# ── Create .friday data directory ────────────────────────────────
-echo -e "${YELLOW}[2/7] Creating data directory at $FRIDAY_DATA...${NC}"
+# ── [2/8] Create ~/.friday data directory ────────────────────────
+echo -e "${YELLOW}[2/8] Creating data directory at $FRIDAY_DATA...${NC}"
 
 mkdir -p "$FRIDAY_DATA/vault"
 mkdir -p "$FRIDAY_DATA/integrity"
 mkdir -p "$FRIDAY_DATA/audio-cache"
 mkdir -p "$FRIDAY_DATA/vibe-code-logs"
+mkdir -p "$FRIDAY_DATA/finance"
+mkdir -p "$FRIDAY_DATA/health"
+mkdir -p "$FRIDAY_DATA/career-ops/data"
+mkdir -p "$FRIDAY_DATA/career-ops/reports"
+mkdir -p "$FRIDAY_DATA/flow-queue"
+mkdir -p "$FRIDAY_DATA/outreach"
+mkdir -p "$FRIDAY_DATA/content"
+mkdir -p "$FRIDAY_DATA/futurespeak"
+mkdir -p "$FRIDAY_DATA/wiki"
+
+# Seed profile.json from template if missing
+if [ ! -f "$FRIDAY_DATA/profile.json" ] && [ -f "$DESKTOP_DIR/profile.example.json" ]; then
+    cp "$DESKTOP_DIR/profile.example.json" "$FRIDAY_DATA/profile.json"
+    echo "  Seeded $FRIDAY_DATA/profile.json (edit to personalize Friday)"
+fi
 echo "  Created $FRIDAY_DATA/"
 
-# ── Create Python virtual environment ────────────────────────────
-echo -e "${YELLOW}[3/7] Creating Python virtual environment...${NC}"
+# ── [3/8] Python venv ────────────────────────────────────────────
+echo -e "${YELLOW}[3/8] Creating Python virtual environment...${NC}"
 
 if [ ! -d "$REPO_DIR/venv" ]; then
     python3 -m venv "$REPO_DIR/venv"
@@ -59,86 +71,93 @@ else
     echo "  venv/ already exists, skipping"
 fi
 
+# shellcheck disable=SC1091
 source "$REPO_DIR/venv/bin/activate"
 
-# ── Install Python dependencies ──────────────────────────────────
-echo -e "${YELLOW}[4/7] Installing Python dependencies...${NC}"
-pip install -q -r "$REPO_DIR/requirements.txt"
-echo "  All Python packages installed"
+# ── [4/8] Install Python dependencies ────────────────────────────
+echo -e "${YELLOW}[4/8] Installing Python dependencies...${NC}"
+if [ -f "$DESKTOP_DIR/requirements.txt" ]; then
+    pip install -q --upgrade pip
+    pip install -q -r "$DESKTOP_DIR/requirements.txt"
+    echo "  Installed desktop requirements"
+fi
+if [ -f "$REPO_DIR/requirements.txt" ]; then
+    pip install -q -r "$REPO_DIR/requirements.txt"
+fi
 
-# ── Install Node.js dependencies (Claude Code plugin) ───────────
-echo -e "${YELLOW}[5/7] Installing Node.js dependencies...${NC}"
-
-if command -v node &> /dev/null; then
-    cd "$REPO_DIR/mcp/friday-core"
-    if [ -f "package.json" ]; then
-        npm install --silent 2>/dev/null || echo "  npm install skipped (will auto-install on first run)"
-    fi
-    cd "$REPO_DIR"
-
-    # Desktop OS (Playwright for testing)
-    if [ -f "$REPO_DIR/interfaces/desktop/package.json" ]; then
-        cd "$REPO_DIR/interfaces/desktop"
-        npm install --silent 2>/dev/null || true
-        cd "$REPO_DIR"
-    fi
+# ── [5/8] Install Node deps ──────────────────────────────────────
+echo -e "${YELLOW}[5/8] Installing Node.js dependencies...${NC}"
+if command -v node &> /dev/null && [ -f "$REPO_DIR/mcp/friday-core/package.json" ]; then
+    (cd "$REPO_DIR/mcp/friday-core" && npm install --silent 2>/dev/null) || echo "  npm install skipped (will auto-install on first run)"
     echo "  Node packages installed"
 else
-    echo "  Skipped (Node.js not installed)"
+    echo "  Skipped (Node.js not installed or package.json missing)"
 fi
 
-# ── Create .env from template ────────────────────────────────────
-echo -e "${YELLOW}[6/7] Setting up environment...${NC}"
+# ── [6/8] Prompt for API keys ────────────────────────────────────
+echo -e "${YELLOW}[6/8] API keys...${NC}"
+echo ""
+echo -e "  ${CYAN}Anthropic API key${NC} (REQUIRED) — All reasoning and chat uses Claude."
+echo "  Get one at: https://console.anthropic.com"
+read -r -p "  ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY
+while [ -z "$ANTHROPIC_API_KEY" ]; do
+    echo -e "  ${RED}Required.${NC}"
+    read -r -p "  ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY
+done
 
-if [ ! -f "$REPO_DIR/.env" ]; then
-    cp "$REPO_DIR/templates/env.example" "$REPO_DIR/.env"
-    echo "  Created .env from template — edit it with your API keys"
-else
-    echo "  .env already exists, skipping"
-fi
+echo ""
+echo -e "  ${CYAN}Gemini API key${NC} (REQUIRED) — Voice mode and image creation use Gemini."
+echo "  Get one at: https://aistudio.google.com/app/apikey"
+read -r -p "  GEMINI_API_KEY: " GEMINI_API_KEY
+while [ -z "$GEMINI_API_KEY" ]; do
+    echo -e "  ${RED}Required.${NC}"
+    read -r -p "  GEMINI_API_KEY: " GEMINI_API_KEY
+done
 
-# ── Build Desktop UI ─────────────────────────────────────────────
-echo -e "${YELLOW}[7/7] Building Desktop UI...${NC}"
+# ── [7/8] Generate gitignored start.sh ───────────────────────────
+echo -e "${YELLOW}[7/8] Writing start.sh (gitignored)...${NC}"
+cat > "$REPO_DIR/start.sh" <<EOF
+#!/usr/bin/env bash
+# Friday Desktop launcher — generated by setup.sh
+# DO NOT COMMIT — contains API keys
+export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+export GEMINI_API_KEY="$GEMINI_API_KEY"
 
-if [ -f "$REPO_DIR/interfaces/desktop/build_ui.py" ]; then
-    cd "$REPO_DIR/interfaces/desktop"
-    python3 build_ui.py
-    cd "$REPO_DIR"
+REPO_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+source "\$REPO_DIR/venv/bin/activate"
+cd "\$REPO_DIR/interfaces/desktop"
+exec python server.py
+EOF
+chmod +x "$REPO_DIR/start.sh"
+echo "  Wrote start.sh"
+
+# ── [8/8] Build Desktop UI ───────────────────────────────────────
+echo -e "${YELLOW}[8/8] Building Desktop UI...${NC}"
+if [ -f "$DESKTOP_DIR/build_ui.py" ]; then
+    (cd "$DESKTOP_DIR" && python3 build_ui.py)
     echo "  Desktop UI assembled"
-else
-    echo "  Skipped (build_ui.py not found)"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}  ╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}  ║         SETUP COMPLETE                          ║${NC}"
+echo -e "${GREEN}  ║         SETUP COMPLETE                           ║${NC}"
 echo -e "${GREEN}  ╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${CYAN}Next steps:${NC}"
 echo ""
-echo "  1. Edit .env with your API keys:"
-echo "     - GEMINI_API_KEY (for image/video/music generation)"
-echo "     - ANTHROPIC_API_KEY (for Claude Code)"
+echo "  1. (Optional) Personalize Friday by editing your profile:"
+echo "     \$EDITOR $FRIDAY_DATA/profile.json"
+echo "     Template: $DESKTOP_DIR/profile.example.json"
 echo ""
-echo "  2. Install the Claude Code plugin:"
-echo "     claude plugin install ."
+echo "  2. Start Friday Desktop:"
+echo "     ./start.sh"
+echo "     Open http://localhost:5000"
 echo ""
-echo "  3. Start a Claude Code session and try:"
-echo "     /friday          — talk to Agent Friday"
-echo "     /status          — system health dashboard"
-echo "     /onboard         — first-time personality setup"
-echo "     /unlock          — initialize the encrypted vault"
+echo "  3. (Optional) Install Claude Code for development:"
+echo "     https://claude.com/claude-code"
+echo "     Then: claude plugin add ."
 echo ""
-echo "  4. Launch Friday Desktop (optional):"
-echo "     source venv/bin/activate"
-echo "     cd interfaces/desktop && python3 server.py"
-echo "     Open http://localhost:3000"
-echo ""
-echo "  5. Add MCP servers to Claude Code (optional):"
-echo "     claude mcp add friday-core -- python3 mcp-servers/core-mcp/server.py"
-echo "     claude mcp add friday-gemini -- python3 mcp-servers/gemini-mcp/server.py"
-echo ""
-echo -e "  ${YELLOW}Data directory: $FRIDAY_DATA${NC}"
-echo -e "  ${YELLOW}Documentation: README.md, docs/, GETTING_STARTED.md${NC}"
+echo -e "  ${YELLOW}Data: $FRIDAY_DATA${NC}"
+echo -e "  ${YELLOW}Docs: README.md, docs/, GETTING_STARTED.md${NC}"
 echo ""

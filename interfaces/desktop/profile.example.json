@@ -1,0 +1,38 @@
+{
+  "_comment": "Friday Desktop user profile. Copy to ~/.friday/profile.json and edit. All keys optional — Friday falls back to neutral language when missing.",
+
+  "user_name": "Ada Lovelace",
+  "user_first_name": "Ada",
+  "user_role": "AI researcher",
+  "user_location": "London",
+  "user_bio": "Working on agentic systems and AI governance.",
+  "organization": "Analytical Engines Co.",
+
+  "family": [
+    {
+      "name": "Charles",
+      "relation": "partner",
+      "notes": "engineer",
+      "birthday": "Dec 26"
+    },
+    {
+      "name": "Byron",
+      "relation": "child",
+      "notes": "age 8",
+      "birthday": "May 3"
+    }
+  ],
+
+  "pets": [
+    { "name": "Babbage", "species": "tabby cat", "notes": "loves keyboards" }
+  ],
+
+  "anniversaries": [
+    { "label": "Anniversary",      "date": "2026-07-08", "emoji": "💍" },
+    { "label": "Byron's Birthday", "date": "2026-05-03", "emoji": "🎂" }
+  ],
+
+  "interests": ["mathematics", "music", "synthesis"],
+  "communication_style": "warm, direct, no corporate BS",
+  "agent_address_term": ""
+}

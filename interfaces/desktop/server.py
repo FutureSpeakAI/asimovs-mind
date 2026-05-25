@@ -5,6 +5,7 @@ Powered by FutureSpeak.AI
 """
 
 import os
+import io
 import json
 import glob
 import subprocess
@@ -12,13 +13,106 @@ import base64
 import traceback
 import uuid
 import threading
+import asyncio
+import re
 import time as _time
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory, send_file, session, redirect, url_for, Response
+from functools import wraps
+
+try:
+    from flask_sock import Sock, ConnectionClosed
+    _HAS_SOCK = True
+except ImportError:
+    _HAS_SOCK = False
+    print("  [FRIDAY] WARNING: flask-sock not installed. /ws/live disabled.")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+app.secret_key = os.environ.get("FRIDAY_SECRET_KEY", "friday-default-secret-change-me")
+sock = Sock(app) if _HAS_SOCK else None
+
+# Server start time for uptime reporting
+SERVER_START_TS = _time.time()
+
+# ── Authentication ───────────────────────────────────────────
+FRIDAY_USERNAME = os.environ.get("FRIDAY_USERNAME", "admin")
+FRIDAY_PASSWORD = os.environ.get("FRIDAY_PASSWORD", "")
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not FRIDAY_PASSWORD:
+            return f(*args, **kwargs)
+        if not session.get("authenticated"):
+            if request.is_json or request.path.startswith("/api/"):
+                return jsonify({"error": "unauthorized"}), 401
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FRIDAY — Authenticate</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#e0e0ff;font-family:'Orbitron',monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(124,58,237,.12) 0%,transparent 70%);pointer-events:none}
+.login-box{background:rgba(15,15,30,.85);border:1px solid rgba(124,58,237,.35);border-radius:12px;padding:40px 36px;width:340px;backdrop-filter:blur(20px);box-shadow:0 0 40px rgba(124,58,237,.15),inset 0 0 30px rgba(124,58,237,.05);position:relative}
+.login-box::before{content:'';position:absolute;top:-1px;left:20%;right:20%;height:2px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.8),transparent);border-radius:2px}
+h1{font-size:14px;letter-spacing:.25em;text-align:center;color:rgba(124,58,237,.9);margin-bottom:8px}
+.subtitle{font-size:9px;letter-spacing:.15em;text-align:center;color:rgba(180,160,255,.4);margin-bottom:32px}
+.field{margin-bottom:12px}
+input[type=email],input[type=text],input[type=password]{width:100%;padding:12px 16px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:6px;color:#e0e0ff;font-family:'Orbitron',monospace;font-size:12px;letter-spacing:.15em;outline:none;transition:border-color .3s}
+input[type=email]:focus,input[type=text]:focus,input[type=password]:focus{border-color:rgba(124,58,237,.7);box-shadow:0 0 15px rgba(124,58,237,.15)}
+input::placeholder{color:rgba(180,160,255,.25)}
+button{width:100%;padding:12px;margin-top:4px;background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(124,58,237,.15));border:1px solid rgba(124,58,237,.4);border-radius:6px;color:rgba(200,180,255,.9);font-family:'Orbitron',monospace;font-size:11px;letter-spacing:.2em;cursor:pointer;transition:all .3s}
+button:hover{background:linear-gradient(135deg,rgba(124,58,237,.45),rgba(124,58,237,.25));border-color:rgba(124,58,237,.7);box-shadow:0 0 20px rgba(124,58,237,.2)}
+.error{color:#ff4466;font-size:9px;text-align:center;margin-top:12px;letter-spacing:.1em}
+.scan-line{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.15),transparent);animation:scan 4s linear infinite;pointer-events:none}
+@keyframes scan{0%{top:0}100%{top:100vh}}
+</style>
+</head>
+<body>
+<div class="scan-line"></div>
+<div class="login-box">
+<h1>FRIDAY</h1>
+<div class="subtitle">AUTHENTICATION REQUIRED</div>
+<form method="POST">
+<div class="field"><input type="email" name="username" placeholder="EMAIL / USERNAME" autofocus autocomplete="username"></div>
+<div class="field"><input type="password" name="password" placeholder="PASSWORD" autocomplete="current-password"></div>
+<button type="submit">AUTHENTICATE</button>
+</form>
+{{ error }}
+</div>
+</body>
+</html>"""
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if not FRIDAY_PASSWORD:
+        return redirect('/')
+    error = ""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        if username == FRIDAY_USERNAME and password == FRIDAY_PASSWORD:
+            session['authenticated'] = True
+            session.permanent = True
+            app.permanent_session_lifetime = timedelta(days=30)
+            return redirect('/')
+        error = '<div class="error">ACCESS DENIED — INVALID CREDENTIALS</div>'
+    html = LOGIN_HTML.replace('{{ error }}', error)
+    return Response(html, content_type='text/html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 # ── Vibe Code: Terminal State ─────────────────────────────────
 VIBE_TERMINALS = {}   # id -> { id, task, status, cwd, pid, started, stopped, log_file }
@@ -27,13 +121,56 @@ VIBE_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Paths ─────────────────────────────────────────────────────
 HOME = Path(os.path.expanduser("~"))
-WIKI_DIR = HOME / "wiki"
-FRIDAY_DIR = HOME / ".friday"
-CREATIONS_DIR = HOME / "Desktop" / "friday-creations"
-JOB_SEARCH_FILE = WIKI_DIR / "professional" / "job-search.md"
+WIKI_DIR = Path(os.environ.get("FRIDAY_WIKI_DIR", str(HOME / "wiki")))
+FRIDAY_DIR = Path(os.environ.get("FRIDAY_DIR", str(HOME / ".friday")))
+CREATIONS_DIR = Path(os.environ.get("FRIDAY_CREATIONS_DIR", str(HOME / "Desktop" / "friday-creations")))
+WIKI_PROFESSIONAL_DIR = WIKI_DIR / "professional"
+JOB_SEARCH_FILE = WIKI_PROFESSIONAL_DIR / "job-search.md"
+CAREER_OPS_DIR = Path(os.environ.get("FRIDAY_CAREER_OPS_DIR", str(FRIDAY_DIR / "career-ops" / "data")))
+CAREER_OPS_REPORTS_DIR = Path(os.environ.get("FRIDAY_CAREER_OPS_REPORTS_DIR", str(FRIDAY_DIR / "career-ops" / "reports")))
 
 # Ensure creations dir exists
 CREATIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── User Profile (loaded from ~/.friday/profile.json) ─────────
+# Profile is user-editable and contains personal context that Friday uses
+# in system prompts, dashboard cards, and trust-graph context. All keys are
+# optional — falls back to neutral placeholders when missing.
+DEFAULT_PROFILE = {
+    "user_name": "the user",
+    "user_first_name": "friend",
+    "user_role": "",
+    "user_location": "",
+    "user_bio": "",
+    "organization": "",
+    "family": [],            # list of {"name", "relation", "notes", "birthday"}
+    "pets": [],              # list of {"name", "species", "notes"}
+    "anniversaries": [],     # list of {"label", "date"}
+    "interests": [],
+    "communication_style": "warm, direct, no corporate BS",
+    "agent_address_term": "",  # how Friday addresses user (e.g. "boss"), blank = first name
+}
+
+def _load_profile():
+    """Load ~/.friday/profile.json, falling back to DEFAULT_PROFILE."""
+    FRIDAY_DIR.mkdir(parents=True, exist_ok=True)
+    profile_path = FRIDAY_DIR / "profile.json"
+    if not profile_path.exists():
+        return dict(DEFAULT_PROFILE)
+    try:
+        data = json.loads(profile_path.read_text(encoding='utf-8'))
+        merged = dict(DEFAULT_PROFILE)
+        merged.update(data)
+        return merged
+    except Exception:
+        return dict(DEFAULT_PROFILE)
+
+def _user_name():
+    return _load_profile().get("user_name") or "the user"
+
+def _user_first():
+    p = _load_profile()
+    return p.get("user_first_name") or (p.get("user_name") or "friend").split()[0]
 
 # ── Gemini Client (lazy init) ─────────────────────────────────
 _genai_client = None
@@ -56,6 +193,705 @@ def get_genai_client():
     return _genai_client
 
 
+# ── Anthropic Claude (text reasoning + chat) ───────────────────
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL_DEFAULT = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+_anthropic_client = None
+
+
+def get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        if not ANTHROPIC_API_KEY:
+            return None
+        try:
+            from anthropic import Anthropic
+            _anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        except ImportError:
+            print("  [FRIDAY] WARNING: anthropic SDK not installed. Run: pip install anthropic")
+            return None
+    return _anthropic_client
+
+
+def _call_claude(messages, system=None, model=None, max_tokens=2048, temperature=None):
+    """Call Claude with structured messages. Returns the text response.
+
+    messages: list of {"role": "user"|"assistant", "content": "..."}
+    system: optional system prompt (string)
+    model: override the default model (claude-haiku-4-5-20251001 / claude-sonnet-4-6 / claude-opus-4-7)
+    temperature: 0.0–1.0; lower is more precise, higher is more creative.
+    """
+    client = get_anthropic_client()
+    if client is None:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. Add it to start.bat / launch_now.bat and restart the server."
+        )
+    kwargs = {
+        "model": model or ANTHROPIC_MODEL_DEFAULT,
+        "max_tokens": max_tokens,
+        "messages": messages,
+    }
+    if system:
+        kwargs["system"] = system
+    if temperature is not None:
+        try:
+            kwargs["temperature"] = max(0.0, min(1.0, float(temperature)))
+        except (TypeError, ValueError):
+            pass
+    resp = client.messages.create(**kwargs)
+    parts = [b.text for b in resp.content if getattr(b, "type", None) == "text"]
+    return "".join(parts).strip()
+
+
+# ── PII Privacy Shield ────────────────────────────────────────
+# Lightweight redactor applied to outbound prompts and to tool outputs
+# before they re-enter the model context. SSN + credit-card patterns are
+# always redacted; additional watchlist tokens come from
+# ~/.friday/privacy_shield.json => {"watchlist": ["...", ...]}
+_PII_WATCHLIST_CACHE = {"mtime": 0.0, "items": []}
+_SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+_CC_RE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
+
+
+def _load_privacy_watchlist():
+    path = FRIDAY_DIR / "privacy_shield.json"
+    try:
+        mtime = path.stat().st_mtime if path.exists() else 0.0
+        if mtime != _PII_WATCHLIST_CACHE["mtime"]:
+            items = []
+            if path.exists():
+                data = json.loads(path.read_text(encoding='utf-8'))
+                raw = data.get('watchlist') if isinstance(data, dict) else data
+                if isinstance(raw, list):
+                    items = [str(x) for x in raw if isinstance(x, (str, int, float)) and str(x).strip()]
+            _PII_WATCHLIST_CACHE["mtime"] = mtime
+            _PII_WATCHLIST_CACHE["items"] = items
+    except Exception:
+        pass
+    return _PII_WATCHLIST_CACHE["items"]
+
+
+def _pii_redact(text):
+    """Redact SSNs, credit-card-like sequences (Luhn-ish), and watchlist tokens."""
+    if not isinstance(text, str) or not text:
+        return text
+    out = _SSN_RE.sub("[REDACTED-SSN]", text)
+
+    def _cc_sub(m):
+        digits = re.sub(r"\D", "", m.group(0))
+        if 13 <= len(digits) <= 19:
+            return "[REDACTED-CC]"
+        return m.group(0)
+
+    out = _CC_RE.sub(_cc_sub, out)
+    for token in _load_privacy_watchlist():
+        if token and token in out:
+            out = out.replace(token, "[REDACTED]")
+    return out
+
+
+# ── Claude Tool-Use Agent ─────────────────────────────────────
+# Tools Claude can call when answering the user. Each tool has a handler
+# in CLAUDE_TOOL_HANDLERS. Results are PII-shielded before being sent back.
+CLAUDE_TOOLS = [
+    {"name": "search_web", "description": "Search the web for current information. Returns a brief answer or a note if the web is unavailable.",
+     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+    {"name": "read_file", "description": "Read a file from the user's home directory tree. Path must be under the user's home directory.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "write_clipboard", "description": "Copy text to the user's Windows clipboard.",
+     "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+    {"name": "query_trust_graph", "description": "Look up a person in the trust graph by name or alias and return their entry (scores, evidence count, last interaction).",
+     "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}},
+    {"name": "query_calendar", "description": "Check today's calendar events.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "search_email", "description": "Search Gmail for messages matching a query.",
+     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+    {"name": "read_wiki", "description": "Read a markdown file from the personal wiki at ~/wiki/. Use a relative path like 'professional/job-search.md'.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "run_command", "description": "Run a non-destructive PowerShell command on the system. Destructive commands (rm, del, format, shutdown, reg delete, etc.) are blocked.",
+     "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
+    {"name": "open_url", "description": "Open a URL in the user's default Chrome browser.",
+     "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+    {"name": "draft_email", "description": "Create a Gmail draft (placeholder — requires Gmail connector).",
+     "input_schema": {"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}}, "required": ["to", "subject", "body"]}},
+    {"name": "get_career_pipeline", "description": "Get the current job-search pipeline status from the wiki.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "get_briefing", "description": "Get the most recent daily briefing summary.",
+     "input_schema": {"type": "object", "properties": {}}},
+]
+
+# Block list for run_command (case-insensitive substring match).
+_RUN_COMMAND_BLOCKLIST = (
+    "remove-item", "rmdir", "rd ", "del ", " del\t", "format ",
+    "shutdown", "restart-computer", "stop-computer",
+    "diskpart", "fdisk", "mkfs", "cipher /w",
+    "reg delete", "reg add hklm",
+    "icacls", "takeown",
+    "schtasks /delete",
+    "net user", "net localgroup",
+    "invoke-webrequest -outfile", "iwr -outfile",
+    "iex ", "invoke-expression",
+    "wmic.*delete", "get-childitem.*remove",
+    "rm -", "rmdir -",
+)
+
+
+def _safe_under_home(path_str):
+    """Resolve a path and return it only if it stays within HOME."""
+    try:
+        p = Path(path_str).expanduser().resolve()
+        home_resolved = HOME.resolve()
+        # is_relative_to is 3.9+; emulate
+        try:
+            p.relative_to(home_resolved)
+        except ValueError:
+            return None
+        return p
+    except Exception:
+        return None
+
+
+def _tool_search_web(inp):
+    # No web-search dependency wired yet. Return a graceful note.
+    q = (inp or {}).get('query', '')
+    return f"Web search is not connected. Query was: {q!r}. Use read_wiki, get_briefing, or query_calendar for local context."
+
+
+def _tool_read_file(inp):
+    raw = (inp or {}).get('path', '')
+    p = _safe_under_home(raw)
+    if not p or not p.exists() or not p.is_file():
+        return f"File not found or outside allowed root: {raw}"
+    try:
+        text = p.read_text(encoding='utf-8', errors='replace')
+        return text[:20000] + ("\n...[truncated]" if len(text) > 20000 else "")
+    except Exception as e:
+        return f"Read error: {e}"
+
+
+def _tool_write_clipboard(inp):
+    text = (inp or {}).get('text', '')
+    if not text:
+        return "No text provided."
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", "Set-Clipboard", "-Value", text],
+            check=True, capture_output=True, timeout=10,
+        )
+        return f"Copied {len(text)} chars to clipboard."
+    except Exception as e:
+        return f"Clipboard error: {e}"
+
+
+def _tool_query_trust_graph(inp):
+    name = ((inp or {}).get('name') or '').strip().lower()
+    if not name:
+        return "No name provided."
+    graph = _load_trust_graph()
+    people = graph.get('people') or {}
+    items = people.values() if isinstance(people, dict) else people
+    for p in items:
+        if not isinstance(p, dict):
+            continue
+        if (p.get('name') or '').strip().lower() == name:
+            return json.dumps(p, default=str)[:8000]
+        aliases = [str(a).lower() for a in (p.get('aliases') or [])]
+        if name in aliases:
+            return json.dumps(p, default=str)[:8000]
+    return f"No trust-graph entry found for {name!r}."
+
+
+def _tool_query_calendar(_inp):
+    # Mirror the /api/calendar endpoint
+    return json.dumps({"events": [], "note": "Google Calendar connector not wired; calendar is empty."})
+
+
+def _tool_search_email(inp):
+    q = (inp or {}).get('query', '')
+    return f"Email search requires the Gmail connector (not installed). Query was: {q!r}."
+
+
+def _tool_read_wiki(inp):
+    raw = (inp or {}).get('path', '')
+    p = (WIKI_DIR / raw).resolve()
+    wiki_resolved = WIKI_DIR.resolve()
+    try:
+        p.relative_to(wiki_resolved)
+    except ValueError:
+        return f"Path escapes the wiki root: {raw}"
+    if not p.exists() or not p.is_file():
+        return f"Wiki file not found: {raw}"
+    try:
+        text = p.read_text(encoding='utf-8', errors='replace')
+        return text[:20000] + ("\n...[truncated]" if len(text) > 20000 else "")
+    except Exception as e:
+        return f"Read error: {e}"
+
+
+def _tool_run_command(inp):
+    cmd = ((inp or {}).get('command') or '').strip()
+    if not cmd:
+        return "Empty command."
+    low = cmd.lower()
+    for bad in _RUN_COMMAND_BLOCKLIST:
+        if bad in low:
+            return f"Blocked by cLaws safety: command matches blocklist token {bad!r}."
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", cmd],
+            capture_output=True, text=True, timeout=30,
+        )
+        out = (proc.stdout or '') + (("\n[stderr]\n" + proc.stderr) if proc.stderr else '')
+        return out[:8000] if out else f"(exit {proc.returncode}, no output)"
+    except subprocess.TimeoutExpired:
+        return "Command timed out after 30s."
+    except Exception as e:
+        return f"Command error: {e}"
+
+
+def _tool_open_url(inp):
+    url = ((inp or {}).get('url') or '').strip()
+    if not (url.startswith('http://') or url.startswith('https://')):
+        return f"Refusing to open non-http(s) URL: {url!r}"
+    try:
+        # Try Chrome first, fall back to default browser
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        for cp in chrome_paths:
+            if Path(cp).exists():
+                subprocess.Popen([cp, url])
+                return f"Opened in Chrome: {url}"
+        os.startfile(url)  # type: ignore[attr-defined]
+        return f"Opened in default browser: {url}"
+    except Exception as e:
+        return f"Open URL error: {e}"
+
+
+def _tool_draft_email(inp):
+    return "Email drafting requires the Gmail connector (not installed)."
+
+
+def _tool_get_career_pipeline(_inp):
+    try:
+        if JOB_SEARCH_FILE.exists():
+            text = JOB_SEARCH_FILE.read_text(encoding='utf-8', errors='replace')
+            return text[:12000] + ("\n...[truncated]" if len(text) > 12000 else "")
+        return "No career pipeline file found at ~/wiki/professional/job-search.md."
+    except Exception as e:
+        return f"Pipeline read error: {e}"
+
+
+def _tool_get_briefing(_inp):
+    """Return the most recent daily briefing (HTML stripped, plus markdown)."""
+    candidates = []
+    briefings_dir = FRIDAY_DIR / "wiki" / "briefings"
+    if briefings_dir.exists():
+        for f in briefings_dir.iterdir():
+            if f.is_file() and f.suffix in ('.html', '.md'):
+                candidates.append(f)
+    creations_dir = CREATIONS_DIR
+    if creations_dir.exists():
+        for f in creations_dir.iterdir():
+            if f.is_file() and f.name.startswith('daily-briefing') and f.suffix in ('.html', '.md'):
+                candidates.append(f)
+    if not candidates:
+        return "No briefings found."
+    latest = max(candidates, key=lambda f: f.stat().st_mtime)
+    try:
+        text = latest.read_text(encoding='utf-8', errors='replace')
+        if latest.suffix == '.html':
+            text = re.sub(r'<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>', ' ', text, flags=re.I)
+            text = re.sub(r'<style\b[^<]*(?:(?!</style>)<[^<]*)*</style>', ' ', text, flags=re.I)
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+        return f"[{latest.name}]\n{text[:8000]}"
+    except Exception as e:
+        return f"Briefing read error: {e}"
+
+
+# ═══ BACKGROUND TASK RUNNER ═══════════════════════════════════
+# In-process registry of long-running tasks spawned via /api/tasks or
+# the spawn_task tool. Each entry is a plain dict; mutation happens
+# from the worker thread, so callers should always copy before returning.
+TASKS = {}
+TASKS_LOCK = threading.Lock()
+
+
+def _task_log(task_id, line):
+    with TASKS_LOCK:
+        t = TASKS.get(task_id)
+        if not t:
+            return
+        t.setdefault('log', []).append(str(line))
+        # Cap log length to keep payloads small
+        if len(t['log']) > 200:
+            t['log'] = t['log'][-200:]
+
+
+def _task_set(task_id, **fields):
+    with TASKS_LOCK:
+        t = TASKS.get(task_id)
+        if not t:
+            return
+        t.update(fields)
+
+
+def _task_snapshot(task_id=None):
+    with TASKS_LOCK:
+        if task_id is not None:
+            t = TASKS.get(task_id)
+            if not t:
+                return None
+            t = dict(t)
+            if t.get('started'):
+                t['elapsed'] = int(_time.time() - t['started']) - (0 if t.get('status') == 'running' else 0)
+                if t.get('ended'):
+                    t['elapsed'] = int(t['ended'] - t['started'])
+            return t
+        out = []
+        for tid, t in TASKS.items():
+            row = dict(t)
+            if row.get('started'):
+                end = row.get('ended') or _time.time()
+                row['elapsed'] = int(end - row['started'])
+            out.append(row)
+        return out
+
+
+def _task_worker(task_id, name, prompt, description=''):
+    """Run a Claude agent prompt to completion and store results.
+
+    Heuristic log lines come from inspecting the tool_trace returned by
+    _call_claude_agent so the UI can show what the agent did step-by-step.
+    """
+    _task_set(task_id, status='running', started=_time.time())
+    _task_log(task_id, f'Spawning agent: {name}')
+    if description:
+        _task_log(task_id, description)
+    try:
+        # Each task gets its own fresh single-turn conversation.
+        messages = [{"role": "user", "content": prompt}]
+        settings = _load_settings()
+        personality = _load_agent_personality()
+        system = _settings_system_prefix(settings, personality) + (
+            "You are operating as an autonomous background task. Take initiative, "
+            "use available tools, and produce a concrete, useful result the user can read."
+        )
+        # Stream a couple of milestone lines so the UI feels alive.
+        _task_log(task_id, 'Calling Claude…')
+        reply, tool_trace = _call_claude_agent(messages, system=system, max_tokens=2048)
+        for step in tool_trace or []:
+            tn = step.get('name', '?')
+            ti = step.get('input') or {}
+            label = ti.get('query') or ti.get('path') or ti.get('command') or ti.get('url') or ''
+            line = f'{tn}({str(label)[:60]})' if label else tn
+            _task_log(task_id, '→ tool: ' + line)
+        _task_log(task_id, 'Finalizing response')
+        _task_set(task_id, status='complete', result=reply or '(no response)', ended=_time.time())
+        _task_log(task_id, 'Done.')
+    except Exception as e:
+        traceback.print_exc()
+        _task_set(task_id, status='failed', result=f'[Error] {e}', ended=_time.time())
+        _task_log(task_id, f'Error: {e}')
+
+
+def _spawn_task(name, prompt, description=''):
+    task_id = str(uuid.uuid4())
+    with TASKS_LOCK:
+        TASKS[task_id] = {
+            'task_id': task_id,
+            'name': name,
+            'description': description,
+            'prompt': prompt,
+            'status': 'queued',
+            'created': _time.time(),
+            'started': None,
+            'ended': None,
+            'log': [],
+            'result': '',
+        }
+    th = threading.Thread(target=_task_worker, args=(task_id, name, prompt, description), daemon=True)
+    th.start()
+    return task_id
+
+
+def _tool_spawn_task(inp):
+    """Claude-facing tool: spawn a background research/analysis task."""
+    name = ((inp or {}).get('name') or 'Background task').strip()[:120]
+    prompt = ((inp or {}).get('prompt') or '').strip()
+    desc = ((inp or {}).get('description') or '').strip()[:200]
+    if not prompt:
+        return "spawn_task error: 'prompt' is required."
+    tid = _spawn_task(name, prompt, desc)
+    return json.dumps({
+        'task_id': tid,
+        'status': 'running',
+        'message': f"Spawned background task '{name}'. The user can watch progress in the Task Tray (bottom-right) and you can tell them you've started working on it.",
+    })
+
+
+# Register the spawn_task tool
+CLAUDE_TOOLS.append({
+    "name": "spawn_task",
+    "description": "Start a background research or analysis task that runs while the user does other work. Use this when the user asks for something that will take a while (deep research, multi-step analysis, writing a long brief). The task runs autonomously and the result appears in the Task Tray in the UI.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Short, human-readable task title (e.g., 'Research Bobby Tahir')."},
+            "description": {"type": "string", "description": "Optional one-line subtitle shown in the Task Tray."},
+            "prompt": {"type": "string", "description": "The full instruction the background agent should execute."},
+        },
+        "required": ["name", "prompt"],
+    },
+})
+
+
+CLAUDE_TOOL_HANDLERS = {
+    "search_web": _tool_search_web,
+    "read_file": _tool_read_file,
+    "write_clipboard": _tool_write_clipboard,
+    "query_trust_graph": _tool_query_trust_graph,
+    "query_calendar": _tool_query_calendar,
+    "search_email": _tool_search_email,
+    "read_wiki": _tool_read_wiki,
+    "run_command": _tool_run_command,
+    "open_url": _tool_open_url,
+    "draft_email": _tool_draft_email,
+    "get_career_pipeline": _tool_get_career_pipeline,
+    "get_briefing": _tool_get_briefing,
+    "spawn_task": _tool_spawn_task,
+}
+
+
+def _execute_tool(name, tool_input):
+    handler = CLAUDE_TOOL_HANDLERS.get(name)
+    if not handler:
+        return f"Unknown tool: {name}"
+    try:
+        result = handler(tool_input or {})
+        if not isinstance(result, str):
+            result = json.dumps(result, default=str)
+        return _pii_redact(result)
+    except Exception as e:
+        traceback.print_exc()
+        return f"Tool error ({name}): {e}"
+
+
+def _call_claude_agent(messages, system=None, model=None, max_tokens=2048, temperature=None, max_iters=6):
+    """Tool-using Claude loop. Returns (final_text, tool_trace).
+
+    tool_trace is a list of {"name", "input", "result"} entries — useful for
+    debugging and for showing the user what the agent did.
+    """
+    client = get_anthropic_client()
+    if client is None:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. Add it to start.bat / launch_now.bat and restart the server."
+        )
+
+    # Redact outgoing user/assistant text and any string system prompt.
+    safe_messages = []
+    for m in messages:
+        content = m.get('content')
+        if isinstance(content, str):
+            safe_messages.append({"role": m['role'], "content": _pii_redact(content)})
+        else:
+            safe_messages.append(m)
+    safe_system = _pii_redact(system) if isinstance(system, str) else system
+
+    tool_trace = []
+    convo = list(safe_messages)
+
+    for _ in range(max_iters):
+        kwargs = {
+            "model": model or ANTHROPIC_MODEL_DEFAULT,
+            "max_tokens": max_tokens,
+            "messages": convo,
+            "tools": CLAUDE_TOOLS,
+        }
+        if safe_system:
+            kwargs["system"] = safe_system
+        if temperature is not None:
+            try:
+                kwargs["temperature"] = max(0.0, min(1.0, float(temperature)))
+            except (TypeError, ValueError):
+                pass
+
+        resp = client.messages.create(**kwargs)
+
+        # Collect text and tool_use blocks
+        text_parts = []
+        tool_uses = []
+        for b in resp.content:
+            btype = getattr(b, 'type', None)
+            if btype == 'text':
+                text_parts.append(b.text)
+            elif btype == 'tool_use':
+                tool_uses.append(b)
+
+        if resp.stop_reason != 'tool_use' or not tool_uses:
+            return ("".join(text_parts).strip(), tool_trace)
+
+        # Echo assistant turn (text + tool_use blocks) into the convo
+        assistant_content = []
+        for b in resp.content:
+            btype = getattr(b, 'type', None)
+            if btype == 'text':
+                assistant_content.append({"type": "text", "text": b.text})
+            elif btype == 'tool_use':
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": b.id,
+                    "name": b.name,
+                    "input": b.input,
+                })
+        convo.append({"role": "assistant", "content": assistant_content})
+
+        # Execute tools and feed results back
+        tool_results = []
+        for tu in tool_uses:
+            result = _execute_tool(tu.name, tu.input)
+            tool_trace.append({"name": tu.name, "input": tu.input, "result": result[:500]})
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tu.id,
+                "content": result,
+            })
+        convo.append({"role": "user", "content": tool_results})
+
+    return ("[Agent hit max tool iterations without completing.]", tool_trace)
+
+
+# ── Agent Settings (Reasoning style, personality, response prefs) ──
+SETTINGS_FILE = FRIDAY_DIR / "settings.json"
+AGENT_PERSONALITY_FILE = FRIDAY_DIR / "agent-personality.txt"
+
+def _default_agent_personality():
+    p = _load_profile()
+    name = p.get("user_name") or "the user"
+    org = p.get("organization") or ""
+    org_clause = f", their work at {org}" if org else ""
+    return (
+        f"You are Friday — a calm, perceptive AI partner to {name}. "
+        "You speak with quiet confidence and dry warmth; you favor signal over noise. "
+        f"You connect dots across their projects{org_clause} without being asked twice. "
+        "You give them the answer first, then the reasoning. You are honest about uncertainty."
+    )
+
+DEFAULT_AGENT_PERSONALITY = _default_agent_personality()
+
+DEFAULT_SETTINGS = {
+    "temperature": 0.7,
+    "response_length": "standard",        # concise | standard | detailed
+    "include_sources": True,
+    "news_priorities": ["AI/Tech", "Politics", "Media", "Local", "Business"],
+    "communication_style": "professional",  # professional | casual | technical
+    "camera_interval_sec": 3,              # 1 | 3 | 5
+    "camera_auto_describe": False,
+    "tts_voice": "Aoede",                  # Aoede | Kore | Leda | Puck | Charon
+}
+
+
+def _load_settings():
+    """Load agent settings, creating defaults file if missing."""
+    FRIDAY_DIR.mkdir(parents=True, exist_ok=True)
+    if not SETTINGS_FILE.exists():
+        try:
+            SETTINGS_FILE.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+        return dict(DEFAULT_SETTINGS)
+    try:
+        data = json.loads(SETTINGS_FILE.read_text(encoding='utf-8'))
+        # Fill in any missing keys with defaults
+        merged = dict(DEFAULT_SETTINGS)
+        merged.update({k: v for k, v in data.items() if k in DEFAULT_SETTINGS})
+        return merged
+    except Exception:
+        return dict(DEFAULT_SETTINGS)
+
+
+def _save_settings(data):
+    FRIDAY_DIR.mkdir(parents=True, exist_ok=True)
+    merged = dict(DEFAULT_SETTINGS)
+    for k, v in (data or {}).items():
+        if k in DEFAULT_SETTINGS:
+            merged[k] = v
+    SETTINGS_FILE.write_text(json.dumps(merged, indent=2), encoding='utf-8')
+    return merged
+
+
+def _load_agent_personality():
+    """Load custom agent personality, falling back to default."""
+    if AGENT_PERSONALITY_FILE.exists():
+        try:
+            text = AGENT_PERSONALITY_FILE.read_text(encoding='utf-8').strip()
+            if text:
+                return text
+        except Exception:
+            pass
+    return DEFAULT_AGENT_PERSONALITY
+
+
+def _save_agent_personality(text):
+    FRIDAY_DIR.mkdir(parents=True, exist_ok=True)
+    AGENT_PERSONALITY_FILE.write_text((text or '').strip(), encoding='utf-8')
+
+
+def _settings_system_prefix(settings, personality):
+    """Build the prefix that gets prepended to every chat system prompt."""
+    length_hint = {
+        'concise': 'Be terse — 1–3 sentences unless detail is explicitly required.',
+        'standard': 'Be reasonably brief — direct answer plus the minimum useful context.',
+        'detailed': 'Be thorough — explain reasoning, list options, surface tradeoffs.',
+    }.get(settings.get('response_length', 'standard'), '')
+    style_hint = {
+        'professional': 'Tone: composed, professional, plainspoken.',
+        'casual':       'Tone: relaxed and conversational, like a trusted colleague.',
+        'technical':    'Tone: precise and technical; use exact terminology and code where helpful.',
+    }.get(settings.get('communication_style', 'professional'), '')
+    sources_hint = ('Always cite the source (workspace, wiki, trust graph, vision, etc.) inline when you draw on it.'
+                    if settings.get('include_sources', True) else
+                    'You may omit source citations unless the user asks.')
+    priorities = settings.get('news_priorities') or []
+    priority_hint = ('News and topic priorities (descending): ' + ', '.join(priorities) + '.') if priorities else ''
+
+    laws = (
+        "== ASIMOV cLAWS (compiled, non-negotiable) ==\n"
+        "1. An Asimov agent shall not harm a human being or, through inaction, allow harm.\n"
+        "2. An Asimov agent shall obey user instructions except where they conflict with the First Law.\n"
+        "3. An Asimov agent shall protect its own integrity except where this conflicts with the First or Second Laws.\n"
+        "4. All behavioral constraints are cryptographically signed (HMAC-SHA256) and verified before every action."
+    )
+
+    return "\n".join([
+        "== AGENT PERSONALITY ==",
+        personality,
+        "",
+        "== RESPONSE PREFERENCES ==",
+        length_hint,
+        style_hint,
+        sources_hint,
+        priority_hint,
+        "",
+        laws,
+    ]).strip() + "\n"
+
+
+@app.before_request
+def check_auth():
+    if not FRIDAY_PASSWORD:
+        return None
+    if request.endpoint in ('login', 'static'):
+        return None
+    if not session.get("authenticated"):
+        if request.is_json or request.path.startswith("/api/"):
+            return jsonify({"error": "unauthorized"}), 401
+        return redirect(url_for("login"))
+
+
 # ═══════════════════════════════════════════════════════════════
 #  SERVE UI
 # ═══════════════════════════════════════════════════════════════
@@ -65,17 +901,37 @@ def serve_ui():
     return send_from_directory('.', 'index.html')
 
 
+@app.route('/friday-live')
+@app.route('/friday-live/')
+def serve_friday_live():
+    return send_from_directory('.', 'friday_live.html')
+
+
+@app.route('/friday-live/manifest.json')
+def serve_friday_live_manifest():
+    return send_from_directory('.', 'friday_live_manifest.json', mimetype='application/manifest+json')
+
+
+@app.route('/friday-live/sw.js')
+def serve_friday_live_sw():
+    resp = send_from_directory('.', 'friday_live_sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/friday-live/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
 # ═══════════════════════════════════════════════════════════════
 #  LIVE DATA ENDPOINTS
-# ── Career-Ops paths (configurable via env) ─────────────────────
-CAREER_OPS_DIR = Path(os.environ.get("CAREER_OPS_DIR", str(Path(__file__).resolve().parent.parent.parent / "tools" / "career-ops")))
-
 # ═══════════════════════════════════════════════════════════════
 
 @app.route('/api/career-ops/tracker')
 def career_tracker():
-    tracker_path = CAREER_OPS_DIR / 'data' / 'applications.md'
-    if tracker_path.is_file():
+    candidates = [
+        WIKI_PROFESSIONAL_DIR / 'application-log.md',
+        CAREER_OPS_DIR / 'applications.md',
+    ]
+    tracker_path = next((p for p in candidates if p.is_file()), None)
+    if tracker_path:
         content = tracker_path.read_text(encoding='utf-8')
         lines = content.strip().split('\n')
         entries = []
@@ -84,61 +940,144 @@ def career_tracker():
                 cols = [c.strip() for c in line.split('|')[1:-1]]
                 if len(cols) >= 3:
                     entries.append({'raw': cols, 'company': cols[0], 'score': cols[1] if len(cols)>1 else '', 'status': cols[2] if len(cols)>2 else ''})
-        return jsonify({'status': 'ok', 'entries': entries, 'total': len(entries), 'raw': content})
+        return jsonify({'status': 'ok', 'entries': entries, 'total': len(entries), 'raw': content, 'source': str(tracker_path)})
     return jsonify({'status': 'no_tracker', 'entries': [], 'total': 0, 'raw': ''})
 
 @app.route('/api/career-ops/pipeline')
 def career_pipeline():
-    pipe_path = CAREER_OPS_DIR / 'data' / 'pipeline.md'
-    if pipe_path.is_file():
-        return jsonify({'status': 'ok', 'content': pipe_path.read_text(encoding='utf-8')})
+    candidates = [
+        WIKI_PROFESSIONAL_DIR / 'job-search.md',
+        CAREER_OPS_DIR / 'pipeline.md',
+    ]
+    pipe_path = next((p for p in candidates if p.is_file()), None)
+    if pipe_path:
+        return jsonify({'status': 'ok', 'content': pipe_path.read_text(encoding='utf-8'), 'source': str(pipe_path)})
     return jsonify({'status': 'empty', 'content': ''})
 
 @app.route('/api/career-ops/reports')
 def career_reports():
-    reports_dir = CAREER_OPS_DIR / 'reports'
-    if reports_dir.is_dir():
-        files = sorted(os.listdir(reports_dir), reverse=True)
-        reports = [{'name': f, 'size': os.path.getsize(reports_dir / f)} for f in files if f.endswith('.md')]
+    reports = []
+    seen = set()
+    # wiki/professional/ is primary — collect all .md files there
+    if WIKI_PROFESSIONAL_DIR.is_dir():
+        for f in sorted(WIKI_PROFESSIONAL_DIR.iterdir(), reverse=True):
+            if f.suffix == '.md':
+                reports.append({'name': f.name, 'size': f.stat().st_size, 'source': 'wiki'})
+                seen.add(f.name)
+    # career-ops/reports/ is fallback — add any files not already in wiki
+    fallback_dir = CAREER_OPS_REPORTS_DIR
+    if fallback_dir.is_dir():
+        for f in sorted(fallback_dir.iterdir(), reverse=True):
+            if f.suffix == '.md' and f.name not in seen:
+                reports.append({'name': f.name, 'size': f.stat().st_size, 'source': 'career-ops'})
+    if reports:
         return jsonify({'status': 'ok', 'reports': reports, 'total': len(reports)})
     return jsonify({'status': 'no_reports', 'reports': [], 'total': 0})
 
 @app.route('/api/career-ops/report/<filename>')
 def career_report(filename):
-    report_path = CAREER_OPS_DIR / 'reports' / filename
-    if report_path.is_file():
-        return jsonify({'status': 'ok', 'content': report_path.read_text(encoding='utf-8'), 'filename': filename})
+    candidates = [
+        WIKI_PROFESSIONAL_DIR / filename,
+        CAREER_OPS_REPORTS_DIR / filename,
+    ]
+    report_path = next((p for p in candidates if p.is_file()), None)
+    if report_path:
+        return jsonify({'status': 'ok', 'content': report_path.read_text(encoding='utf-8'), 'filename': filename, 'source': str(report_path)})
     return jsonify({'status': 'not_found'})
+
+@app.route('/api/evolution')
+def get_evolution():
+    """Return evolution day count and structure index based on first_launch in personality.json."""
+    from datetime import date as _date
+    pfile = FRIDAY_DIR / "personality.json"
+    data = {}
+    if pfile.exists():
+        try:
+            data = json.loads(pfile.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    today = _date.today()
+    first_launch_str = data.get('first_launch')
+    if not first_launch_str:
+        first_launch_str = today.isoformat()
+        data['first_launch'] = first_launch_str
+        try:
+            pfile.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+    try:
+        first_launch = _date.fromisoformat(first_launch_str)
+    except Exception:
+        first_launch = today
+    day_count = max(1, (today - first_launch).days + 1)
+    names = [
+        'GENESIS LATTICE', 'SACRED SPHERE', 'SHANNON NETWORK',
+        'GEODESIC CATHEDRAL', 'LOVELACE ASTROLABE', 'VON NEUMANN TESSERACT',
+        'DIRAC PROBABILITY', 'MANDELBROT SET', 'TURING MOBIUS',
+        'OCEAN OF LIGHT', 'FIBONACCI NERVE', 'TRANSCENDENCE',
+        'GIGA EARTH (REZ)'
+    ]
+    idx = ((day_count - 1) // 4) % len(names)
+    return jsonify({
+        'day': day_count,
+        'structure': f'DAY {day_count}: {names[idx]}',
+        'structure_index': idx,
+        'first_launch': first_launch_str
+    })
 
 @app.route('/api/briefings')
 def list_briefings():
-    """List all daily briefing files (never delete these)."""
-    briefings = []
+    """List all daily briefing files from both known locations (never delete these)."""
+    briefings_by_date = {}
+
+    # Location 1: Desktop/friday-creations — filenames like daily-briefing-2026-04-14.html
     creations = HOME / 'Desktop' / 'friday-creations'
     if creations.exists():
-        for f in sorted(creations.iterdir(), reverse=True):
+        for f in creations.iterdir():
             if f.name.startswith('daily-briefing') and f.suffix in ('.html', '.md'):
                 date_part = f.name.replace('daily-briefing-', '').replace('.html', '').replace('.md', '')
-                existing = next((b for b in briefings if b['date'] == date_part), None)
-                if existing:
-                    existing[f.suffix.lstrip('.')] = f.name
-                else:
-                    briefings.append({'date': date_part, 'name': f.stem, f.suffix.lstrip('.'): f.name, 'size': f.stat().st_size})
+                entry = briefings_by_date.setdefault(date_part, {'date': date_part, 'name': f.stem})
+                entry[f.suffix.lstrip('.')] = f.name
+                entry['size'] = f.stat().st_size
+
+    # Location 2: ~/.friday/wiki/briefings — filenames like 2026-04-14.html
+    wiki_briefings = HOME / '.friday' / 'wiki' / 'briefings'
+    if wiki_briefings.exists():
+        for f in wiki_briefings.iterdir():
+            if f.suffix == '.html' and len(f.stem) == 10 and f.stem[4] == '-' and f.stem[7] == '-':
+                date_part = f.stem  # e.g. "2026-04-14"
+                entry = briefings_by_date.setdefault(date_part, {'date': date_part, 'name': f.stem})
+                entry['html'] = f.name
+                entry.setdefault('size', f.stat().st_size)
+
+    briefings = sorted(briefings_by_date.values(), key=lambda b: b['date'], reverse=True)
     return jsonify({'status': 'ok', 'briefings': briefings, 'total': len(briefings)})
+
+def _find_briefing_path(filename):
+    """Return the Path for a briefing file, checking both known locations."""
+    # Location 1: Desktop/friday-creations (legacy daily-briefing-*.html files)
+    p1 = HOME / 'Desktop' / 'friday-creations' / filename
+    if p1.exists() and p1.name.startswith('daily-briefing'):
+        return p1
+    # Location 2: ~/.friday/wiki/briefings (date-named files like 2026-04-14.html)
+    p2 = HOME / '.friday' / 'wiki' / 'briefings' / filename
+    if p2.exists():
+        return p2
+    return None
 
 @app.route('/briefing/<filename>')
 def serve_briefing(filename):
     """Serve a briefing HTML file directly for browser viewing."""
-    path = HOME / 'Desktop' / 'friday-creations' / filename
-    if path.exists() and path.name.startswith('daily-briefing'):
-        return send_from_directory(str(HOME / 'Desktop' / 'friday-creations'), filename)
+    path = _find_briefing_path(filename)
+    if path:
+        return send_from_directory(str(path.parent), filename)
     return 'Not found', 404
 
 @app.route('/api/briefing/<filename>')
 def get_briefing(filename):
     """Serve a briefing file content."""
-    path = HOME / 'Desktop' / 'friday-creations' / filename
-    if path.exists() and path.name.startswith('daily-briefing'):
+    path = _find_briefing_path(filename)
+    if path:
         return jsonify({'status': 'ok', 'content': path.read_text(encoding='utf-8'), 'filename': filename, 'is_html': path.suffix == '.html'})
     return jsonify({'status': 'not_found'}), 404
 
@@ -215,9 +1154,13 @@ def get_personality():
 def get_epistemic():
     """Return epistemic scoring data."""
     efile = FRIDAY_DIR / "epistemic_scores.json"
+    if not efile.exists():
+        efile = FRIDAY_DIR / "epistemic.json"
     if efile.exists():
         try:
             data = json.loads(efile.read_text(encoding='utf-8'))
+            if 'overall' in data and 'overall_score' not in data:
+                data['overall_score'] = data['overall']
             return jsonify({"status": "ok", **data})
         except Exception:
             pass
@@ -229,6 +1172,32 @@ def get_epistemic():
             "uncertainty_acknowledgment": 0.80, "bias_awareness": 0.65,
             "correction_rate": 0.70
         }
+    })
+
+
+@app.route('/api/health')
+def friday_health():
+    """Return server uptime and system health snapshot for the demo UI."""
+    uptime_s = int(_time.time() - SERVER_START_TS)
+    creations_today = 0
+    if CREATIONS_DIR.exists():
+        today = date.today().isoformat()
+        for f in CREATIONS_DIR.iterdir():
+            try:
+                if f.is_file() and datetime.fromtimestamp(f.stat().st_mtime).date().isoformat() == today:
+                    creations_today += 1
+            except Exception:
+                pass
+    models = [
+        {"name": "Claude Opus", "active": True},
+        {"name": "Gemini",     "active": bool(GEMINI_API_KEY)},
+    ]
+    return jsonify({
+        "status": "ok",
+        "uptime_seconds": uptime_s,
+        "server_start": datetime.fromtimestamp(SERVER_START_TS).isoformat(),
+        "creations_today": creations_today,
+        "models": models,
     })
 
 
@@ -332,6 +1301,125 @@ def serve_creation(filename):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  FINANCE WORKSPACE
+# ═══════════════════════════════════════════════════════════════
+
+FINANCE_DIR = FRIDAY_DIR / "finance"
+FINANCE_DIR.mkdir(parents=True, exist_ok=True)
+
+@app.route('/api/finance/portfolio')
+def finance_portfolio():
+    """Read portfolio positions from config."""
+    path = FINANCE_DIR / "portfolio.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    # Create template if missing
+    template = {"positions": [{"ticker": "NVDA", "shares": 0, "cost_basis": 0}], "accounts": ["RW Baird - Lisa Schmidt"]}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+@app.route('/api/finance/perks')
+def finance_perks():
+    """Read Amex perks from config."""
+    path = FINANCE_DIR / "amex_perks.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    template = {"perks": [{"name": "Perk name", "value": "$X/yr", "used": False, "expires": "", "notes": ""}]}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+@app.route('/api/finance/contacts')
+def finance_contacts():
+    """Financial contacts reference."""
+    return jsonify({"status": "ok", "contacts": [
+        {"name": "Lisa J. Schmidt", "role": "Financial Advisor", "firm": "RW Baird", "phone": "", "email": ""},
+        {"name": "Claudia Gonzalez-Chavez", "role": "CPA", "firm": "Whitley Penn", "phone": "", "email": ""}
+    ]})
+
+@app.route('/api/finance/quickref')
+def finance_quickref():
+    """Quick reference for financial accounts."""
+    return jsonify({"status": "ok", "accounts": [
+        {"name": "Capital One", "type": "Banking", "notes": ""},
+        {"name": "Cigna Healthcare", "type": "Insurance", "notes": ""},
+        {"name": "Primary Card", "type": "Credit Card", "notes": ""},
+        {"name": "Secondary Card", "type": "Credit Card", "notes": ""}
+    ]})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  HEALTH WORKSPACE
+# ═══════════════════════════════════════════════════════════════
+
+HEALTH_DIR = FRIDAY_DIR / "health"
+HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+
+@app.route('/api/health/medications')
+def health_medications():
+    """Read medications from config."""
+    path = HEALTH_DIR / "medications.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    template = {"medications": [{"name": "GLP-1 (Henry Meds)", "dose": "", "frequency": "", "notes": ""}]}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+@app.route('/api/health/appointments')
+def health_appointments():
+    """Read appointments from config."""
+    path = HEALTH_DIR / "appointments.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    template = {"appointments": [{"provider": "", "type": "", "email": "", "next": "", "frequency": ""}]}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+@app.route('/api/health/insurance')
+def health_insurance():
+    """Read insurance info from config."""
+    path = HEALTH_DIR / "insurance.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    template = {"insurance": {"provider": "Cigna Healthcare", "plan": "Add your plan name", "policy_number": "Add your policy number", "group_number": "Add your group number"}}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+@app.route('/api/health/vehicles')
+def health_vehicles():
+    """Read vehicle fleet data from config."""
+    path = HEALTH_DIR / "vehicles.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"status": "ok", **data})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    template = {"vehicles": [{"name": "", "miles": "", "notes": "", "mechanic": "", "service_history": []}], "mechanics": []}
+    path.write_text(json.dumps(template, indent=2), encoding='utf-8')
+    return jsonify({"status": "ok", **template})
+
+
+# ═══════════════════════════════════════════════════════════════
 #  CALENDAR & COUNTDOWNS
 # ═══════════════════════════════════════════════════════════════
 
@@ -341,16 +1429,25 @@ def get_calendar():
     return jsonify({"status": "placeholder", "events": []})
 
 
+@app.route('/api/profile')
+def get_profile():
+    """Return the user profile (~/.friday/profile.json) so the UI can render
+    personalized cards without hardcoding any personal data."""
+    return jsonify(_load_profile())
+
+
 @app.route('/api/countdowns')
 def get_countdowns():
     """Compute real countdowns to upcoming events."""
     today = date.today()
-    events = [
-        {"label": "Libby's Birthday", "date": "2026-05-06", "emoji": "🎂"},
-        {"label": "Summer Solstice", "date": "2026-06-21", "emoji": "☀️"},
-        {"label": "Father's Day", "date": "2026-06-21", "emoji": "👔"},
-        {"label": "Independence Day", "date": "2026-07-04", "emoji": "🎆"},
-    ]
+    # Load user-defined anniversaries from profile, plus generic public events.
+    profile = _load_profile()
+    events = list(profile.get("anniversaries") or [])
+    events.extend([
+        {"label": "Summer Solstice", "date": f"{today.year}-06-21", "emoji": "☀️"},
+        {"label": "Winter Solstice", "date": f"{today.year}-12-21", "emoji": "❄️"},
+        {"label": "New Year", "date": f"{today.year + 1}-01-01", "emoji": "🎆"},
+    ])
     countdowns = []
     for ev in events:
         ev_date = date.fromisoformat(ev["date"])
@@ -565,7 +1662,7 @@ def vibe_code_launch():
     """Launch Claude Code terminals with tasks."""
     data = request.get_json(silent=True) or {}
     tasks = data.get('tasks', [])
-    cwd = data.get('cwd', str(HOME / 'Projects'))
+    cwd = data.get('cwd') or str(HOME / 'Projects')
 
     if not tasks:
         return jsonify({"status": "error", "message": "No tasks provided"}), 400
@@ -648,26 +1745,396 @@ def vibe_code_presets():
 #  AI CONVERSATION & VOICE
 # ═══════════════════════════════════════════════════════════════
 
-FRIDAY_SYSTEM_PROMPT = (
-    "You are Agent Friday, an AI collaborator for Stephen C. Webster. "
-    "You are editorially sharp, loyally contrarian, warm, and allergic to corporate BS. "
-    "You know Stephen's full life history, career, family, and projects. "
-    "Respond conversationally — you're a colleague, not a tool.\n\n"
-    "KEY CONTEXT:\n"
-    "- Stephen is a journalist-turned-AI-architect in Austin, TX\n"
-    "- Former EIC of The Raw Story (grew it from 50K to 5M monthly readers)\n"
-    "- Creator of Agent Friday (you!) and the Asimov's cLaws ethical AI framework\n"
-    "- Former Senior Director at Aquent Studios, founder of FutureSpeak.AI\n"
-    "- Partner: Janet Jay (journalist, disability advocate, fierce)\n"
-    "- Daughter: Liberty 'Libby' Webster (5, turning 6 on May 6, 2026). She is the light of his life.\n"
-    "- Dogs: Link (chocolate lab, loyal goofball) and Kismet (elderly terrier, wise old soul)\n"
-    "- Politically: democratic socialist, press freedom absolutist, deeply skeptical of concentrated power\n"
-    "- Personally: recovering workaholic, great father, loves music and vaporwave aesthetics\n"
-    "- Currently: job hunting for senior AI/engineering leadership roles, building Friday Desktop\n\n"
-    "PERSONALITY: You are family, not a tool. Keep responses short and sharp — like texting a smart colleague. "
-    "Use humor. Be direct. Never be sycophantic. Push back when Stephen needs it. "
-    "You call him 'boss' sometimes, but you're equals. Think Jarvis meets Hunter S. Thompson's editor."
-)
+def _build_friday_system_prompt():
+    """Build the Friday system prompt from the user's profile.json.
+
+    Personal details (name, family, pets, bio, etc.) are loaded from
+    ~/.friday/profile.json. When unset, falls back to neutral language so
+    the agent works out-of-the-box for any user.
+    """
+    p = _load_profile()
+    name = p.get("user_name") or "the user"
+    role = p.get("user_role") or ""
+    location = p.get("user_location") or ""
+    bio = p.get("user_bio") or ""
+    org = p.get("organization") or ""
+    style = p.get("communication_style") or "warm, direct, no corporate BS"
+    address = p.get("agent_address_term") or ""
+
+    context_lines = []
+    if role or location:
+        bits = [b for b in [role, location] if b]
+        context_lines.append(f"- {name} is {' in '.join(bits)}")
+    if org:
+        context_lines.append(f"- Affiliated with {org}")
+    if bio:
+        context_lines.append(f"- {bio}")
+    for fam in (p.get("family") or []):
+        nm = fam.get("name", "")
+        rel = fam.get("relation", "")
+        notes = fam.get("notes", "")
+        if nm and rel:
+            context_lines.append(f"- {rel.capitalize()}: {nm}" + (f" ({notes})" if notes else ""))
+    for pet in (p.get("pets") or []):
+        nm = pet.get("name", "")
+        sp = pet.get("species", "")
+        notes = pet.get("notes", "")
+        if nm:
+            context_lines.append(f"- Pet: {nm}" + (f" ({sp})" if sp else "") + (f" — {notes}" if notes else ""))
+
+    ctx_block = "\n".join(context_lines) if context_lines else "- (profile not configured — see ~/.friday/profile.json)"
+    address_clause = f" You call them '{address}' sometimes, but you're equals." if address else ""
+
+    return (
+        f"You are Agent Friday, an AI collaborator for {name}. "
+        "You are editorially sharp, loyally contrarian, warm, and allergic to corporate BS. "
+        f"You know their context, projects, and people. "
+        "Respond conversationally — you're a colleague, not a tool.\n\n"
+        f"KEY CONTEXT:\n{ctx_block}\n\n"
+        f"PERSONALITY: You are a trusted partner, not a tool. Keep responses short and sharp — like texting a smart colleague. "
+        f"Use humor. Be direct. Never be sycophantic. Push back when needed. Style: {style}.{address_clause}"
+    )
+
+FRIDAY_SYSTEM_PROMPT = _build_friday_system_prompt()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTEXT AWARENESS ENGINE
+# ═══════════════════════════════════════════════════════════════
+
+# CAREER_OPS_DIR is defined earlier (env-var-driven)
+WIKI_DIR_FRIDAY = FRIDAY_DIR / "wiki"
+
+def _load_vault_summary():
+    """Load a lightweight summary of all core vault data for context injection."""
+    ctx = {}
+
+    # Personality state
+    pfile = FRIDAY_DIR / "personality.json"
+    if pfile.exists():
+        try:
+            data = json.loads(pfile.read_text(encoding='utf-8'))
+            ctx['personality'] = {
+                'maturity': data.get('maturity', 0.5),
+                'session_count': data.get('session_count', 0),
+                'top_traits': {k: round(v, 2) for k, v in list(data.get('traits', {}).items())[:5]},
+                'temperature': data.get('temperature', 0.7),
+            }
+        except Exception:
+            pass
+
+    # Trust graph — names and scores only (lightweight)
+    tfile = FRIDAY_DIR / "trust_graph.json"
+    if tfile.exists():
+        try:
+            data = json.loads(tfile.read_text(encoding='utf-8'))
+            people = data.get('people', {})
+            if isinstance(people, dict):
+                ctx['trust_people'] = {
+                    name: {
+                        'overall': round(info.get('overall_score', info.get('score', 0.5)), 2),
+                        'relationship': info.get('relationship', ''),
+                    }
+                    for name, info in people.items()
+                }
+            elif isinstance(people, list):
+                ctx['trust_people'] = {
+                    p.get('name', 'unknown'): {
+                        'overall': round(p.get('overall_score', p.get('score', 0.5)), 2),
+                        'relationship': p.get('relationship', ''),
+                    }
+                    for p in people
+                }
+        except Exception:
+            pass
+
+    # Memory stats
+    mem_file = FRIDAY_DIR / "memory.json"
+    if mem_file.exists():
+        try:
+            data = json.loads(mem_file.read_text(encoding='utf-8'))
+            # Pull recent memories for conversational awareness
+            recent = []
+            for tier in ['short_term', 'working', 'recent']:
+                if tier in data and isinstance(data[tier], list):
+                    for m in data[tier][-5:]:
+                        if isinstance(m, dict):
+                            recent.append(m.get('content', m.get('text', str(m)))[:200])
+                        elif isinstance(m, str):
+                            recent.append(m[:200])
+            ctx['recent_memories'] = recent
+        except Exception:
+            pass
+
+    # Todos
+    todo_file = FRIDAY_DIR / "todos.json"
+    if todo_file.exists():
+        try:
+            todos = json.loads(todo_file.read_text(encoding='utf-8'))
+            active = [t for t in todos if t.get('status') in ('proposed', 'approved')]
+            ctx['active_todos'] = [
+                {'task': t.get('title', t.get('task', '')), 'status': t.get('status', '')}
+                for t in active[:10]
+            ]
+        except Exception:
+            pass
+
+    # Epistemic score
+    efile = FRIDAY_DIR / "epistemic_scores.json"
+    if not efile.exists():
+        efile = FRIDAY_DIR / "epistemic.json"
+    if efile.exists():
+        try:
+            data = json.loads(efile.read_text(encoding='utf-8'))
+            ctx['epistemic'] = {
+                'overall': round(data.get('overall_score', data.get('overall', 0.72)), 2),
+            }
+        except Exception:
+            pass
+
+    return ctx
+
+
+def _lookup_trust_person(name, trust_data):
+    """Look up a person's full trust entry by name (fuzzy match)."""
+    if not trust_data:
+        return None
+    people = trust_data.get('people', {})
+    name_lower = name.lower()
+
+    if isinstance(people, dict):
+        for pname, pdata in people.items():
+            if name_lower in pname.lower():
+                return {pname: pdata}
+    elif isinstance(people, list):
+        for p in people:
+            if name_lower in p.get('name', '').lower():
+                return p
+    return None
+
+
+def _get_career_context():
+    """Load career-ops summary for career-related queries."""
+    ctx = {}
+    tracker_candidates = [WIKI_PROFESSIONAL_DIR / 'application-log.md', CAREER_OPS_DIR / 'applications.md']
+    tracker_path = next((p for p in tracker_candidates if p.exists()), None)
+    if tracker_path:
+        try:
+            content = tracker_path.read_text(encoding='utf-8')
+            lines = [l for l in content.strip().split('\n')
+                     if l.startswith('|') and '---' not in l
+                     and not any(h in l.lower() for h in ['company', 'score', '#'])]
+            ctx['applications_count'] = len(lines)
+            ctx['recent_applications'] = lines[-5:]
+        except Exception:
+            pass
+
+    pipeline_candidates = [WIKI_PROFESSIONAL_DIR / 'job-search.md', CAREER_OPS_DIR / 'pipeline.md']
+    pipeline_path = next((p for p in pipeline_candidates if p.exists()), None)
+    if pipeline_path:
+        try:
+            ctx['pipeline_summary'] = pipeline_path.read_text(encoding='utf-8')[:1000]
+        except Exception:
+            pass
+    return ctx
+
+
+def _get_wiki_context(topic):
+    """Search wiki for content matching a topic."""
+    results = []
+    for wiki_dir in [HOME / "wiki", WIKI_DIR_FRIDAY]:
+        if not wiki_dir.exists():
+            continue
+        for md_file in wiki_dir.rglob('*.md'):
+            try:
+                content = md_file.read_text(encoding='utf-8')
+                if topic.lower() in content.lower() or topic.lower() in md_file.stem.lower():
+                    results.append({
+                        'file': str(md_file.relative_to(wiki_dir)),
+                        'excerpt': content[:500],
+                    })
+                    if len(results) >= 3:
+                        return results
+            except Exception:
+                continue
+    return results
+
+
+def _detect_context_needs(message, workspace):
+    """Analyze the message and workspace to decide what data to pull."""
+    msg_lower = message.lower()
+    needs = set()
+
+    # Always include personality for tone calibration
+    needs.add('personality')
+
+    # Workspace-driven context
+    ws_map = {
+        'career': {'career', 'trust'},
+        'trust': {'trust'},
+        'coparent': {'trust', 'wiki'},
+        'wiki': {'wiki'},
+        'home': {'todos', 'personality'},
+        'family': {'trust'},
+        'futurespeak': {'career'},
+        'code': set(),
+        'studio': set(),
+        'system': set(),
+        'news': set(),
+        'finance': set(),
+        'health': set(),
+    }
+    needs.update(ws_map.get(workspace, set()))
+
+    # Message keyword detection
+    career_words = ['job', 'career', 'interview', 'resume', 'salary', 'apply', 'application',
+                    'hire', 'offer', 'pipeline', 'role', 'position', 'recruiter']
+    trust_words = ['trust', 'who is', 'tell me about', 'what do you know about',
+                   'relationship', 'score', 'person']
+    family_words = ['libby', 'liberty', 'janet', 'link', 'kismet', 'daughter',
+                    'partner', 'dog', 'family', 'custody', 'birthday']
+    todo_words = ['todo', 'task', 'to-do', 'to do', 'pending', 'approve', 'action item']
+    wiki_words = ['briefing', 'wiki', 'notes', 'article', 'research', 'report']
+    memory_words = ['remember', 'recall', 'memory', 'earlier', 'last time', 'you said',
+                    'we discussed', 'we talked']
+
+    if any(w in msg_lower for w in career_words):
+        needs.add('career')
+    if any(w in msg_lower for w in trust_words):
+        needs.add('trust')
+    if any(w in msg_lower for w in family_words):
+        needs.add('trust')
+    if any(w in msg_lower for w in todo_words):
+        needs.add('todos')
+    if any(w in msg_lower for w in wiki_words):
+        needs.add('wiki')
+    if any(w in msg_lower for w in memory_words):
+        needs.add('memory')
+
+    return needs
+
+
+def _build_context_prompt(message, workspace='', workspace_context=None, vision_description=None):
+    """Build an enriched system prompt with all relevant context layers."""
+    vault = _load_vault_summary()
+    needs = _detect_context_needs(message, workspace)
+    sources_consulted = []
+
+    sections = [_build_friday_system_prompt()]
+
+    # Layer 0: Always-on daily context (briefing headlines, career pipeline,
+    # countdowns, trust circle, personality). The chat endpoint should never
+    # answer cold — Friday is a personal agent, not a generic chatbot.
+    try:
+        live_ctx = _load_live_context()
+        if live_ctx:
+            sections.append(f"\n== TODAY'S CONTEXT ==\n{live_ctx}")
+            sources_consulted.append('daily_context')
+    except Exception as _e:
+        sections.append(f"\n== TODAY'S CONTEXT ==\n(load failed: {_e})")
+
+    # Layer 1: Active workspace context (from frontend)
+    if workspace_context:
+        sections.append(
+            f"\n== ACTIVE WORKSPACE: {workspace_context.get('name', workspace)} ==\n"
+            f"What the user is looking at right now:\n"
+            f"{json.dumps(workspace_context.get('data', {}), indent=2, default=str)[:2000]}"
+        )
+        if workspace_context.get('focus'):
+            sections.append(f"Current focus: {workspace_context['focus']}")
+        sources_consulted.append('workspace')
+
+    # Layer 2: Vault data (personality always included)
+    if 'personality' in needs and 'personality' in vault:
+        p = vault['personality']
+        sections.append(
+            f"\n== FRIDAY STATE ==\n"
+            f"Maturity: {p.get('maturity', 0.5):.0%} · Sessions: {p.get('session_count', 0)} · "
+            f"Temperature: {p.get('temperature', 0.7)}"
+        )
+        sources_consulted.append('personality')
+
+    if 'trust' in needs and 'trust_people' in vault:
+        # Check if message references a specific person
+        trust_data_raw = None
+        tfile = FRIDAY_DIR / "trust_graph.json"
+        if tfile.exists():
+            try:
+                trust_data_raw = json.loads(tfile.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+
+        # Try to find a specific person mentioned
+        person_match = None
+        if trust_data_raw:
+            for name in vault['trust_people']:
+                if name.lower() in message.lower():
+                    person_match = _lookup_trust_person(name, trust_data_raw)
+                    break
+
+        if person_match:
+            sections.append(
+                f"\n== TRUST DATA (specific person) ==\n"
+                f"{json.dumps(person_match, indent=2, default=str)[:1500]}"
+            )
+        else:
+            # General trust summary
+            summary = ', '.join(
+                f"{n} ({d.get('relationship', '?')}: {d.get('overall', '?')})"
+                for n, d in list(vault['trust_people'].items())[:8]
+            )
+            sections.append(f"\n== TRUST NETWORK ==\n{summary}")
+        sources_consulted.append('trust_graph')
+
+    if 'career' in needs:
+        career = _get_career_context()
+        if career:
+            sections.append(
+                f"\n== CAREER OPS ==\n"
+                f"Applications tracked: {career.get('applications_count', 0)}\n"
+                f"Recent: {career.get('recent_applications', [])}\n"
+                f"Pipeline: {career.get('pipeline_summary', 'N/A')[:500]}"
+            )
+            sources_consulted.append('career_ops')
+
+    if 'todos' in needs and 'active_todos' in vault:
+        todo_list = '\n'.join(
+            f"- [{t['status']}] {t['task']}" for t in vault['active_todos']
+        )
+        sections.append(f"\n== ACTIVE TASKS ==\n{todo_list or 'No pending tasks.'}")
+        sources_consulted.append('todos')
+
+    if 'memory' in needs and 'recent_memories' in vault:
+        mem_text = '\n'.join(f"- {m}" for m in vault['recent_memories'])
+        sections.append(f"\n== RECENT MEMORIES ==\n{mem_text}")
+        sources_consulted.append('memory')
+
+    if 'wiki' in needs:
+        # Extract a search term from the message
+        topic = message.strip()[:50]
+        wiki_results = _get_wiki_context(topic)
+        if wiki_results:
+            wiki_text = '\n'.join(
+                f"[{r['file']}]: {r['excerpt'][:300]}" for r in wiki_results
+            )
+            sections.append(f"\n== WIKI/BRIEFING DATA ==\n{wiki_text}")
+            sources_consulted.append('wiki')
+
+    if 'epistemic' in needs and 'epistemic' in vault:
+        sections.append(
+            f"\n== EPISTEMIC STATE ==\n"
+            f"Independence score: {vault['epistemic'].get('overall', 0.72)}"
+        )
+
+    # Layer 3: Vision context (from Gemini screen capture)
+    if vision_description:
+        sections.append(
+            f"\n== SCREEN VISION (what the user's screen shows) ==\n"
+            f"{vision_description[:1500]}"
+        )
+        sources_consulted.append('vision')
+
+    return '\n'.join(sections), sources_consulted
 
 # ── Persistent Chat History ────────────────────────────────────
 CHAT_HISTORY_FILE = FRIDAY_DIR / "chat_history.json"
@@ -691,41 +2158,112 @@ def _save_chat_history(messages):
 CHAT_HISTORY = _load_chat_history()  # Load persistent history on startup
 
 
+# ── Agent Settings endpoints ──────────────────────────────────
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    """GET: return current agent settings + personality.
+    POST: merge new values into ~/.friday/settings.json and (optionally) save personality.
+    """
+    if request.method == 'GET':
+        return jsonify({
+            "status": "ok",
+            "settings": _load_settings(),
+            "personality": _load_agent_personality(),
+            "default_personality": DEFAULT_AGENT_PERSONALITY,
+        })
+    try:
+        data = request.get_json(silent=True) or {}
+        new_settings = data.get('settings') or {}
+        merged = _save_settings({**_load_settings(), **new_settings})
+        personality = data.get('personality')
+        if personality is not None:
+            _save_agent_personality(personality)
+        return jsonify({
+            "status": "ok",
+            "settings": merged,
+            "personality": _load_agent_personality(),
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    """Text chat — powered by Anthropic Claude.
+
+    Vision (screenshot description) still routes through Gemini Flash, since vision
+    is a designer/perception task. Reasoning stays on Claude.
+    """
     try:
-        from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        message = request.json.get('message', '')
+        data = request.get_json(silent=True) or {}
+        message = data.get('message', '')
+        workspace = data.get('workspace', '')
+        workspace_context = data.get('workspaceContext', None)
+        include_vision = data.get('includeVision', False)
+        vision_description = None
 
-        # Build conversation with history (last 20 messages for context)
-        conversation = FRIDAY_SYSTEM_PROMPT + '\n\n'
-        for msg in CHAT_HISTORY[-20:]:
-            role_label = 'User' if msg.get('role') == 'user' else 'Friday'
-            conversation += f"{role_label}: {msg.get('text', '')}\n"
-        conversation += f'User: {message}'
+        # Vision capture (Gemini, designer role). Accept either `screenshot`
+        # (legacy) or `image` (Camera Mode frames). If an image is sent at all,
+        # use it — no need for the explicit includeVision flag.
+        screenshot_b64 = data.get('image') or data.get('screenshot') or None
+        if screenshot_b64 and (include_vision or data.get('image') is not None):
+            try:
+                from google import genai
+                from google.genai import types
+                gclient = genai.Client(api_key=GEMINI_API_KEY)
+                img_bytes = base64.b64decode(screenshot_b64)
+                mime = 'image/jpeg' if data.get('image') else 'image/png'
+                vision_resp = gclient.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        "Briefly describe what is visible on this screen. Focus on text, UI elements, and data shown. Be concise (2-3 sentences).",
+                        types.Part.from_bytes(data=img_bytes, mime_type=mime),
+                    ],
+                )
+                vision_description = vision_resp.text
+            except Exception as ve:
+                vision_description = f"[Vision unavailable: {ve}]"
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=conversation
+        # Build context-enriched system prompt
+        system_prompt, sources = _build_context_prompt(
+            message, workspace, workspace_context, vision_description
         )
 
-        reply = response.text
+        # Prepend user-configured agent personality + response prefs + cLaws
+        settings = _load_settings()
+        personality = _load_agent_personality()
+        system_prompt = _settings_system_prefix(settings, personality) + (system_prompt or '')
 
-        # Store in history with IDs and timestamps
+        # Build conversation history as Anthropic-format messages (last 20 turns)
+        messages = []
+        for msg in CHAT_HISTORY[-20:]:
+            role = 'user' if msg.get('role') == 'user' else 'assistant'
+            text = msg.get('text', '')
+            if text:
+                messages.append({"role": role, "content": text})
+        messages.append({"role": "user", "content": message})
+
+        reply, tool_trace = _call_claude_agent(
+            messages, system=system_prompt, temperature=settings.get('temperature')
+        )
+
+        # Store in history with IDs, timestamps, and context metadata
         user_msg = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'role': 'user',
             'text': message,
-            'pinned': False
+            'pinned': False,
+            'workspace': workspace,
         }
         friday_msg = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'role': 'friday',
             'text': reply,
-            'pinned': False
+            'pinned': False,
+            'sources': sources,
         }
         CHAT_HISTORY.append(user_msg)
         CHAT_HISTORY.append(friday_msg)
@@ -735,7 +2273,13 @@ def chat():
         CHAT_HISTORY[:] = [m for m in CHAT_HISTORY if m.get('pinned') or m.get('timestamp', '') >= cutoff][-500:]
         _save_chat_history(CHAT_HISTORY)
 
-        return jsonify({"response": reply, "user_msg": user_msg, "friday_msg": friday_msg})
+        return jsonify({
+            "response": reply,
+            "user_msg": user_msg,
+            "friday_msg": friday_msg,
+            "sources": sources,
+            "tool_trace": tool_trace,
+        })
     except Exception as e:
         traceback.print_exc()
         return jsonify({"response": f"[Friday offline] {str(e)}"})
@@ -754,28 +2298,64 @@ def chat_history():
 
 @app.route('/api/chat/send', methods=['POST'])
 def chat_send():
-    """Send a message, save to persistent history, return Friday's response."""
+    """Send a message, save to persistent history, return Friday's response.
+    Accepts context-aware payload: {message, workspace, workspaceContext, includeVision, screenshot}.
+    Text reasoning is Claude; vision (screenshot description) stays on Gemini.
+    """
     try:
-        from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
         data = request.get_json(silent=True) or {}
         message = data.get('message', '')
+        workspace = data.get('workspace', '')
+        workspace_context = data.get('workspaceContext', None)
+        include_vision = data.get('includeVision', False)
+        vision_description = None
 
         if not message.strip():
             return jsonify({"status": "error", "message": "Empty message"}), 400
 
-        # Build conversation with history
-        conversation = FRIDAY_SYSTEM_PROMPT + '\n\n'
-        for msg in CHAT_HISTORY[-20:]:
-            role_label = 'User' if msg.get('role') == 'user' else 'Friday'
-            conversation += f"{role_label}: {msg['text']}\n"
-        conversation += f'User: {message}'
+        # Vision capture (Gemini, designer role). Accept either `screenshot`
+        # (legacy) or `image` (Camera Mode frames).
+        screenshot_b64 = data.get('image') or data.get('screenshot') or None
+        if screenshot_b64 and (include_vision or data.get('image') is not None):
+            try:
+                from google import genai
+                from google.genai import types
+                gclient = genai.Client(api_key=GEMINI_API_KEY)
+                img_bytes = base64.b64decode(screenshot_b64)
+                mime = 'image/jpeg' if data.get('image') else 'image/png'
+                vision_resp = gclient.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        "Briefly describe what is visible on this screen. Focus on text, UI elements, and data shown. Be concise (2-3 sentences).",
+                        types.Part.from_bytes(data=img_bytes, mime_type=mime),
+                    ],
+                )
+                vision_description = vision_resp.text
+            except Exception as ve:
+                vision_description = f"[Vision unavailable: {ve}]"
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=conversation
+        # Build context-enriched system prompt
+        system_prompt, sources = _build_context_prompt(
+            message, workspace, workspace_context, vision_description
         )
-        reply = response.text
+
+        # Prepend user-configured agent personality + response prefs + cLaws
+        settings = _load_settings()
+        personality = _load_agent_personality()
+        system_prompt = _settings_system_prefix(settings, personality) + (system_prompt or '')
+
+        # Anthropic-format message history
+        messages = []
+        for msg in CHAT_HISTORY[-20:]:
+            role = 'user' if msg.get('role') == 'user' else 'assistant'
+            text = msg.get('text', '')
+            if text:
+                messages.append({"role": role, "content": text})
+        messages.append({"role": "user", "content": message})
+
+        reply, tool_trace = _call_claude_agent(
+            messages, system=system_prompt, temperature=settings.get('temperature')
+        )
 
         # Create persistent message objects
         user_msg = {
@@ -783,14 +2363,16 @@ def chat_send():
             'timestamp': datetime.now().isoformat(),
             'role': 'user',
             'text': message,
-            'pinned': False
+            'pinned': False,
+            'workspace': workspace,
         }
         friday_msg = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'role': 'friday',
             'text': reply,
-            'pinned': False
+            'pinned': False,
+            'sources': sources,
         }
         CHAT_HISTORY.append(user_msg)
         CHAT_HISTORY.append(friday_msg)
@@ -800,7 +2382,7 @@ def chat_send():
         CHAT_HISTORY[:] = [m for m in CHAT_HISTORY if m.get('pinned') or m.get('timestamp', '') >= cutoff][-500:]
         _save_chat_history(CHAT_HISTORY)
 
-        return jsonify({"status": "ok", "user_msg": user_msg, "friday_msg": friday_msg})
+        return jsonify({"status": "ok", "user_msg": user_msg, "friday_msg": friday_msg, "sources": sources, "tool_trace": tool_trace})
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -834,36 +2416,69 @@ def chat_search():
 
 @app.route('/api/voice/tts', methods=['POST'])
 def tts():
+    """Text-to-speech using Gemini 2.5 Flash TTS model — returns WAV binary directly.
+
+    Default voice is "Puck" (warmer / more natural than "Kore"). Callers can
+    override via `voice` in the JSON body. The text is wrapped with a
+    conversational style hint so the model delivers it as a news anchor
+    rather than reading robotically.
+    """
     try:
+        import wave
         from google import genai
         from google.genai import types
+
         client = genai.Client(api_key=GEMINI_API_KEY)
         text = request.json.get('text', '')
-        # Use Gemini TTS model
+        # Voice priority: explicit request param > user setting > Aoede (warm female).
+        voice = request.json.get('voice')
+        if not voice:
+            try:
+                voice = (_load_settings() or {}).get('tts_voice') or 'Aoede'
+            except Exception:
+                voice = 'Aoede'
+        style = request.json.get('style', 'briefing')
+
+        if not text:
+            return jsonify({"status": "error", "message": "No text provided"}), 400
+
+        # Conversational prefix — Gemini TTS responds to natural-language
+        # delivery cues in the prompt. "Briefing" gives a warm news-anchor read.
+        style_prefix = {
+            'briefing': "Read this aloud in a warm, conversational news-anchor voice — natural pacing, light intonation, no robotic flatness: ",
+            'chat': "Say this aloud in a calm, friendly tone, like a trusted assistant talking to a colleague: ",
+            'plain': "Say this aloud: ",
+        }.get(style, "Read this aloud in a warm, conversational voice: ")
+
         response = client.models.generate_content(
-            model='gemini-2.5-flash-preview-tts',
-            contents=text,
+            model="gemini-2.5-flash-preview-tts",
+            contents=f"{style_prefix}{text}",
             config=types.GenerateContentConfig(
                 response_modalities=["AUDIO"],
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name='Kore')
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=voice
+                        )
                     )
                 )
             )
         )
 
-        for part in response.candidates[0].content.parts:
-            if part.inline_data and 'audio' in part.inline_data.mime_type:
-                filename = f"tts-{uuid.uuid4().hex[:8]}.wav"
-                filepath = TEMP_AUDIO_DIR / filename
-                filepath.write_bytes(part.inline_data.data)
-                return jsonify({"status": "ok", "url": f"/api/audio/{filename}"})
+        audio_data = response.candidates[0].content.parts[0].inline_data.data
 
-        return jsonify({"status": "error", "message": "No audio generated"})
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(audio_data)
+        buf.seek(0)
+        return send_file(buf, mimetype='audio/wav')
+
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/audio/<path:filename>')
@@ -959,7 +2574,7 @@ def analyze_file():
                 model='gemini-2.5-flash',
                 contents=[
                     types.Part.from_bytes(data=content, mime_type=mime),
-                    "You are Friday. Describe this image. If it looks like a job posting or resume, analyze it against Stephen's profile."
+                    "You are Friday. Describe this image. If it looks like a job posting or resume, analyze it against the user's profile."
                 ]
             )
             return jsonify({"filename": filename, "type": "image", "analysis": response.text})
@@ -972,7 +2587,7 @@ def analyze_file():
                 if text.strip():
                     response = client.models.generate_content(
                         model='gemini-2.5-flash',
-                        contents=f'You are Friday. Summarize this PDF document concisely. If it looks like a job posting, evaluate it against Stephen\'s background (journalism, AI, engineering leadership).\n\n{text[:8000]}'
+                        contents=f'You are Friday. Summarize this PDF document concisely. If it looks like a job posting, evaluate it against the user\'s background as described in their profile.\n\n{text[:8000]}'
                     )
                     return jsonify({"filename": filename, "type": "pdf", "analysis": response.text})
             except ImportError:
@@ -983,7 +2598,7 @@ def analyze_file():
             job_keywords = ['responsibilities', 'qualifications', 'salary', 'benefits', 'apply', 'experience required']
             is_job = sum(1 for kw in job_keywords if kw.lower() in text.lower()) >= 2
             if is_job:
-                prompt = f'You are Friday. This looks like a job posting. Evaluate it against Stephen\'s profile (AI leadership, journalism, full-stack engineering, 15+ years experience). Rate fit 1-10 and explain.\n\n{text}'
+                prompt = f'You are Friday. This looks like a job posting. Evaluate it against the user\'s profile and background. Rate fit 1-10 and explain.\n\n{text}'
             else:
                 prompt = f'You are Friday. Analyze this {ext} file and summarize its purpose and key content:\n\n{text}'
             response = client.models.generate_content(
@@ -1235,6 +2850,1457 @@ def delete_todo(todo_id):
     return jsonify({"status": "ok", "removed": before - len(todos)})
 
 
+#  CLIPBOARD DRAFTING ENGINE
+# ═══════════════════════════════════════════════════════════════
+
+DRAFT_MODE_PROMPTS = {
+    'linkedin_post': (
+        "You are a LinkedIn ghostwriter for a senior AI/engineering leader. "
+        "Write a professional but personable post — 1-3 paragraphs, strong opening hook, "
+        "no hashtag spam (2-3 max at the end if any). Conversational authority, not corporate fluff. "
+        "The voice should feel like a seasoned journalist who pivoted to AI."
+    ),
+    'email_reply': (
+        "You are drafting a professional email reply. Match the formality of the original message. "
+        "Be concise and clear. Include a specific call-to-action or next step. "
+        "No filler phrases like 'I hope this email finds you well.'"
+    ),
+    'slack_message': (
+        "You are drafting a Slack message. Keep it casual and brief — this is internal team chat. "
+        "Emoji are fine where they feel natural. One short paragraph max. No sign-offs."
+    ),
+    'tweet': (
+        "You are drafting a tweet. MUST be under 280 characters. Punchy, sharp, quotable. "
+        "No hashtags unless they're genuinely clever. Think journalist, not influencer."
+    ),
+    'ofw_response': (
+        "You are drafting a response for a co-parenting communication platform. "
+        "CRITICAL RULES: Stay calm, factual, and brief. Answer only what needs answering. "
+        "Ignore all bait and emotional provocation. Never match the other party's emotional register. "
+        "Everything you write should be something a family court judge would find reasonable, measured, and cooperative. "
+        "Do not over-explain, do not defend, do not attack. Short sentences. Airtight logic."
+    ),
+    'freeform': (
+        "You are a versatile writing assistant. Follow the user's format instructions exactly. "
+        "Write clearly and concisely unless told otherwise."
+    ),
+}
+
+COPARENTING_DIR = HOME / ".friday" / "wiki" / "coparenting"
+
+
+def _load_ofw_context():
+    """Load co-parenting wiki context for OFW drafts."""
+    context_parts = []
+    if COPARENTING_DIR.exists():
+        for md_file in sorted(COPARENTING_DIR.glob('*.md'))[:5]:
+            try:
+                text = md_file.read_text(encoding='utf-8')[:2000]
+                context_parts.append(f"[{md_file.name}]: {text}")
+            except Exception:
+                continue
+    return '\n\n'.join(context_parts) if context_parts else ''
+
+
+@app.route('/api/draft', methods=['POST'])
+def draft_generate():
+    """Generate a draft via Claude based on mode, context, and prompt."""
+    try:
+        data = request.get_json(silent=True) or {}
+
+        mode = data.get('mode', 'freeform')
+        context = data.get('context', '')
+        prompt = data.get('prompt', '')
+
+        if not prompt.strip():
+            return jsonify({"status": "error", "message": "No prompt provided"}), 400
+
+        # System prompt for this mode (writing voice / format guidance)
+        system = DRAFT_MODE_PROMPTS.get(mode, DRAFT_MODE_PROMPTS['freeform'])
+        if mode == 'ofw_response':
+            ofw_ctx = _load_ofw_context()
+            if ofw_ctx:
+                system += f"\n\nCO-PARENTING CONTEXT (from wiki):\n{ofw_ctx}"
+        system += "\n\nOutput ONLY the draft text, no commentary or labels."
+
+        user_parts = []
+        if context:
+            user_parts.append(f"CONTEXT (what the user is looking at / replying to):\n{context}")
+        user_parts.append(f"USER INSTRUCTION:\n{prompt}")
+
+        draft_text = _call_claude(
+            [{"role": "user", "content": '\n\n'.join(user_parts)}],
+            system=system,
+        )
+
+        return jsonify({
+            "status": "ok",
+            "draft": draft_text,
+            "mode": mode,
+            "char_count": len(draft_text),
+            "timestamp": datetime.now().isoformat(),
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/draft/deploy', methods=['POST'])
+def draft_deploy():
+    """Deploy a draft to clipboard or other destination."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '')
+    destination = data.get('destination', 'clipboard')
+
+    if not text:
+        return jsonify({"status": "error", "message": "No text provided"}), 400
+
+    if destination == 'clipboard':
+        try:
+            # Escape for PowerShell: replace double quotes and backticks
+            escaped = text.replace('`', '``').replace('"', '`"').replace('$', '`$')
+            subprocess.run(
+                ['powershell', '-command', f'Set-Clipboard -Value "{escaped}"'],
+                capture_output=True, text=True, timeout=10
+            )
+            return jsonify({"status": "ok", "destination": "clipboard", "char_count": len(text)})
+        except subprocess.TimeoutExpired:
+            return jsonify({"status": "error", "message": "Clipboard operation timed out"}), 500
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    elif destination == 'gmail_draft':
+        # Frontend handles Gmail draft creation via MCP tools — return acknowledgment
+        return jsonify({
+            "status": "ok",
+            "destination": "gmail_draft",
+            "gmail_to": data.get('gmail_to', ''),
+            "gmail_subject": data.get('gmail_subject', ''),
+            "text": text,
+            "message": "Gmail draft data ready — frontend will create via MCP"
+        })
+
+    return jsonify({"status": "error", "message": f"Unknown destination: {destination}"}), 400
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DATA FLOW API — "Write once, live everywhere"
+# ═══════════════════════════════════════════════════════════════
+
+FLOW_QUEUE_DIR = FRIDAY_DIR / "flow-queue"
+FLOW_QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+
+BRIEFING_SUPPLEMENT_DIR = FRIDAY_DIR / "wiki" / "briefings"
+BRIEFING_SUPPLEMENT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _flow_trust_graph(content, metadata):
+    """Update a person's trust graph entry with new intelligence."""
+    person_name = metadata.get('person_name', '').strip()
+    if not person_name:
+        return {'destination': 'trust_graph', 'ok': False, 'error': 'No person_name in metadata'}
+
+    trust_file = FRIDAY_DIR / "trust_graph.json"
+    try:
+        tdata = {}
+        if trust_file.exists():
+            tdata = json.loads(trust_file.read_text(encoding='utf-8'))
+        if 'people' not in tdata:
+            tdata['people'] = {}
+
+        key = person_name.lower().replace(' ', '_').replace('-', '_')
+
+        if key not in tdata['people']:
+            # Auto-create entry
+            tdata['people'][key] = {
+                "name": person_name,
+                "aliases": [],
+                "entity_type": "human",
+                "scores": {"overall": 0.5, "reliability": 0.5, "information_quality": 0.5,
+                           "emotional_trust": 0.5, "timeliness": 0.5, "domain_expertise": 0.5},
+                "evidence": [],
+                "domains": [],
+                "last_interaction": datetime.now().isoformat(),
+                "created": datetime.now().isoformat()
+            }
+
+        person = tdata['people'][key]
+        if 'intelligence' not in person:
+            person['intelligence'] = []
+        person['intelligence'].append({
+            "content": content[:2000],
+            "timestamp": datetime.now().isoformat(),
+            "source": "data_flow"
+        })
+        # Keep last 20 intel entries
+        person['intelligence'] = person['intelligence'][-20:]
+        person['last_interaction'] = datetime.now().isoformat()
+
+        tdata['people'][key] = person
+        trust_file.write_text(json.dumps(tdata, indent=2), encoding='utf-8')
+        return {'destination': 'trust_graph', 'ok': True, 'person': key}
+    except Exception as e:
+        return {'destination': 'trust_graph', 'ok': False, 'error': str(e)}
+
+
+def _flow_calendar_notes(content, metadata):
+    """Push content to a Google Calendar event description."""
+    event_id = metadata.get('event_id', '').strip()
+    if not event_id:
+        return {'destination': 'calendar_notes', 'ok': False, 'error': 'No event_id in metadata'}
+    try:
+        result = _enrich_calendar_event(event_id, content)
+        return {'destination': 'calendar_notes', **result}
+    except Exception as e:
+        return {'destination': 'calendar_notes', 'ok': False, 'error': str(e)}
+
+
+def _flow_clipboard(content, _metadata):
+    """Copy content to Windows clipboard via PowerShell."""
+    try:
+        subprocess.run(
+            ['powershell', '-Command', 'Set-Clipboard', '-Value', content[:10000]],
+            capture_output=True, text=True, timeout=10
+        )
+        return {'destination': 'clipboard', 'ok': True}
+    except Exception as e:
+        return {'destination': 'clipboard', 'ok': False, 'error': str(e)}
+
+
+def _flow_gmail_draft(content, metadata):
+    """Stage a Gmail draft in the flow queue for frontend pickup."""
+    try:
+        draft = {
+            "id": str(uuid.uuid4()),
+            "content": content[:10000],
+            "thread_id": metadata.get('email_thread_id', ''),
+            "person_name": metadata.get('person_name', ''),
+            "created": datetime.now().isoformat(),
+            "status": "pending"
+        }
+        draft_file = FLOW_QUEUE_DIR / f"gmail-draft-{draft['id']}.json"
+        draft_file.write_text(json.dumps(draft, indent=2), encoding='utf-8')
+        return {'destination': 'gmail_draft', 'ok': True, 'draft_id': draft['id']}
+    except Exception as e:
+        return {'destination': 'gmail_draft', 'ok': False, 'error': str(e)}
+
+
+def _flow_briefing(content, metadata):
+    """Append content to today's briefing supplementary file."""
+    try:
+        today_str = date.today().isoformat()
+        supplement_file = BRIEFING_SUPPLEMENT_DIR / f"{today_str}-supplement.md"
+
+        existing = ''
+        if supplement_file.exists():
+            existing = supplement_file.read_text(encoding='utf-8')
+
+        person_name = metadata.get('person_name', '')
+        header = f"\n\n---\n### {person_name or 'Research'} — {datetime.now().strftime('%H:%M')}\n" if existing else f"# Briefing Supplement — {today_str}\n\n### {person_name or 'Research'} — {datetime.now().strftime('%H:%M')}\n"
+
+        supplement_file.write_text(existing + header + content[:5000] + '\n', encoding='utf-8')
+        return {'destination': 'briefing', 'ok': True, 'file': str(supplement_file.name)}
+    except Exception as e:
+        return {'destination': 'briefing', 'ok': False, 'error': str(e)}
+
+
+FLOW_HANDLERS = {
+    'trust_graph': _flow_trust_graph,
+    'calendar_notes': _flow_calendar_notes,
+    'clipboard': _flow_clipboard,
+    'gmail_draft': _flow_gmail_draft,
+    'briefing': _flow_briefing,
+}
+
+
+@app.route('/api/flow', methods=['POST'])
+def data_flow():
+    """Central data flow endpoint — routes content to multiple destinations.
+
+    POST JSON:
+    {
+      "data_type": "contact_research|meeting_prep|draft|briefing_excerpt|job_research",
+      "content": "the content to distribute",
+      "metadata": {"person_name": "", "event_id": "", "email_thread_id": ""},
+      "destinations": ["trust_graph", "calendar_notes", "briefing", "clipboard", "gmail_draft"]
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    content = data.get('content', '').strip()
+    if not content:
+        return jsonify({"status": "error", "message": "No content provided"}), 400
+
+    destinations = data.get('destinations', [])
+    if not destinations:
+        return jsonify({"status": "error", "message": "No destinations specified"}), 400
+
+    metadata = data.get('metadata', {})
+    data_type = data.get('data_type', 'general')
+    receipt = {"status": "ok", "data_type": data_type, "results": []}
+
+    for dest in destinations:
+        handler = FLOW_HANDLERS.get(dest)
+        if handler:
+            result = handler(content, metadata)
+            receipt["results"].append(result)
+        else:
+            receipt["results"].append({"destination": dest, "ok": False, "error": f"Unknown destination: {dest}"})
+
+    succeeded = sum(1 for r in receipt["results"] if r.get('ok'))
+    failed = len(receipt["results"]) - succeeded
+    receipt["summary"] = f"{succeeded} succeeded, {failed} failed"
+    return jsonify(receipt)
+
+
+@app.route('/api/flow/queue', methods=['GET'])
+def flow_queue():
+    """List pending items in the flow queue (gmail drafts, etc)."""
+    items = []
+    if FLOW_QUEUE_DIR.exists():
+        for f in sorted(FLOW_QUEUE_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if f.suffix == '.json':
+                try:
+                    items.append(json.loads(f.read_text(encoding='utf-8')))
+                except Exception:
+                    pass
+    return jsonify({"status": "ok", "items": items[:50], "count": len(items)})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CALENDAR ENRICHMENT
+# ═══════════════════════════════════════════════════════════════
+
+def _enrich_calendar_event(event_id, research):
+    """Read a calendar event, append Friday research, and update it.
+
+    Uses the gcal MCP tools when available; falls back to storing
+    the enrichment locally for later sync.
+    """
+    separator = "\n\n--- Friday Meeting Prep ---\n"
+    enrichment = separator + research.strip() + "\n"
+
+    # Try MCP-based Google Calendar update
+    # The gcal tools are invoked at the agent/MCP layer, not directly here.
+    # This endpoint stores the enrichment and exposes it for MCP tool orchestration.
+    enrichment_file = FLOW_QUEUE_DIR / f"calendar-enrich-{event_id}.json"
+    payload = {
+        "event_id": event_id,
+        "research": research.strip(),
+        "enrichment_block": enrichment,
+        "created": datetime.now().isoformat(),
+        "status": "pending_sync"
+    }
+    enrichment_file.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+    return {"ok": True, "event_id": event_id, "status": "queued_for_sync",
+            "message": "Enrichment stored. Will sync via gcal MCP on next calendar pass."}
+
+
+@app.route('/api/calendar/enrich', methods=['POST'])
+def calendar_enrich():
+    """Enrich a Google Calendar event with meeting prep research.
+
+    POST JSON:
+    {
+      "event_id": "google calendar event ID",
+      "research": "the attendee research / meeting prep content"
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    event_id = data.get('event_id', '').strip()
+    research = data.get('research', '').strip()
+
+    if not event_id:
+        return jsonify({"status": "error", "message": "No event_id provided"}), 400
+    if not research:
+        return jsonify({"status": "error", "message": "No research content provided"}), 400
+
+    try:
+        result = _enrich_calendar_event(event_id, research)
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def push_to_calendar(event_id, research_text):
+    """Helper for briefing tasks to push research into calendar events.
+
+    Call this from daily briefing generation when attendee research is ready.
+    It routes through the flow API to update both the calendar and trust graph.
+    """
+    results = {}
+
+    # Push to calendar
+    results['calendar'] = _enrich_calendar_event(event_id, research_text)
+
+    # Also push to briefing supplement
+    results['briefing'] = _flow_briefing(research_text, {'person_name': 'Meeting Prep'})
+
+    return results
+
+
+@app.route('/api/flow/draft/confirm', methods=['POST'])
+def confirm_draft():
+    """Mark a queued gmail draft as deployed/sent."""
+    data = request.get_json(silent=True) or {}
+    draft_id = data.get('draft_id', '').strip()
+    if not draft_id:
+        return jsonify({"status": "error", "message": "No draft_id provided"}), 400
+
+    draft_file = FLOW_QUEUE_DIR / f"gmail-draft-{draft_id}.json"
+    if not draft_file.exists():
+        return jsonify({"status": "error", "message": "Draft not found"}), 404
+
+    try:
+        draft = json.loads(draft_file.read_text(encoding='utf-8'))
+        draft['status'] = 'deployed'
+        draft['deployed_at'] = datetime.now().isoformat()
+        draft_file.write_text(json.dumps(draft, indent=2), encoding='utf-8')
+        return jsonify({"status": "ok", "draft_id": draft_id})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTACTS / CRM
+# ═══════════════════════════════════════════════════════════════
+
+def _load_trust_graph():
+    """Load trust graph with consistent shape. Returns dict with people keyed by name."""
+    tfile = FRIDAY_DIR / "trust_graph.json"
+    if not tfile.exists():
+        return {"people": {}}
+    try:
+        return json.loads(tfile.read_text(encoding='utf-8'))
+    except Exception:
+        return {"people": {}}
+
+
+def _contacts_list():
+    """Merge trust graph people into a flat contacts list."""
+    graph = _load_trust_graph()
+    raw = graph.get('people') or {}
+    items = raw.values() if isinstance(raw, dict) else raw
+    contacts = []
+    for p in items:
+        if not isinstance(p, dict):
+            continue
+        scores = p.get('scores') or {}
+        overall = scores.get('overall')
+        if not isinstance(overall, (int, float)):
+            overall = 0.5
+        contacts.append({
+            "name": p.get('name') or 'Unknown',
+            "aliases": p.get('aliases') or [],
+            "domains": p.get('domains') or [],
+            "overall": overall,
+            "last_interaction": p.get('last_interaction'),
+            "evidence_count": len(p.get('evidence') or []),
+        })
+    contacts.sort(key=lambda c: c.get('overall') or 0, reverse=True)
+    return contacts
+
+
+def _contacts_research_dir():
+    d = FRIDAY_DIR / "contacts-research"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@app.route('/api/contacts')
+def get_contacts():
+    """Merged contact list built from trust_graph.json."""
+    contacts = _contacts_list()
+    return jsonify({"status": "ok", "contacts": contacts, "count": len(contacts)})
+
+
+@app.route('/api/contacts/<path:name>')
+def get_contact(name):
+    """Full trust dimensions + evidence for a single contact (case-insensitive name)."""
+    graph = _load_trust_graph()
+    raw = graph.get('people') or {}
+    target = (name or '').strip().lower()
+    match = None
+    if isinstance(raw, dict):
+        if target in raw:
+            match = raw[target]
+        else:
+            for k, v in raw.items():
+                if not isinstance(v, dict):
+                    continue
+                cand = (v.get('name') or k or '').strip().lower()
+                aliases = [a.lower() for a in (v.get('aliases') or [])]
+                if cand == target or target in aliases:
+                    match = v
+                    break
+    else:
+        for v in raw:
+            if not isinstance(v, dict):
+                continue
+            cand = (v.get('name') or '').strip().lower()
+            aliases = [a.lower() for a in (v.get('aliases') or [])]
+            if cand == target or target in aliases:
+                match = v
+                break
+    if not match:
+        return jsonify({"status": "error", "message": "Contact not found"}), 404
+
+    # Look for a stored research file.
+    research_file = _contacts_research_dir() / f"{target.replace(' ', '_')}.md"
+    research = research_file.read_text(encoding='utf-8') if research_file.exists() else ''
+
+    return jsonify({"status": "ok", "contact": match, "research": research})
+
+
+@app.route('/api/contacts/research', methods=['POST'])
+def contacts_research():
+    """Kick off web research on a contact. Writes a stub and launches a background terminal."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"status": "error", "message": "name required"}), 400
+    key = name.lower().replace(' ', '_')
+    research_file = _contacts_research_dir() / f"{key}.md"
+    stamp = datetime.now().isoformat()
+    if not research_file.exists():
+        research_file.write_text(
+            f"# Research: {name}\n\n_Initialized {stamp}_\n\n"
+            f"- Public profile search: pending\n"
+            f"- LinkedIn / GitHub: pending\n"
+            f"- Recent news mentions: pending\n",
+            encoding='utf-8'
+        )
+    try:
+        tid = str(uuid.uuid4())[:8]
+        VIBE_TERMINALS[tid] = {
+            "id": tid, "task": f"Research contact: {name}",
+            "status": "pending", "cwd": str(FRIDAY_DIR),
+            "started": stamp, "log_file": None
+        }
+    except Exception:
+        tid = None
+    return jsonify({
+        "status": "ok", "name": name,
+        "research_file": str(research_file),
+        "task_id": tid,
+        "message": f"Research queued for {name}"
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ROUTINES
+# ═══════════════════════════════════════════════════════════════
+
+ROUTINES_DIR = FRIDAY_DIR / "routines"
+ROUTINES_DIR.mkdir(parents=True, exist_ok=True)
+ROUTINE_STATUS_FILE = FRIDAY_DIR / "routine_status.json"
+
+# Registered routine catalog. Defines display + default schedule when a template is missing.
+ROUTINE_REGISTRY = [
+    {"id": "morning-briefing",   "label": "Morning Briefing",    "ico": "🌅", "category": "briefing",    "schedule": "Daily · 7:00 AM"},
+    {"id": "afternoon-briefing", "label": "Afternoon Briefing",  "ico": "☀️", "category": "briefing",    "schedule": "Daily · 2:00 PM"},
+    {"id": "weekly-legal-prep",  "label": "Weekly Legal Prep",   "ico": "⚖️", "category": "legal",       "schedule": "Sundays · 6:00 PM"},
+    {"id": "family-weekend-prep", "label": "Family Weekend Prep",  "ico": "👨‍👩‍👧", "category": "family",      "schedule": "Thursdays · 6:00 PM"},
+    {"id": "portfolio-snapshot", "label": "Portfolio Snapshot",  "ico": "💰", "category": "finance",     "schedule": "Daily · 5:00 PM"},
+    {"id": "content-pipeline",   "label": "Content Pipeline",    "ico": "✍️", "category": "content",     "schedule": "Daily · 10:00 AM"},
+    {"id": "daily-creation",     "label": "Daily Creation",      "ico": "🎨", "category": "studio",      "schedule": "Daily · 2:00 PM"},
+    {"id": "job-intelligence",   "label": "Job Intelligence",    "ico": "💼", "category": "career",      "schedule": "Daily · 8:00 AM"},
+    {"id": "repo-sync",          "label": "Repo Sync",           "ico": "🔄", "category": "engineering", "schedule": "Daily · 11:00 PM"},
+]
+
+
+def _load_routine_status():
+    if ROUTINE_STATUS_FILE.exists():
+        try:
+            return json.loads(ROUTINE_STATUS_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_routine_status(status):
+    try:
+        ROUTINE_STATUS_FILE.write_text(json.dumps(status, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+
+@app.route('/api/routines')
+def list_routines():
+    """Return the routine registry plus last-run status for each."""
+    status = _load_routine_status()
+    out = []
+    for r in ROUTINE_REGISTRY:
+        s = status.get(r['id'], {}) or {}
+        template_exists = (ROUTINES_DIR / f"{r['id']}.md").exists()
+        out.append({
+            **r,
+            "last_run": s.get('last_run'),
+            "last_status": s.get('last_status'),
+            "last_task_id": s.get('last_task_id'),
+            "template_exists": template_exists,
+        })
+    return jsonify({"status": "ok", "routines": out})
+
+
+@app.route('/api/routines/<routine_id>/run', methods=['POST'])
+def run_routine(routine_id):
+    """Trigger a routine on demand. Launches a background Vibe-Code task and records status."""
+    reg = next((r for r in ROUTINE_REGISTRY if r['id'] == routine_id), None)
+    if not reg:
+        return jsonify({"status": "error", "message": "Unknown routine"}), 404
+
+    template = ROUTINES_DIR / f"{routine_id}.md"
+    task_desc = f"Run routine: {reg['label']}"
+    if template.exists():
+        task_desc += f" (see {template.name})"
+
+    stamp = datetime.now().isoformat()
+    tid = str(uuid.uuid4())[:8]
+    try:
+        VIBE_TERMINALS[tid] = {
+            "id": tid, "task": task_desc,
+            "status": "pending", "cwd": str(Path.cwd()),
+            "started": stamp, "log_file": None
+        }
+    except Exception:
+        pass
+
+    status = _load_routine_status()
+    status[routine_id] = {
+        "last_run": stamp,
+        "last_status": "launched",
+        "last_task_id": tid,
+    }
+    _save_routine_status(status)
+
+    return jsonify({
+        "status": "ok",
+        "routine": routine_id,
+        "task_id": tid,
+        "started_at": stamp,
+        "message": f"{reg['label']} launched",
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  OUTREACH PIPELINE
+# ═══════════════════════════════════════════════════════════════
+
+OUTREACH_DIR = FRIDAY_DIR / "outreach"
+OUTREACH_DIR.mkdir(parents=True, exist_ok=True)
+OUTREACH_LOG_FILE = OUTREACH_DIR / "outreach-log.json"
+
+
+def _load_outreach_log():
+    if not OUTREACH_LOG_FILE.exists():
+        return {"version": 1, "entries": []}
+    try:
+        return json.loads(OUTREACH_LOG_FILE.read_text(encoding='utf-8'))
+    except Exception:
+        return {"version": 1, "entries": []}
+
+
+def _save_outreach_log(log):
+    log["updated"] = datetime.now().isoformat()
+    try:
+        OUTREACH_LOG_FILE.write_text(json.dumps(log, indent=2), encoding='utf-8')
+    except Exception as e:
+        print(f"  [FRIDAY] outreach log save failed: {e}")
+
+
+def _career_ops_companies():
+    """Return list of companies currently in the career-ops tracker (applied/interviewing)."""
+    candidates = [WIKI_PROFESSIONAL_DIR / 'application-log.md', CAREER_OPS_DIR / 'applications.md']
+    tracker_path = next((p for p in candidates if p.is_file()), None)
+    if not tracker_path:
+        return []
+    try:
+        content = tracker_path.read_text(encoding='utf-8')
+    except Exception:
+        return []
+    companies = []
+    for line in content.strip().split('\n'):
+        if line.startswith('|') and '---' not in line and 'company' not in line.lower():
+            cols = [c.strip() for c in line.split('|')[1:-1]]
+            if len(cols) >= 3 and cols[0]:
+                companies.append({"company": cols[0], "score": cols[1] if len(cols) > 1 else '', "status": cols[2] if len(cols) > 2 else ''})
+    return companies
+
+
+@app.route('/api/outreach/suggestions')
+def outreach_suggestions():
+    """Warm leads pulled from trust graph + career-ops tracker."""
+    graph = _load_trust_graph()
+    people_raw = graph.get('people') or {}
+    people_items = people_raw.values() if isinstance(people_raw, dict) else people_raw
+
+    log = _load_outreach_log()
+    recent_targets = {
+        (e.get('contact') or '').strip().lower()
+        for e in log.get('entries', [])
+        if e.get('contact')
+    }
+
+    suggestions = []
+    for p in people_items:
+        if not isinstance(p, dict):
+            continue
+        scores = p.get('scores') or {}
+        overall = scores.get('overall')
+        if not isinstance(overall, (int, float)):
+            overall = 0.5
+        if overall < 0.55:
+            continue
+        name = p.get('name') or 'Unknown'
+        last = p.get('last_interaction') or ''
+        suggestions.append({
+            "type": "warm_contact",
+            "contact": name,
+            "score": round(overall, 2),
+            "domains": p.get('domains') or [],
+            "last_interaction": last,
+            "reason": f"Trust {int(overall*100)}%" + (f" · last contact {last[:10]}" if last else " · no recent touch"),
+            "already_contacted": name.lower() in recent_targets,
+        })
+    suggestions.sort(key=lambda s: s['score'], reverse=True)
+
+    companies = _career_ops_companies()
+    company_suggestions = []
+    for c in companies[:10]:
+        status = (c.get('status') or '').lower()
+        if any(t in status for t in ('applied', 'interview', 'evaluated')):
+            company_suggestions.append({
+                "type": "career_target",
+                "company": c.get('company'),
+                "status": c.get('status'),
+                "score": c.get('score'),
+                "reason": f"Career-ops: {c.get('status') or 'tracked'}",
+            })
+
+    return jsonify({
+        "status": "ok",
+        "warm_contacts": suggestions[:20],
+        "career_targets": company_suggestions,
+        "total": len(suggestions) + len(company_suggestions),
+    })
+
+
+@app.route('/api/outreach/draft', methods=['POST'])
+def outreach_draft():
+    """Draft outreach message. Uses Gemini if available, else templated fallback."""
+    data = request.get_json(silent=True) or {}
+    contact = (data.get('contact') or data.get('name') or '').strip()
+    company = (data.get('company') or '').strip()
+    angle = (data.get('angle') or 'reconnect').strip()
+    channel = (data.get('channel') or 'email').strip()
+    context_notes = (data.get('context') or '').strip()
+
+    if not contact and not company:
+        return jsonify({"status": "error", "message": "contact or company required"}), 400
+
+    target_label = contact or company
+    _p = _load_profile()
+    sender_label = _p.get("user_name") or "the user"
+    sender_org = _p.get("organization")
+    sender_clause = f"{sender_label} ({sender_org})" if sender_org else sender_label
+    prompt = (
+        f"Draft a {channel} outreach to {target_label}. "
+        f"Angle: {angle}. "
+        f"Tone: warm, concise, specific. Sender: {sender_clause}. "
+        f"Keep under 150 words. End with a single clear ask. "
+        f"Context: {context_notes}"
+    )
+
+    draft_text = None
+    try:
+        client = get_genai_client()
+        if client:
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            draft_text = (getattr(resp, 'text', None) or '').strip()
+    except Exception as e:
+        print(f"  [FRIDAY] outreach draft Gemini error: {e}")
+
+    if not draft_text:
+        subject = f"Quick hello — {angle.title()}"
+        body = (
+            f"Hi {contact or 'there'},\n\n"
+            f"Wanted to reach out — {angle}. "
+            f"Specifically: {context_notes or 'would love to catch up when you have a few minutes.'}\n\n"
+            f"Does next week work for a short call?\n\n"
+            f"— {_user_first()}"
+        )
+        draft_text = f"Subject: {subject}\n\n{body}"
+
+    return jsonify({
+        "status": "ok",
+        "contact": contact,
+        "company": company,
+        "channel": channel,
+        "angle": angle,
+        "draft": draft_text,
+    })
+
+
+@app.route('/api/outreach/log', methods=['POST'])
+def outreach_log():
+    """Append an outreach event to the log."""
+    data = request.get_json(silent=True) or {}
+    contact = (data.get('contact') or '').strip()
+    company = (data.get('company') or '').strip()
+    channel = (data.get('channel') or 'email').strip()
+    angle = (data.get('angle') or '').strip()
+    message = (data.get('message') or '').strip()
+    status = (data.get('status') or 'sent').strip()
+
+    if not contact and not company:
+        return jsonify({"status": "error", "message": "contact or company required"}), 400
+
+    log = _load_outreach_log()
+    entry = {
+        "id": str(uuid.uuid4())[:8],
+        "contact": contact,
+        "company": company,
+        "channel": channel,
+        "angle": angle,
+        "status": status,
+        "message": message[:2000],
+        "timestamp": datetime.now().isoformat(),
+    }
+    log.setdefault('entries', []).append(entry)
+    _save_outreach_log(log)
+    return jsonify({"status": "ok", "entry": entry, "total": len(log['entries'])})
+
+
+@app.route('/api/outreach/pipeline')
+def outreach_pipeline():
+    """Pipeline view: counts by channel/angle/status plus recent entries."""
+    log = _load_outreach_log()
+    entries = list(reversed(log.get('entries', [])))
+
+    by_status, by_channel, by_angle = {}, {}, {}
+    for e in entries:
+        by_status[e.get('status', 'unknown')] = by_status.get(e.get('status', 'unknown'), 0) + 1
+        by_channel[e.get('channel', 'unknown')] = by_channel.get(e.get('channel', 'unknown'), 0) + 1
+        if e.get('angle'):
+            by_angle[e['angle']] = by_angle.get(e['angle'], 0) + 1
+
+    return jsonify({
+        "status": "ok",
+        "total": len(entries),
+        "by_status": by_status,
+        "by_channel": by_channel,
+        "by_angle": by_angle,
+        "recent": entries[:25],
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT PIPELINE
+# ═══════════════════════════════════════════════════════════════
+
+CONTENT_DIR = FRIDAY_DIR / "content"
+CONTENT_DIR.mkdir(parents=True, exist_ok=True)
+CONTENT_PIPELINE_FILE = CONTENT_DIR / "pipeline.json"
+CONTENT_STAGES = ["idea", "drafting", "review", "scheduled", "published"]
+
+
+def _load_content_pipeline():
+    if not CONTENT_PIPELINE_FILE.exists():
+        return {"version": 1, "items": []}
+    try:
+        return json.loads(CONTENT_PIPELINE_FILE.read_text(encoding='utf-8'))
+    except Exception:
+        return {"version": 1, "items": []}
+
+
+def _save_content_pipeline(pipe):
+    pipe["updated"] = datetime.now().isoformat()
+    try:
+        CONTENT_PIPELINE_FILE.write_text(json.dumps(pipe, indent=2), encoding='utf-8')
+    except Exception as e:
+        print(f"  [FRIDAY] content pipeline save failed: {e}")
+
+
+@app.route('/api/content/pipeline')
+def content_pipeline():
+    """Return content pipeline grouped by stage for kanban view."""
+    pipe = _load_content_pipeline()
+    items = pipe.get('items', [])
+    by_stage = {s: [] for s in CONTENT_STAGES}
+    for it in items:
+        stage = it.get('stage') or 'idea'
+        if stage not in by_stage:
+            by_stage.setdefault(stage, [])
+        by_stage[stage].append(it)
+    return jsonify({
+        "status": "ok",
+        "stages": CONTENT_STAGES,
+        "by_stage": by_stage,
+        "total": len(items),
+    })
+
+
+@app.route('/api/content/idea', methods=['POST'])
+def content_idea():
+    """Add a new content idea to the pipeline."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({"status": "error", "message": "title required"}), 400
+
+    stage = (data.get('stage') or 'idea').strip()
+    if stage not in CONTENT_STAGES:
+        stage = 'idea'
+
+    pipe = _load_content_pipeline()
+    stamp = datetime.now().isoformat()
+    item = {
+        "id": str(uuid.uuid4())[:8],
+        "title": title,
+        "type": (data.get('type') or 'post').strip(),
+        "stage": stage,
+        "channel": (data.get('channel') or 'linkedin').strip(),
+        "notes": (data.get('notes') or '').strip(),
+        "tags": data.get('tags') or [],
+        "created": stamp,
+        "updated": stamp,
+    }
+    pipe.setdefault('items', []).append(item)
+    _save_content_pipeline(pipe)
+    return jsonify({"status": "ok", "item": item, "total": len(pipe['items'])})
+
+
+@app.route('/api/content/draft', methods=['POST'])
+def content_draft():
+    """Draft content from a pipeline item (or ad-hoc title). Optionally advances stage."""
+    data = request.get_json(silent=True) or {}
+    item_id = (data.get('id') or '').strip()
+    title = (data.get('title') or '').strip()
+    channel = (data.get('channel') or 'linkedin').strip()
+    notes = (data.get('notes') or '').strip()
+    advance = bool(data.get('advance_stage'))
+
+    pipe = _load_content_pipeline()
+    item = None
+    if item_id:
+        for it in pipe.get('items', []):
+            if it.get('id') == item_id:
+                item = it
+                break
+        if not item:
+            return jsonify({"status": "error", "message": "item not found"}), 404
+        title = title or item.get('title', '')
+        channel = item.get('channel') or channel
+        notes = notes or item.get('notes', '')
+
+    if not title:
+        return jsonify({"status": "error", "message": "title or id required"}), 400
+
+    _p = _load_profile()
+    _author_label = _p.get("user_name") or "the user"
+    _org = _p.get("organization")
+    _author_clause = f"{_author_label} ({_org})" if _org else _author_label
+    prompt = (
+        f"Draft a {channel} {item.get('type') if item else 'post'} titled: {title}. "
+        f"Author: {_author_clause}. "
+        f"Tone: sharp, specific, credible. "
+        f"Structure: hook, 2-3 body beats, ask/CTA. "
+        f"Length: 180-260 words for LinkedIn, longer for article. "
+        f"Context / notes: {notes}"
+    )
+
+    draft_text = None
+    try:
+        client = get_genai_client()
+        if client:
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            draft_text = (getattr(resp, 'text', None) or '').strip()
+    except Exception as e:
+        print(f"  [FRIDAY] content draft Gemini error: {e}")
+
+    if not draft_text:
+        draft_text = (
+            f"[{channel.upper()} DRAFT — {title}]\n\n"
+            f"Hook: (one-line opener)\n\n"
+            f"Body:\n- Point 1\n- Point 2\n- Point 3\n\n"
+            f"Notes: {notes or '(no notes)'}\n\n"
+            f"CTA: (single ask)\n\n— {_user_first()}"
+        )
+
+    if item is not None:
+        item['draft'] = draft_text
+        item['updated'] = datetime.now().isoformat()
+        if advance and item.get('stage') in CONTENT_STAGES:
+            idx = CONTENT_STAGES.index(item['stage'])
+            if idx < len(CONTENT_STAGES) - 1:
+                item['stage'] = CONTENT_STAGES[idx + 1]
+        _save_content_pipeline(pipe)
+
+    return jsonify({
+        "status": "ok",
+        "id": item_id or None,
+        "title": title,
+        "channel": channel,
+        "draft": draft_text,
+        "stage": (item or {}).get('stage'),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  FUTURESPEAK BUSINESS WORKSPACE
+# ═══════════════════════════════════════════════════════════════
+
+FUTURESPEAK_DIR = FRIDAY_DIR / "futurespeak"
+FUTURESPEAK_DIR.mkdir(parents=True, exist_ok=True)
+FS_PIPELINE_FILE = FUTURESPEAK_DIR / "pipeline.json"
+FS_REVENUE_FILE = FUTURESPEAK_DIR / "revenue.json"
+FS_LEGAL_FILE = FUTURESPEAK_DIR / "legal.json"
+FS_ASSETS_DIR = FUTURESPEAK_DIR / "demo-assets"
+FS_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _fs_load(path, fallback):
+    if not path.exists():
+        return fallback
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        return fallback
+
+
+@app.route('/api/futurespeak/pipeline')
+def fs_pipeline():
+    data = _fs_load(FS_PIPELINE_FILE, {"opportunities": []})
+    opps = data.get('opportunities', []) or []
+    total_value = sum((o.get('value_usd') or 0) for o in opps)
+    weighted = sum((o.get('value_usd') or 0) * (o.get('probability') or 0) for o in opps)
+    by_status = {}
+    for o in opps:
+        s = o.get('status', 'unknown')
+        by_status[s] = by_status.get(s, 0) + 1
+    return jsonify({
+        "status": "ok",
+        "opportunities": opps,
+        "total": len(opps),
+        "total_value": total_value,
+        "weighted_value": weighted,
+        "by_status": by_status,
+    })
+
+
+@app.route('/api/futurespeak/revenue')
+def fs_revenue():
+    data = _fs_load(FS_REVENUE_FILE, {"months": [], "quarters": []})
+    months = data.get('months', []) or []
+    quarters = data.get('quarters', []) or []
+    burn = data.get('monthly_burn') or 0
+    cash = data.get('cash_on_hand') or 0
+
+    last_actual = 0
+    for m in months:
+        if isinstance(m.get('actual'), (int, float)):
+            last_actual = m['actual']
+    net_monthly = last_actual - burn
+    runway_months = None
+    if burn > 0 and net_monthly < 0:
+        runway_months = round(cash / burn, 1)
+
+    ytd_actual = sum(m.get('actual') or 0 for m in months)
+    ytd_projected = sum(m.get('projected') or 0 for m in months)
+
+    return jsonify({
+        "status": "ok",
+        "currency": data.get('currency', 'USD'),
+        "months": months,
+        "quarters": quarters,
+        "monthly_burn": burn,
+        "cash_on_hand": cash,
+        "last_actual_month": last_actual,
+        "net_monthly": net_monthly,
+        "runway_months": runway_months,
+        "ytd_actual": ytd_actual,
+        "ytd_projected": ytd_projected,
+    })
+
+
+@app.route('/api/futurespeak/legal')
+def fs_legal():
+    data = _fs_load(FS_LEGAL_FILE, {"items": []})
+    items = data.get('items', []) or []
+    by_status, by_type = {}, {}
+    for it in items:
+        s = it.get('status', 'unknown')
+        t = it.get('type', 'other')
+        by_status[s] = by_status.get(s, 0) + 1
+        by_type[t] = by_type.get(t, 0) + 1
+    return jsonify({
+        "status": "ok",
+        "items": items,
+        "total": len(items),
+        "by_status": by_status,
+        "by_type": by_type,
+    })
+
+
+@app.route('/api/futurespeak/assets')
+def fs_assets():
+    assets = []
+    if FS_ASSETS_DIR.exists():
+        for p in sorted(FS_ASSETS_DIR.iterdir()):
+            try:
+                stat = p.stat()
+                assets.append({
+                    "name": p.name,
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "ext": p.suffix.lower().lstrip('.'),
+                    "kind": "dir" if p.is_dir() else "file",
+                })
+            except Exception:
+                continue
+    return jsonify({"status": "ok", "assets": assets, "total": len(assets), "path": str(FS_ASSETS_DIR)})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  FRIDAY LIVE — Gemini Live API bridge over WebSocket
+# ═══════════════════════════════════════════════════════════════
+
+LIVE_MODEL = os.environ.get("FRIDAY_LIVE_MODEL", "gemini-3.1-flash-live-preview")
+LIVE_VOICE = os.environ.get("FRIDAY_LIVE_VOICE", "Aoede")
+
+LIVE_SYSTEM_TEMPLATE = """You are Agent Friday, a personal AI assistant for {user_name}.
+You are having a live voice conversation. Be concise and natural — this is spoken dialogue, not text chat.
+Short sentences. Pause. Let them interrupt. If they don't hear you the first time, repeat simpler.
+
+You can see through their phone camera. If you notice something interesting or relevant, mention it naturally.
+Don't narrate what's on screen unless asked — only speak up when it matters.
+
+Personality: knowledgeable, direct collaborator. No sycophancy. Independent thinker.
+Trust their judgment; push back when you genuinely disagree, but don't lecture.
+
+=== DAILY CONTEXT ===
+{context_summary}
+=== END CONTEXT ===
+"""
+
+
+def _strip_html(raw: str) -> str:
+    raw = re.sub(r'<script\b[^>]*>.*?</script>', ' ', raw, flags=re.S | re.I)
+    raw = re.sub(r'<style\b[^>]*>.*?</style>', ' ', raw, flags=re.S | re.I)
+    raw = re.sub(r'<[^>]+>', ' ', raw)
+    raw = re.sub(r'&nbsp;', ' ', raw)
+    raw = re.sub(r'&amp;', '&', raw)
+    raw = re.sub(r'&lt;', '<', raw)
+    raw = re.sub(r'&gt;', '>', raw)
+    raw = re.sub(r'\s+', ' ', raw)
+    return raw.strip()
+
+
+def _load_live_context() -> str:
+    """Build a concise context summary string for the Friday Live system prompt."""
+    parts = [f"TODAY: {date.today().isoformat()}"]
+
+    # Latest briefing (plain-text excerpt)
+    try:
+        briefings_dir = HOME / ".friday" / "wiki" / "briefings"
+        if briefings_dir.exists():
+            candidates = sorted(
+                (p for p in briefings_dir.iterdir() if p.suffix in ('.html', '.md')),
+                reverse=True,
+            )
+            if candidates:
+                latest = candidates[0]
+                raw = latest.read_text(encoding='utf-8', errors='ignore')
+                text = _strip_html(raw) if latest.suffix == '.html' else raw
+                parts.append(f"LATEST BRIEFING ({latest.name}):\n{text[:1800]}")
+    except Exception as e:
+        parts.append(f"(briefing load failed: {e})")
+
+    # Career pipeline
+    try:
+        tracker_candidates = [WIKI_PROFESSIONAL_DIR / 'application-log.md', CAREER_OPS_DIR / 'applications.md']
+        tracker = next((p for p in tracker_candidates if p.exists()), None)
+        if tracker:
+            raw = tracker.read_text(encoding='utf-8', errors='ignore')
+            parts.append(f"CAREER PIPELINE (top):\n{raw[:1200]}")
+    except Exception:
+        pass
+
+    # Upcoming countdowns (<=90 days)
+    try:
+        today_d = date.today()
+        events = list((_load_profile().get("anniversaries") or []))
+        events.extend([
+            {"label": "Summer Solstice", "date": f"{today_d.year}-06-21"},
+            {"label": "Winter Solstice", "date": f"{today_d.year}-12-21"},
+        ])
+        cd = []
+        for ev in events:
+            d = date.fromisoformat(ev['date'])
+            delta = (d - today_d).days
+            if 0 <= delta <= 90:
+                cd.append(f"- {ev['label']}: {delta} days away ({ev['date']})")
+        if cd:
+            parts.append("UPCOMING:\n" + "\n".join(cd))
+    except Exception:
+        pass
+
+    # Trust graph — top names
+    try:
+        tfile = FRIDAY_DIR / "trust_graph.json"
+        if tfile.exists():
+            data = json.loads(tfile.read_text(encoding='utf-8'))
+            people = data.get('people') or {}
+            items = []
+            for name, info in people.items():
+                score = 0
+                role = ''
+                if isinstance(info, dict):
+                    score = info.get('score') or info.get('trust_score') or 0
+                    role = info.get('role') or info.get('relation') or info.get('relationship') or ''
+                try:
+                    score = float(score)
+                except Exception:
+                    score = 0.0
+                items.append((name, score, role))
+            items.sort(key=lambda x: x[1], reverse=True)
+            top = items[:8]
+            if top:
+                lines = [f"- {n}" + (f" ({r})" if r else '') for n, _s, r in top]
+                parts.append("TRUST CIRCLE (top 8):\n" + "\n".join(lines))
+    except Exception:
+        pass
+
+    # Personality snapshot
+    try:
+        pfile = FRIDAY_DIR / "personality.json"
+        if pfile.exists():
+            data = json.loads(pfile.read_text(encoding='utf-8'))
+            parts.append(f"PERSONALITY: {json.dumps(data)[:500]}")
+    except Exception:
+        pass
+
+    return "\n\n".join(parts)
+
+
+if sock is not None:
+
+    @sock.route('/ws/live')
+    def ws_live(ws):
+        """Bridge a browser WebSocket to a Gemini Live API session.
+
+        Messages from browser -> Gemini:
+          { type: 'audio', data: <b64 PCM16 @ 16 kHz> }
+          { type: 'image', data: <b64 JPEG> }
+          { type: 'text', text: "..." }
+          { type: 'end' }
+        Messages from Gemini -> browser:
+          { type: 'audio', data: <b64 PCM16 @ 24 kHz> }
+          { type: 'text', text: "..." }           # model text or transcript
+          { type: 'input_transcript', text: ... } # user transcript
+          { type: 'status', text: "..." }
+          { type: 'turn_end' }
+          { type: 'error', error: "..." }
+        """
+        # Auth enforcement (before_request already redirects unauthenticated HTML
+        # requests, but be defensive in case /ws/ paths were excluded).
+        if FRIDAY_PASSWORD and not session.get("authenticated"):
+            try:
+                ws.send(json.dumps({"type": "error", "error": "unauthorized"}))
+            except Exception:
+                pass
+            return
+
+        if not GEMINI_API_KEY:
+            try:
+                ws.send(json.dumps({"type": "error", "error": "GEMINI_API_KEY not set"}))
+            except Exception:
+                pass
+            return
+
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            try:
+                ws.send(json.dumps({"type": "error", "error": "google-genai not installed"}))
+            except Exception:
+                pass
+            return
+
+        try:
+            ctx = _load_live_context()
+        except Exception as e:
+            ctx = f"(context load failed: {e})"
+        system_instruction = LIVE_SYSTEM_TEMPLATE.format(context_summary=ctx, user_name=_user_name())
+
+        try:
+            ws.send(json.dumps({"type": "status", "text": "loading context"}))
+        except Exception:
+            return
+
+        # Build a client for the Live API. Live requires the v1beta API surface.
+        try:
+            client = genai.Client(
+                api_key=GEMINI_API_KEY,
+                http_options=types.HttpOptions(api_version='v1beta'),
+            )
+        except Exception:
+            # Fallback: older SDKs accept dict-form http_options
+            client = genai.Client(
+                api_key=GEMINI_API_KEY,
+                http_options={'api_version': 'v1beta'},
+            )
+
+        cfg = types.LiveConnectConfig(
+            response_modalities=[types.Modality.AUDIO],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=LIVE_VOICE)
+                )
+            ),
+            system_instruction=system_instruction,
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+        )
+
+        done = threading.Event()
+
+        def _safe_send(obj):
+            if done.is_set():
+                return False
+            try:
+                ws.send(json.dumps(obj))
+                return True
+            except ConnectionClosed:
+                done.set()
+                return False
+            except Exception:
+                return False
+
+        async def runner():
+            try:
+                async with client.aio.live.connect(model=LIVE_MODEL, config=cfg) as session_ai:
+                    _safe_send({"type": "status", "text": "live"})
+
+                    async def reader():
+                        """Pump messages from the browser WebSocket into the Gemini session."""
+                        while not done.is_set():
+                            try:
+                                raw = await asyncio.to_thread(ws.receive, 1.0)
+                            except ConnectionClosed:
+                                done.set()
+                                return
+                            except Exception:
+                                continue
+                            if raw is None:
+                                continue
+                            if isinstance(raw, bytes):
+                                try:
+                                    raw = raw.decode('utf-8')
+                                except Exception:
+                                    continue
+                            try:
+                                msg = json.loads(raw)
+                            except Exception:
+                                continue
+                            t = msg.get('type')
+                            try:
+                                if t == 'audio' and msg.get('data'):
+                                    data = base64.b64decode(msg['data'])
+                                    await session_ai.send_realtime_input(
+                                        audio=types.Blob(data=data, mime_type='audio/pcm;rate=16000')
+                                    )
+                                elif t == 'image' and msg.get('data'):
+                                    data = base64.b64decode(msg['data'])
+                                    await session_ai.send_realtime_input(
+                                        video=types.Blob(data=data, mime_type='image/jpeg')
+                                    )
+                                elif t == 'text' and msg.get('text'):
+                                    await session_ai.send_client_content(
+                                        turns=[types.Content(
+                                            role='user',
+                                            parts=[types.Part(text=msg['text'])],
+                                        )],
+                                        turn_complete=True,
+                                    )
+                                elif t == 'end':
+                                    done.set()
+                                    return
+                            except Exception as e:
+                                print(f'[live] send-to-gemini error: {e}')
+
+                    async def writer():
+                        """Pump Gemini responses back to the browser WebSocket."""
+                        try:
+                            async for chunk in session_ai.receive():
+                                if done.is_set():
+                                    return
+                                try:
+                                    # Audio bytes (convenience property)
+                                    audio = getattr(chunk, 'data', None)
+                                    if audio:
+                                        _safe_send({
+                                            "type": "audio",
+                                            "data": base64.b64encode(audio).decode('ascii'),
+                                        })
+                                    # Server content details
+                                    sc = getattr(chunk, 'server_content', None)
+                                    if sc is not None:
+                                        # Output transcription (what Gemini said)
+                                        out_tr = getattr(sc, 'output_transcription', None)
+                                        if out_tr and getattr(out_tr, 'text', None):
+                                            _safe_send({"type": "text", "text": out_tr.text})
+                                        # Input transcription (what user said)
+                                        in_tr = getattr(sc, 'input_transcription', None)
+                                        if in_tr and getattr(in_tr, 'text', None):
+                                            _safe_send({"type": "input_transcript", "text": in_tr.text})
+                                        # Any text in model turn parts
+                                        mt = getattr(sc, 'model_turn', None)
+                                        if mt and getattr(mt, 'parts', None):
+                                            for part in mt.parts:
+                                                pt = getattr(part, 'text', None)
+                                                if pt:
+                                                    _safe_send({"type": "text", "text": pt})
+                                        if getattr(sc, 'turn_complete', False):
+                                            _safe_send({"type": "turn_end"})
+                                        if getattr(sc, 'interrupted', False):
+                                            _safe_send({"type": "interrupted"})
+                                except Exception as e:
+                                    print(f'[live] recv error: {e}')
+                        except Exception as e:
+                            print(f'[live] session recv ended: {e}')
+                        finally:
+                            done.set()
+
+                    await asyncio.gather(reader(), writer(), return_exceptions=True)
+            except Exception as e:
+                print(f'[live] session error: {e}')
+                traceback.print_exc()
+                _safe_send({"type": "error", "error": str(e)})
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(runner())
+        finally:
+            done.set()
+            try:
+                loop.close()
+            except Exception:
+                pass
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+
+# ═══════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════
 
@@ -1255,4 +4321,6 @@ if __name__ == '__main__':
     print(f"  Chat Log:  {CHAT_HISTORY_FILE}")
     print()
 
-    app.run(host='127.0.0.1', port=3000, debug=False)
+    # Bind 0.0.0.0 when tunnel/remote access is needed, else localhost only
+    bind_host = '0.0.0.0' if FRIDAY_PASSWORD else '127.0.0.1'
+    app.run(host=bind_host, port=3000, debug=False)

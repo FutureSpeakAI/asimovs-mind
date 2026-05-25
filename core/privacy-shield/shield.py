@@ -379,7 +379,7 @@ def _find_names(text: str) -> list[tuple[int, int, str]]:
     watchlist = _load_watchlist()
     if not watchlist:
         return []
-    # Sort by length descending so longer names match first (e.g. "Stephen C. Webster" before "Libby")
+    # Sort by length descending so longer names match first (e.g. "Jane Smith Doe" before "Jane")
     sorted_names = sorted(watchlist, key=len, reverse=True)
     pattern = re.compile(
         r'(?i)\b(' + '|'.join(re.escape(name) for name in sorted_names) + r')\b'
