@@ -118,7 +118,7 @@ class TestSSN:
 
     def test_no_false_positive_on_phone(self):
         """SSN pattern should not match phone numbers."""
-        text = "Call (512) 814-7609 for details."
+        text = "Call (512) 555-0147 for details."
         matches = scan_text(text, categories=[PIICategory.SSN], allowlist=set())
         assert not has_category(matches, PIICategory.SSN)
 
@@ -181,17 +181,17 @@ class TestCreditCard:
 
 class TestPhone:
     def test_parentheses_format(self):
-        matches = scan_text("Call (512) 814-7609 today.", allowlist=set())
+        matches = scan_text("Call (512) 555-0147 today.", allowlist=set())
         assert has_category(matches, PIICategory.PHONE)
         phone_matches = get_by_category(matches, PIICategory.PHONE)
-        assert "(512) 814-7609" in phone_matches[0].original
+        assert "(512) 555-0147" in phone_matches[0].original
 
     def test_dashed_format(self):
-        matches = scan_text("Phone: 512-814-7609", allowlist=set())
+        matches = scan_text("Phone: 512-555-0147", allowlist=set())
         assert has_category(matches, PIICategory.PHONE)
 
     def test_dotted_format(self):
-        matches = scan_text("Phone: 512.814.7609", allowlist=set())
+        matches = scan_text("Phone: 512.555.0147", allowlist=set())
         assert has_category(matches, PIICategory.PHONE)
 
 
@@ -577,7 +577,7 @@ class TestRoundTrip:
         original = (
             "Name: John Doe\n"
             "SSN: 123-45-6789\n"
-            "Phone: (512) 814-7609\n"
+            "Phone: (512) 555-0147\n"
             "Email: test@example.com\n"
             "Takes metformin daily.\n"
             "Passport number: AB1234567\n"
@@ -600,7 +600,7 @@ class TestRoundTrip:
 class TestMixedContent:
     def test_multiple_pii_types(self):
         text = (
-            "Contact me at (512) 814-7609 or test@example.com. "
+            "Contact me at (512) 555-0147 or test@example.com. "
             "My SSN is 123-45-6789. I live at 456 Main Street, Austin TX 78701."
         )
         matches = scan_text(text, allowlist=set())
@@ -613,7 +613,7 @@ class TestMixedContent:
     def test_paragraph_with_pii(self):
         text = (
             "Dear Dr. Smith, I am writing to confirm my appointment. "
-            "You can reach me at (512) 814-7609 or email test@example.com. "
+            "You can reach me at (512) 555-0147 or email test@example.com. "
             "My insurance ID is on file. I currently take metformin and lisinopril. "
             "Please send documents to 13304 Slow Poke Drive, Austin TX 78727. "
             "My SSN for billing is 123-45-6789."
@@ -683,14 +683,14 @@ class TestEdgeCases:
 
     def test_repeated_pii(self):
         """Same PII appearing multiple times should be caught each time."""
-        text = "Call (512) 814-7609 or (512) 814-7609."
+        text = "Call (512) 555-0147 or (512) 555-0147."
         matches = scan_text(text, categories=[PIICategory.PHONE], allowlist=set())
         phones = get_by_category(matches, PIICategory.PHONE)
         assert len(phones) == 2
 
     def test_pii_at_boundaries(self):
         """PII at start and end of text."""
-        text = "123-45-6789 is my SSN and call (512) 814-7609"
+        text = "123-45-6789 is my SSN and call (512) 555-0147"
         matches = scan_text(text, allowlist=set())
         assert has_category(matches, PIICategory.SSN)
         assert has_category(matches, PIICategory.PHONE)
@@ -708,7 +708,7 @@ class TestCategorySpecificScan:
         assert matches[0].category == PIICategory.EMAIL
 
     def test_scan_only_phones(self):
-        text = "Call (512) 814-7609, email test@example.com"
+        text = "Call (512) 555-0147, email test@example.com"
         matches = scan_text(text, categories=[PIICategory.PHONE], allowlist=set())
         assert len(matches) == 1
         assert matches[0].category == PIICategory.PHONE

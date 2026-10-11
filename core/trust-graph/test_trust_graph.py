@@ -61,17 +61,17 @@ class TestPersonManagement:
 
     def test_add_person_with_aliases(self):
         g = TrustGraph()
-        node = g.add_person("Jamie Chen", aliases=["JJ", "Janet"])
+        node = g.add_person("Jamie Chen", aliases=["JJ", "Jamie"])
         assert "JJ" in node.aliases
-        assert "Janet" in node.aliases
+        assert "Jamie" in node.aliases
 
     def test_add_duplicate_merges_aliases(self):
         g = TrustGraph()
         g.add_person("Jamie Chen", aliases=["JJ"])
-        node = g.add_person("Jamie Chen", aliases=["Janet"])
+        node = g.add_person("Jamie Chen", aliases=["Jamie"])
         assert g.people_count == 1
         assert "JJ" in node.aliases
-        assert "Janet" in node.aliases
+        assert "Jamie" in node.aliases
 
     def test_default_scores(self):
         g = TrustGraph()
@@ -88,7 +88,7 @@ class TestPersonManagement:
         g = TrustGraph()
         g.add_person("Jamie Chen")
         assert g.get_person("Jamie Chen") is not None
-        assert g.get_person("janet jay") is not None
+        assert g.get_person("jamie chen") is not None
         assert g.get_person("Unknown") is None
 
 
@@ -112,20 +112,20 @@ class TestFuzzyResolution:
     def test_normalized_name_match(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        result = g.find_person("janet jay")
+        result = g.find_person("jamie chen")
         assert result is not None
         assert result.name == "Jamie Chen"
 
     def test_normalized_extra_spaces(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        result = g.find_person("  janet   jay  ")
+        result = g.find_person("  jamie   chen  ")
         assert result is not None
 
     def test_levenshtein_match(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        result = g.find_person("Janet Jey")
+        result = g.find_person("Jamie Chem")
         assert result is not None
         assert result.name == "Jamie Chen"
 
@@ -139,16 +139,16 @@ class TestFuzzyResolution:
     def test_first_name_unique_match(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        g.add_person("Robb DeFilippis")
-        result = g.find_person("Janet")
+        g.add_person("Morgan Diaz")
+        result = g.find_person("Jamie")
         assert result is not None
         assert result.name == "Jamie Chen"
 
     def test_first_name_ambiguous(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        g.add_person("Janet Smith")
-        result = g.find_person("Janet")
+        g.add_person("Jamie Smith")
+        result = g.find_person("Jamie")
         assert result is None
 
     def test_not_found(self):
@@ -462,7 +462,7 @@ class TestEdgeCases:
     def test_duplicate_names_different_case(self):
         g = TrustGraph()
         g.add_person("Jamie Chen")
-        g.add_person("janet jay")
+        g.add_person("jamie chen")
         assert g.people_count == 1
 
     def test_evidence_type_from_string(self):
@@ -479,7 +479,7 @@ class TestEdgeCases:
 class TestRealPeopleScenario:
     def _build_graph(self):
         g = TrustGraph()
-        g.add_person("Jamie Chen", aliases=["JJ", "Janet"])
+        g.add_person("Jamie Chen", aliases=["JJ", "Jamie"])
         for _ in range(4):
             g.add_evidence("Jamie Chen", _make_evidence(EvidenceType.PROMISE_KEPT, 0.9))
         g.add_evidence("Jamie Chen", _make_evidence(EvidenceType.ACCURATE_INFO, 0.85))
@@ -487,14 +487,14 @@ class TestRealPeopleScenario:
         g.add_evidence("Jamie Chen", _make_evidence(EvidenceType.TIMELY_RESPONSE, 0.8))
         g.add_evidence("Jamie Chen", _make_evidence(EvidenceType.DOMAIN_EXPERTISE_SHOWN, 0.9, domain="leadership"))
 
-        g.add_person("Robb DeFilippis", aliases=["Robb", "RD"])
-        g.add_evidence("Robb DeFilippis", _make_evidence(EvidenceType.PROMISE_KEPT, 0.7))
-        g.add_evidence("Robb DeFilippis", _make_evidence(EvidenceType.PROMISE_KEPT, 0.8))
-        g.add_evidence("Robb DeFilippis", _make_evidence(EvidenceType.ACCURATE_INFO, 0.7))
-        g.add_evidence("Robb DeFilippis", _make_evidence(EvidenceType.LATE_RESPONSE, 0.5))
-        g.add_evidence("Robb DeFilippis", _make_evidence(EvidenceType.DOMAIN_EXPERTISE_SHOWN, 0.8, domain="finance"))
+        g.add_person("Morgan Diaz", aliases=["Morgan", "MD"])
+        g.add_evidence("Morgan Diaz", _make_evidence(EvidenceType.PROMISE_KEPT, 0.7))
+        g.add_evidence("Morgan Diaz", _make_evidence(EvidenceType.PROMISE_KEPT, 0.8))
+        g.add_evidence("Morgan Diaz", _make_evidence(EvidenceType.ACCURATE_INFO, 0.7))
+        g.add_evidence("Morgan Diaz", _make_evidence(EvidenceType.LATE_RESPONSE, 0.5))
+        g.add_evidence("Morgan Diaz", _make_evidence(EvidenceType.DOMAIN_EXPERTISE_SHOWN, 0.8, domain="finance"))
 
-        g.add_person("Taylor Nguyen-Park", aliases=["Elisabeth", "EDW"])
+        g.add_person("Taylor Nguyen-Park", aliases=["Taylor", "TNP"])
         g.add_evidence("Taylor Nguyen-Park", _make_evidence(EvidenceType.PROMISE_BROKEN, 0.7))
         g.add_evidence("Taylor Nguyen-Park", _make_evidence(EvidenceType.PROMISE_BROKEN, 0.6))
         g.add_evidence("Taylor Nguyen-Park", _make_evidence(EvidenceType.INACCURATE_INFO, 0.8))
@@ -508,27 +508,27 @@ class TestRealPeopleScenario:
         assert people[0].name == "Jamie Chen"
         assert people[-1].name == "Taylor Nguyen-Park"
 
-    def test_janet_high_reliability(self):
+    def test_trusted_high_reliability(self):
         g = self._build_graph()
         assert g.get_score("Jamie Chen", TrustDimension.RELIABILITY) > 0.65
 
-    def test_elisabeth_low_reliability(self):
+    def test_unreliable_low_reliability(self):
         g = self._build_graph()
         assert g.get_score("Taylor Nguyen-Park", TrustDimension.RELIABILITY) < DEFAULT_SCORE
 
-    def test_fuzzy_find_robb(self):
+    def test_fuzzy_find_alias(self):
         g = self._build_graph()
-        assert g.find_person("RD").name == "Robb DeFilippis"
-        assert g.find_person("Robb").name == "Robb DeFilippis"
+        assert g.find_person("MD").name == "Morgan Diaz"
+        assert g.find_person("Morgan").name == "Morgan Diaz"
 
-    def test_fuzzy_find_elisabeth_alias(self):
+    def test_fuzzy_find_initials_alias(self):
         g = self._build_graph()
-        assert g.find_person("EDW").name == "Taylor Nguyen-Park"
+        assert g.find_person("TNP").name == "Taylor Nguyen-Park"
 
     def test_domain_tracking(self):
         g = self._build_graph()
         assert "leadership" in g.find_person("Jamie Chen").domains
-        assert "finance" in g.find_person("Robb DeFilippis").domains
+        assert "finance" in g.find_person("Morgan Diaz").domains
 
     def test_persistence_roundtrip(self):
         g = self._build_graph()
@@ -546,7 +546,7 @@ class TestRealPeopleScenario:
 
     def test_overall_scores_differ(self):
         g = self._build_graph()
-        janet = g.get_score("Jamie Chen")
-        robb = g.get_score("Robb DeFilippis")
-        elisabeth = g.get_score("Taylor Nguyen-Park")
-        assert janet > robb > elisabeth
+        trusted = g.get_score("Jamie Chen")
+        middle = g.get_score("Morgan Diaz")
+        unreliable = g.get_score("Taylor Nguyen-Park")
+        assert trusted > middle > unreliable

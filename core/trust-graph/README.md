@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 ```bash
 # Add a person
-python cli.py add "Jamie Chen" -a JJ -a Janet
+python cli.py add "Jamie Chen" -a JJ -a Jamie
 
 # Record evidence
 python cli.py evidence "Jamie Chen" promise_kept 0.9

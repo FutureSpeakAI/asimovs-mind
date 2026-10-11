@@ -11,7 +11,7 @@ A Python module that detects and masks personally identifiable information (PII)
 | SSN | 123-45-6789 |
 | Credit Card | 4532-0151-1283-0366 (Luhn-validated) |
 | Bank Account | Account/routing numbers |
-| Phone | (512) 814-7609, 512-814-7609 |
+| Phone | (512) 555-0147, 512-555-0147 |
 | Email | user@example.com |
 | Address | 123 Main Street, Austin TX 78701 |
 | Medical | Medications, diagnoses, conditions |
@@ -46,7 +46,7 @@ from shield import scan_text, scrub_text, unscrub_text, PIICategory
 matches = scan_text("My SSN is 123-45-6789")
 
 # Scrub and get matches for later restoration
-scrubbed, matches = scrub_text("Call (512) 814-7609")
+scrubbed, matches = scrub_text("Call (512) 555-0147")
 # scrubbed = "Call [PHONE:a3f8b2c1e4d5f607]"
 
 # Restore original text

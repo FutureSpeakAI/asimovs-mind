@@ -214,7 +214,7 @@ _BANK_PATTERN = re.compile(
 # Phone numbers: US formats
 _PHONE_PATTERN = re.compile(
     r'(?<!\d)'                       # not preceded by digit
-    r'(\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4})'  # (512) 814-7609 or 512-814-7609
+    r'(\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4})'  # (512) 555-0147 or 512-555-0147
     r'(?!\d)'                        # not followed by digit
 )
 

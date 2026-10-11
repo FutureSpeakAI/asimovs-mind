@@ -1,3 +1,5 @@
+> **The desktop app in `interfaces/desktop` is superseded by [Agent-Friday](https://github.com/FutureSpeakAI/Agent-Friday). The `mcp/friday-core` server here is still maintained in place.**
+
 # Asimov's Mind — v4: Friday Desktop
 
 ### A governed AI runtime with a holographic desktop, an encrypted memory, and a personality that grows up.

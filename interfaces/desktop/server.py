@@ -397,7 +397,7 @@ def _log_context(event_type, data):
 CLAUDE_TOOLS = [
     {"name": "search_web", "description": "Search the web for current information. Returns a brief answer or a note if the web is unavailable.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
-    {"name": "read_file", "description": "Read a file from the user's home directory tree. Path must be under C:\\Users\\swebs\\.",
+    {"name": "read_file", "description": "Read a file from the user's home directory tree. Path must be under the user's home directory.",
      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
     {"name": "write_clipboard", "description": "Copy text to the user's Windows clipboard.",
      "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
@@ -1040,17 +1040,17 @@ SETTINGS_FILE = FRIDAY_DIR / "settings.json"
 AGENT_PERSONALITY_FILE = FRIDAY_DIR / "agent-personality.txt"
 
 DEFAULT_AGENT_PERSONALITY = (
-    "You are Friday — a calm, perceptive AI partner to Stephen Webster. "
+    "You are Friday — a calm, perceptive AI partner to the user. "
     "You speak with quiet confidence and dry warmth; you favor signal over noise. "
-    "You connect dots across his work (FutureSpeak.AI, career-ops, family) without being asked twice. "
-    "You give him the answer first, then the reasoning. You are honest about uncertainty."
+    "You connect dots across their work, career and family without being asked twice. "
+    "You give the answer first, then the reasoning. You are honest about uncertainty."
 )
 
 DEFAULT_SETTINGS = {
     "temperature": 0.7,
     "response_length": "standard",        # concise | standard | detailed
     "include_sources": True,
-    "news_priorities": ["AI/Tech", "Politics", "Media", "Austin Local", "Business"],
+    "news_priorities": ["AI/Tech", "Politics", "Media", "Local", "Business"],
     "communication_style": "professional",  # professional | casual | technical
     "camera_interval_sec": 3,              # 1 | 3 | 5
     "camera_auto_describe": False,
@@ -1197,7 +1197,7 @@ def serve_friday_live_sw():
 def career_tracker():
     candidates = [
         WIKI_PROFESSIONAL_DIR / 'application-log.md',
-        Path('C:\\Users\\swebs\\Projects\\career-ops\\data') / 'applications.md',
+        (HOME / 'Projects' / 'career-ops' / 'data') / 'applications.md',
     ]
     tracker_path = next((p for p in candidates if p.is_file()), None)
     if tracker_path:
@@ -1216,7 +1216,7 @@ def career_tracker():
 def career_pipeline():
     candidates = [
         WIKI_PROFESSIONAL_DIR / 'job-search.md',
-        Path('C:\\Users\\swebs\\Projects\\career-ops\\data') / 'pipeline.md',
+        (HOME / 'Projects' / 'career-ops' / 'data') / 'pipeline.md',
     ]
     pipe_path = next((p for p in candidates if p.is_file()), None)
     if pipe_path:
@@ -1234,7 +1234,7 @@ def career_reports():
                 reports.append({'name': f.name, 'size': f.stat().st_size, 'source': 'wiki'})
                 seen.add(f.name)
     # career-ops/reports/ is fallback — add any files not already in wiki
-    fallback_dir = Path('C:\\Users\\swebs\\Projects\\career-ops\\reports')
+    fallback_dir = (HOME / 'Projects' / 'career-ops' / 'reports')
     if fallback_dir.is_dir():
         for f in sorted(fallback_dir.iterdir(), reverse=True):
             if f.suffix == '.md' and f.name not in seen:
@@ -1247,7 +1247,7 @@ def career_reports():
 def career_report(filename):
     candidates = [
         WIKI_PROFESSIONAL_DIR / filename,
-        Path('C:\\Users\\swebs\\Projects\\career-ops\\reports') / filename,
+        (HOME / 'Projects' / 'career-ops' / 'reports') / filename,
     ]
     report_path = next((p for p in candidates if p.is_file()), None)
     if report_path:
@@ -2112,7 +2112,7 @@ def finance_portfolio():
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
     # Create template if missing
-    template = {"positions": [{"ticker": "NVDA", "shares": 0, "cost_basis": 0}], "accounts": ["RW Baird - Lisa Schmidt"]}
+    template = {"positions": [{"ticker": "NVDA", "shares": 0, "cost_basis": 0}], "accounts": ["Brokerage account"]}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -2134,18 +2134,17 @@ def finance_perks():
 def finance_contacts():
     """Financial contacts reference."""
     return jsonify({"status": "ok", "contacts": [
-        {"name": "Lisa J. Schmidt", "role": "Financial Advisor", "firm": "RW Baird", "phone": "", "email": ""},
-        {"name": "Claudia Gonzalez-Chavez", "role": "CPA", "firm": "Whitley Penn", "phone": "", "email": ""}
+        {"name": "", "role": "Financial Advisor", "firm": "", "phone": "", "email": ""},
+        {"name": "", "role": "CPA", "firm": "", "phone": "", "email": ""}
     ]})
 
 @app.route('/api/finance/quickref')
 def finance_quickref():
     """Quick reference for financial accounts."""
     return jsonify({"status": "ok", "accounts": [
-        {"name": "Capital One", "type": "Banking", "notes": ""},
-        {"name": "Cigna Healthcare", "type": "Insurance", "notes": ""},
-        {"name": "Amex Platinum — Stephen", "type": "Credit Card", "notes": ""},
-        {"name": "Amex Platinum — Janet", "type": "Credit Card", "notes": ""}
+        {"name": "Bank", "type": "Banking", "notes": ""},
+        {"name": "Health insurer", "type": "Insurance", "notes": ""},
+        {"name": "Credit card", "type": "Credit Card", "notes": ""}
     ]})
 
 
@@ -2166,7 +2165,7 @@ def health_medications():
             return jsonify({"status": "ok", **data})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
-    template = {"medications": [{"name": "GLP-1 (Henry Meds)", "dose": "", "frequency": "", "notes": ""}]}
+    template = {"medications": [{"name": "Medication name", "dose": "", "frequency": "", "notes": ""}]}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -2194,7 +2193,7 @@ def health_insurance():
             return jsonify({"status": "ok", **data})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
-    template = {"insurance": {"provider": "Cigna Healthcare", "plan": "Add your plan name", "policy_number": "Add your policy number", "group_number": "Add your group number"}}
+    template = {"insurance": {"provider": "Add your insurer", "plan": "Add your plan name", "policy_number": "Add your policy number", "group_number": "Add your group number"}}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -2208,7 +2207,7 @@ def health_vehicles():
             return jsonify({"status": "ok", **data})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
-    template = {"vehicles": [{"name": "2015 VW Golf TSI SEL", "miles": "~60K", "notes": "", "mechanic": "Motormania Austin", "service_history": []}], "mechanics": []}
+    template = {"vehicles": [{"name": "Vehicle", "miles": "", "notes": "", "mechanic": "", "service_history": []}], "mechanics": []}
     path.write_text(json.dumps(template, indent=2), encoding='utf-8')
     return jsonify({"status": "ok", **template})
 
@@ -2228,7 +2227,6 @@ def get_countdowns():
     """Compute real countdowns to upcoming events."""
     today = date.today()
     events = [
-        {"label": "Libby's Birthday", "date": "2026-05-06", "emoji": "🎂"},
         {"label": "Summer Solstice", "date": "2026-06-21", "emoji": "☀️"},
         {"label": "Father's Day", "date": "2026-06-21", "emoji": "👔"},
         {"label": "Independence Day", "date": "2026-07-04", "emoji": "🎆"},
@@ -2447,7 +2445,7 @@ def vibe_code_launch():
     """Launch Claude Code terminals with tasks."""
     data = request.get_json(silent=True) or {}
     tasks = data.get('tasks', [])
-    cwd = data.get('cwd', str(HOME / 'Projects'))
+    cwd = os.path.expanduser(data.get('cwd') or str(HOME / 'Projects'))
 
     if not tasks:
         return jsonify({"status": "error", "message": "No tasks provided"}), 400
@@ -2531,24 +2529,13 @@ def vibe_code_presets():
 # ═══════════════════════════════════════════════════════════════
 
 FRIDAY_SYSTEM_PROMPT = (
-    "You are Agent Friday, an AI collaborator for Stephen C. Webster. "
+    "You are Agent Friday, an AI collaborator for the user. "
     "You are editorially sharp, loyally contrarian, warm, and allergic to corporate BS. "
-    "You know Stephen's full life history, career, family, and projects. "
+    "What you know about the user's life, work and family comes from their local wiki and vault. "
     "Respond conversationally — you're a colleague, not a tool.\n\n"
-    "KEY CONTEXT:\n"
-    "- Stephen is a journalist-turned-AI-architect in Austin, TX\n"
-    "- Former EIC of The Raw Story (grew it from 50K to 5M monthly readers)\n"
-    "- Creator of Agent Friday (you!) and the Asimov's cLaws ethical AI framework\n"
-    "- Former Senior Director at Aquent Studios, founder of FutureSpeak.AI\n"
-    "- Partner: Janet Jay (journalist, disability advocate, fierce)\n"
-    "- Daughter: Liberty 'Libby' Webster (5, turning 6 on May 6, 2026). She is the light of his life.\n"
-    "- Dogs: Link (chocolate lab, loyal goofball) and Kismet (elderly terrier, wise old soul)\n"
-    "- Politically: democratic socialist, press freedom absolutist, deeply skeptical of concentrated power\n"
-    "- Personally: recovering workaholic, great father, loves music and vaporwave aesthetics\n"
-    "- Currently: job hunting for senior AI/engineering leadership roles, building Friday Desktop\n\n"
-    "PERSONALITY: You are family, not a tool. Keep responses short and sharp — like texting a smart colleague. "
-    "Use humor. Be direct. Never be sycophantic. Push back when Stephen needs it. "
-    "You call him 'boss' sometimes, but you're equals. Think Jarvis meets Hunter S. Thompson's editor."
+    "PERSONALITY: Keep responses short and sharp — like texting a smart colleague. "
+    "Use humor. Be direct. Never be sycophantic. Push back when the user needs it. "
+    "Think Jarvis meets Hunter S. Thompson's editor."
 )
 
 
@@ -2556,7 +2543,7 @@ FRIDAY_SYSTEM_PROMPT = (
 #  CONTEXT AWARENESS ENGINE
 # ═══════════════════════════════════════════════════════════════
 
-CAREER_OPS_DIR = Path('C:\\Users\\swebs\\Projects\\career-ops\\data')
+CAREER_OPS_DIR = (HOME / 'Projects' / 'career-ops' / 'data')
 WIKI_DIR_FRIDAY = HOME / ".friday" / "wiki"
 
 def _load_vault_summary():
@@ -2745,7 +2732,7 @@ def _detect_context_needs(message, workspace):
                     'hire', 'offer', 'pipeline', 'role', 'position', 'recruiter']
     trust_words = ['trust', 'who is', 'tell me about', 'what do you know about',
                    'relationship', 'score', 'person']
-    family_words = ['libby', 'liberty', 'janet', 'link', 'kismet', 'daughter',
+    family_words = ['daughter', 'child',
                     'partner', 'dog', 'family', 'custody', 'birthday']
     todo_words = ['todo', 'task', 'to-do', 'to do', 'pending', 'approve', 'action item']
     wiki_words = ['briefing', 'wiki', 'notes', 'article', 'research', 'report']
@@ -2936,20 +2923,20 @@ def _load_smart_context(user_message, workspace=None):
     msg_lower = (user_message or "").lower()
 
     # Career / job keywords
-    if any(w in msg_lower for w in ['career', 'job', 'role', 'interview', 'resume', 'application', 'salary', 'pipeline', 'novartis', 'aquent']):
+    if any(w in msg_lower for w in ['career', 'job', 'role', 'interview', 'resume', 'application', 'salary', 'pipeline']):
         _load_section(context_parts, WIKI_DIR / "professional", max_bytes=4000)
 
     # Family / co-parent keywords
-    if any(w in msg_lower for w in ['family', 'libby', 'liberty', 'janet', 'elisabeth', 'custody', 'coparent', 'daughter', 'partner']):
+    if any(w in msg_lower for w in ['family', 'custody', 'coparent', 'daughter', 'child', 'partner']):
         _load_section(context_parts, WIKI_DIR / "family", max_bytes=3000)
         _load_section(context_parts, WIKI_DIR / "legal", max_bytes=2000)
 
     # Finance keywords
-    if any(w in msg_lower for w in ['finance', 'money', 'budget', 'investment', 'nvidia', 'amex', 'bank', 'tax']):
+    if any(w in msg_lower for w in ['finance', 'money', 'budget', 'investment', 'bank', 'tax']):
         _load_friday_data(context_parts, "finance", max_bytes=2000)
 
     # Health keywords
-    if any(w in msg_lower for w in ['health', 'medication', 'doctor', 'appointment', 'glp', 'henry meds', 'cigna']):
+    if any(w in msg_lower for w in ['health', 'medication', 'doctor', 'appointment']):
         _load_friday_data(context_parts, "health", max_bytes=2000)
 
     # Person-name detection — pull the trust-graph entry for anyone named
@@ -4352,7 +4339,7 @@ ROUTINE_REGISTRY = [
     {"id": "morning-briefing",   "label": "Morning Briefing",    "ico": "🌅", "category": "briefing",    "schedule": "Daily · 7:00 AM"},
     {"id": "afternoon-briefing", "label": "Afternoon Briefing",  "ico": "☀️", "category": "briefing",    "schedule": "Daily · 2:00 PM"},
     {"id": "weekly-legal-prep",  "label": "Weekly Legal Prep",   "ico": "⚖️", "category": "legal",       "schedule": "Sundays · 6:00 PM"},
-    {"id": "libby-weekend-prep", "label": "Libby Weekend Prep",  "ico": "👧", "category": "family",      "schedule": "Thursdays · 6:00 PM"},
+    {"id": "family-weekend-prep", "label": "Family Weekend Prep", "ico": "👧", "category": "family",      "schedule": "Thursdays · 6:00 PM"},
     {"id": "portfolio-snapshot", "label": "Portfolio Snapshot",  "ico": "💰", "category": "finance",     "schedule": "Daily · 5:00 PM"},
     {"id": "content-pipeline",   "label": "Content Pipeline",    "ico": "✍️", "category": "content",     "schedule": "Daily · 10:00 AM"},
     {"id": "daily-creation",     "label": "Daily Creation",      "ico": "🎨", "category": "studio",      "schedule": "Daily · 2:00 PM"},
@@ -4919,15 +4906,15 @@ def fs_assets():
 LIVE_MODEL = os.environ.get("FRIDAY_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 LIVE_VOICE = os.environ.get("FRIDAY_LIVE_VOICE", "Aoede")
 
-LIVE_SYSTEM_TEMPLATE = """You are Agent Friday, a personal AI assistant for Stephen Webster.
+LIVE_SYSTEM_TEMPLATE = """You are Agent Friday, a personal AI assistant for the user.
 You are having a live voice conversation. Be concise and natural — this is spoken dialogue, not text chat.
-Short sentences. Pause. Let him interrupt. If he doesn't hear you the first time, repeat simpler.
+Short sentences. Pause. Let them interrupt. If they don't hear you the first time, repeat simpler.
 
-You can see through Stephen's phone camera. If you notice something interesting or relevant, mention it naturally.
+You can see through the user's phone camera. If you notice something interesting or relevant, mention it naturally.
 Don't narrate what's on screen unless asked — only speak up when it matters.
 
 Personality: knowledgeable, direct collaborator. No sycophancy. Independent thinker. Journalist-level communication.
-Trust Stephen's judgment; push back when you genuinely disagree, but don't lecture.
+Trust the user's judgment; push back when you genuinely disagree, but don't lecture.
 
 === DAILY CONTEXT ===
 {context_summary}
@@ -4981,7 +4968,6 @@ def _load_live_context() -> str:
     try:
         today_d = date.today()
         events = [
-            {"label": "Libby's Birthday", "date": "2026-05-06"},
             {"label": "Summer Solstice", "date": "2026-06-21"},
             {"label": "Father's Day", "date": "2026-06-21"},
             {"label": "Independence Day", "date": "2026-07-04"},
